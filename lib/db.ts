@@ -104,7 +104,83 @@ export async function initializeDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       synced_at DATETIME
     );
+
+    CREATE TABLE IF NOT EXISTS companies (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      address TEXT,
+      cotwu_rate INTEGER DEFAULT 2,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS sections (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      FOREIGN KEY (company_id) REFERENCES companies(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS supervisor_sections (
+      supervisor_id TEXT NOT NULL,
+      section_id TEXT NOT NULL,
+      PRIMARY KEY (supervisor_id, section_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS leave_requests (
+      id TEXT PRIMARY KEY,
+      employee_id TEXT NOT NULL,
+      start_date DATE NOT NULL,
+      end_date DATE NOT NULL,
+      days INTEGER NOT NULL,
+      reason TEXT,
+      status TEXT CHECK(status IN ('pending','approved','denied')) DEFAULT 'pending',
+      submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      reviewed_by TEXT,
+      reviewed_at DATETIME,
+      review_note TEXT,
+      FOREIGN KEY (employee_id) REFERENCES employees(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS leave_balances (
+      id TEXT PRIMARY KEY,
+      employee_id TEXT NOT NULL,
+      year INTEGER NOT NULL,
+      allowed_days INTEGER DEFAULT 28,
+      used_days INTEGER DEFAULT 0,
+      UNIQUE(employee_id, year),
+      FOREIGN KEY (employee_id) REFERENCES employees(id)
+    );
   `);
+
+  await migrateDatabase();
+}
+
+export async function migrateDatabase() {
+  const employeeColumns = [
+    "ALTER TABLE employees ADD COLUMN company_id TEXT",
+    "ALTER TABLE employees ADD COLUMN section_id TEXT",
+    "ALTER TABLE employees ADD COLUMN deduct_nssf INTEGER DEFAULT 0",
+    "ALTER TABLE employees ADD COLUMN deduct_cotwu INTEGER DEFAULT 0",
+    "ALTER TABLE employees ADD COLUMN deduct_fadhila INTEGER DEFAULT 0",
+    "ALTER TABLE employees ADD COLUMN heslb_amount INTEGER DEFAULT 0",
+  ];
+
+  const payslipColumns = [
+    "ALTER TABLE payslips ADD COLUMN nssf_amount INTEGER DEFAULT 0",
+    "ALTER TABLE payslips ADD COLUMN cotwu_amount INTEGER DEFAULT 0",
+    "ALTER TABLE payslips ADD COLUMN fadhila_amount INTEGER DEFAULT 0",
+    "ALTER TABLE payslips ADD COLUMN heslb_amount INTEGER DEFAULT 0",
+    "ALTER TABLE payslips ADD COLUMN total_deductions INTEGER DEFAULT 0",
+    "ALTER TABLE payslips ADD COLUMN leave_days INTEGER DEFAULT 0",
+  ];
+
+  for (const sql of [...employeeColumns, ...payslipColumns]) {
+    try {
+      await db.execute(sql);
+    } catch {
+      // Silently ignore duplicate column errors
+    }
+  }
 }
 
 export async function seedDemoData() {
@@ -133,4 +209,8 @@ export async function seedDemoData() {
       ('emp-7', 'Eva Moshi', '+255712345007', 'casual', 'Ghala', 'user-sup-1', 15000, 0, 'none'),
       ('emp-8', 'Frank Kimani', '+255712345008', 'casual', 'Ghala', 'user-sup-1', 15000, 0, 'none');
   `);
+
+  await db.execute(
+    `INSERT OR IGNORE INTO companies (id, name, address) VALUES ('co-1', 'East African Spirit Ltd', 'Dar es Salaam, Tanzania')`
+  );
 }

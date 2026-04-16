@@ -179,9 +179,9 @@ export async function POST(request: NextRequest) {
     // Send SMS with login credentials
     const message =
       `Karibu TrustTrack! Jina: ${name}. ` +
-      `Ingia kwa nambari yako ya simu: ${phone}. ` +
-      `PIN yako ya siri: ${pin}. ` +
-      `Usishiriki PIN hii na mtu yeyote.`;
+      `Ingia kwa nambari yako: ${phone}. ` +
+      `PIN: ${pin}. Usishiriki PIN hii. ` +
+      `Ingia hapa: https://atwork.eastafricanspirit.co.tz/login`;
 
     const smsResult = await sendSMS(phone, message);
 

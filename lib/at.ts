@@ -151,5 +151,5 @@ export const smsTemplates = {
     `TrustTrack: Ombi lako la mkopo wa ${amount} limepokelewa. Utaarifiwa ukikubaliwa.`,
 
   newEmployeeCredentials: (name: string, phone: string, pin: string) =>
-    `Karibu TrustTrack! Jina: ${name}. Ingia kwa nambari yako: ${phone}. PIN ya siri: ${pin}. Usishiriki PIN hii.`,
+    `Karibu TrustTrack! Jina: ${name}. Ingia kwa nambari yako: ${phone}. PIN ya siri: ${pin}. Usishiriki PIN hii. Ingia hapa: https://atwork.eastafricanspirit.co.tz/login`,
 };
