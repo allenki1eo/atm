@@ -13,6 +13,9 @@ import {
   LogOut,
   ChevronRight,
   Shield,
+  Building2,
+  Palmtree,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -32,7 +35,10 @@ const navItems: NavItem[] = [
   { href: "/", label: "Dashibodi", icon: LayoutDashboard, roles: ["supervisor", "hr", "admin"] },
   { href: "/attendance/today", label: "Mahudhurio ya Leo", icon: ClipboardList, roles: ["supervisor", "hr", "admin"] },
   { href: "/attendance/history", label: "Historia ya Mahudhurio", icon: Calendar, roles: ["supervisor", "hr", "admin"] },
+  { href: "/attendance/import", label: "Ingiza Mahudhurio", icon: Upload, roles: ["admin"] },
   { href: "/employees", label: "Wafanyakazi", icon: Users, roles: ["hr", "admin"] },
+  { href: "/companies", label: "Makampuni & Sehemu", icon: Building2, roles: ["admin"] },
+  { href: "/leave", label: "Likizo", icon: Palmtree, roles: ["supervisor", "hr", "admin", "employee"] },
   { href: "/advances", label: "Mikopo", icon: DollarSign, roles: ["hr", "admin"] },
   { href: "/payroll/periods", label: "Vipindi vya Mshahara", icon: DollarSign, roles: ["hr", "admin"] },
   { href: "/payroll/casual", label: "Mshahara wa Mkataba", icon: DollarSign, roles: ["hr", "admin"] },
