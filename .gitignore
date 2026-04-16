@@ -49,6 +49,9 @@ public/workbox-*.js
 # vercel
 .vercel
 
+# Claude Code session data
+.claude/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
