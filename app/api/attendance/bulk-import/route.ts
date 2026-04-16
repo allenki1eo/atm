@@ -10,6 +10,55 @@ const STATUS_MAP: Record<string, string> = {
   h: "half_day",
 };
 
+/**
+ * Parses a phone number from various formats including scientific notation.
+ * Excel converts +255... to 2.557E+11 format when saving CSV.
+ * We need to convert it back to proper phone format.
+ */
+function parsePhoneNumber(raw: string): string | null {
+  // Remove quotes (Excel sometimes wraps cells in quotes)
+  const trimmed = raw.trim().replace(/^["']|["']$/g, "");
+
+  // Already in correct format
+  if (trimmed.startsWith("+")) {
+    return trimmed;
+  }
+
+  // Check if it's scientific notation (e.g., 2.557E+11)
+  const sciNotationMatch = trimmed.match(/^([\d.]+)[eE]([+-]?\d+)$/);
+  if (sciNotationMatch) {
+    const mantissa = parseFloat(sciNotationMatch[1]);
+    const exponent = parseInt(sciNotationMatch[2], 10);
+    // Convert to full number string
+    const fullNumber = mantissa * Math.pow(10, exponent);
+    const numStr = Math.round(fullNumber).toString();
+
+    // If it looks like a Tanzanian phone number (starts with 255)
+    if (numStr.startsWith("255") && numStr.length >= 12) {
+      return `+${numStr}`;
+    }
+
+    // If it starts with 0, convert to +255 format
+    if (numStr.startsWith("0") && numStr.length >= 10) {
+      return `+255${numStr.substring(1)}`;
+    }
+
+    return numStr.length >= 9 ? `+${numStr}` : null;
+  }
+
+  // Plain number format - check if it needs +255 prefix
+  const digitsOnly = trimmed.replace(/\D/g, "");
+  if (digitsOnly.startsWith("255") && digitsOnly.length >= 12) {
+    return `+${digitsOnly}`;
+  }
+  if (digitsOnly.startsWith("0") && digitsOnly.length >= 10) {
+    return `+255${digitsOnly.substring(1)}`;
+  }
+
+  // Return as-is if it's a valid phone number
+  return trimmed.length >= 9 ? trimmed : null;
+}
+
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -62,9 +111,17 @@ export async function POST(request: NextRequest) {
 
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(",").map((c) => c.trim());
-    const phone = cols[0];
+    const rawPhone = cols[0];
 
-    if (!phone) continue;
+    if (!rawPhone) continue;
+
+    // Parse phone number (handles scientific notation from Excel)
+    const phone = parsePhoneNumber(rawPhone);
+
+    if (!phone) {
+      results.push({ phone: rawPhone, name: null, dates_processed: 0, dates_skipped: 0 });
+      continue;
+    }
 
     // Look up employee by phone
     const empResult = await db.execute({
