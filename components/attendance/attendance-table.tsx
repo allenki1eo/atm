@@ -159,7 +159,7 @@ export function AttendanceTable({ records, isLoading, date, isLocked = false }: 
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border bg-card overflow-hidden">
+      <div className="rounded-lg border bg-card overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/30">

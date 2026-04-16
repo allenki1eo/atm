@@ -29,7 +29,7 @@ export default async function DashboardLayout({
       </aside>
 
       {/* Main content */}
-      <div className="flex flex-1 flex-col lg:pl-64">
+      <div className="flex flex-1 flex-col lg:pl-64 min-w-0 overflow-hidden">
         {/* Mobile nav header */}
         <MobileNav user={user} />
 
@@ -37,7 +37,7 @@ export default async function DashboardLayout({
         <OfflineBanner />
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-background">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
           <div className="container mx-auto max-w-7xl p-4 lg:p-6">
             {children}
           </div>
