@@ -134,9 +134,9 @@ export default function LoginPage() {
             <div className="mt-4 rounded-lg bg-muted/50 p-3">
               <p className="text-xs font-medium text-muted-foreground mb-2">Demo Credentials:</p>
               <div className="space-y-1 text-xs text-muted-foreground">
-                <p><span className="font-medium">Admin:</span> admin@trusttrack.com / admin123</p>
+                {/* <p><span className="font-medium">Admin:</span> admin@trusttrack.com / admin123</p>
                 <p><span className="font-medium">Supervisor:</span> supervisor@trusttrack.com / supervisor123</p>
-                <p><span className="font-medium">HR:</span> hr@trusttrack.com / hr123</p>
+                <p><span className="font-medium">HR:</span> hr@trusttrack.com / hr123</p> */}
                 <p><span className="font-medium">Mfanyakazi:</span> nambari ya simu / PIN iliyotumwa</p>
               </div>
             </div>
