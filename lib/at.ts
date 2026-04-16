@@ -93,17 +93,25 @@ export async function processSmSQueue() {
   }
 }
 
-// SMS message templates
+// SMS templates — Swahili for casual workers, English for full-time
 export const smsTemplates = {
+  /** Swahili: attendance confirmation sent to casual workers */
   attendanceMarked: (name: string, status: string, date: string, daysTotal: number, net: string) =>
-    `TrustTrack: ${status} recorded for ${date}. Month total: ${daysTotal} days. Balance: ${net}`,
+    `TrustTrack: Hali yako (${status}) imewekwa tarehe ${date}. Siku za kazi mwezi huu: ${daysTotal}. Bakaa: ${net}`,
 
+  /** Swahili: payroll ready notification for casual workers */
   payrollReady: (month: string, days: number, rate: string, gross: string, deadline: string) =>
-    `${month} payroll ready: ${days} days x ${rate}/day = ${gross}. Disputes? Visit HR by ${deadline}`,
+    `${month}: Umefanya kazi siku ${days} x ${rate}/siku = ${gross}. Maswali? Tembelea HR kabla ya ${deadline}`,
 
+  /** Swahili: advance approved notification */
   advanceApproved: (amount: string, newBalance: string) =>
-    `TrustTrack: Advance of ${amount} approved. New balance: ${newBalance}`,
+    `TrustTrack: Mkopo wa ${amount} umeidhinishwa. Bakaa mpya: ${newBalance}`,
 
+  /** Swahili: period locked notification */
   periodLocked: (month: string) =>
-    `TrustTrack: Attendance for ${month} is now locked. Check your dashboard for details.`,
+    `TrustTrack: Mahudhurio ya ${month} yamefungwa. Angalia dashibodi yako kwa maelezo.`,
+
+  /** Swahili: advance request submitted (to employee) */
+  advanceRequested: (amount: string) =>
+    `TrustTrack: Ombi lako la mkopo wa ${amount} limepokelewa. Utaarifiwa ukikubaliwa.`,
 };

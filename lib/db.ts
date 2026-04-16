@@ -123,13 +123,13 @@ export async function seedDemoData() {
       ('user-hr-1', 'hr@trusttrack.com', 'HR Manager', 'hr', '+1234567892', '${hrHash}');
 
     INSERT INTO employees (id, name, phone, type, department, supervisor_id, daily_rate, monthly_salary, overtime_rule) VALUES
-      ('emp-1', 'John Doe', '+1234567001', 'casual', 'Operations', 'user-sup-1', 1500, 0, 'none'),
-      ('emp-2', 'Jane Smith', '+1234567002', 'casual', 'Operations', 'user-sup-1', 1500, 0, 'none'),
-      ('emp-3', 'Bob Johnson', '+1234567003', 'fulltime', 'Finance', 'user-sup-1', 0, 300000, 'all_days'),
-      ('emp-4', 'Alice Brown', '+1234567004', 'casual', 'Operations', 'user-sup-1', 1500, 0, 'none'),
-      ('emp-5', 'Charlie Wilson', '+1234567005', 'fulltime', 'HR', 'user-sup-1', 0, 250000, 'none'),
-      ('emp-6', 'Diana Prince', '+1234567006', 'casual', 'Operations', 'user-sup-1', 2000, 0, 'none'),
-      ('emp-7', 'Eve Adams', '+1234567007', 'casual', 'Warehouse', 'user-sup-1', 1500, 0, 'none'),
-      ('emp-8', 'Frank Miller', '+1234567008', 'casual', 'Warehouse', 'user-sup-1', 1500, 0, 'none');
+      ('emp-1', 'Juma Salim', '+255712345001', 'casual', 'Uendeshaji', 'user-sup-1', 15000, 0, 'none'),
+      ('emp-2', 'Fatuma Hassan', '+255712345002', 'casual', 'Uendeshaji', 'user-sup-1', 15000, 0, 'none'),
+      ('emp-3', 'Robert Mwangi', '+255712345003', 'fulltime', 'Fedha', 'user-sup-1', 0, 800000, 'all_days'),
+      ('emp-4', 'Amina Bakari', '+255712345004', 'casual', 'Uendeshaji', 'user-sup-1', 15000, 0, 'none'),
+      ('emp-5', 'Charles Osei', '+255712345005', 'fulltime', 'Utumishi', 'user-sup-1', 0, 650000, 'none'),
+      ('emp-6', 'Dina Njau', '+255712345006', 'casual', 'Uendeshaji', 'user-sup-1', 18000, 0, 'none'),
+      ('emp-7', 'Eva Moshi', '+255712345007', 'casual', 'Ghala', 'user-sup-1', 15000, 0, 'none'),
+      ('emp-8', 'Frank Kimani', '+255712345008', 'casual', 'Ghala', 'user-sup-1', 15000, 0, 'none');
   `);
 }

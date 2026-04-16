@@ -28,8 +28,8 @@ import { toast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 const advanceSchema = z.object({
-  amount: z.number().min(1, "Amount must be at least $1"),
-  description: z.string().min(3, "Please provide a reason"),
+  amount: z.number().min(1, "Kiasi lazima kiwe angalau TZS 1"),
+  description: z.string().min(3, "Tafadhali eleza sababu"),
 });
 type AdvanceForm = z.infer<typeof advanceSchema>;
 
@@ -227,38 +227,38 @@ export default function MePage() {
       <Dialog open={advanceOpen} onOpenChange={setAdvanceOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Request Advance</DialogTitle>
+            <DialogTitle>Omba Mkopo</DialogTitle>
             <DialogDescription>
-              Submit an advance request to HR. Approved advances are deducted from your salary.
+              Tuma ombi la mkopo kwa HR. Mikopo iliyoidhinishwa itakatwa kwenye mshahara wako.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit((data) => advanceMutation.mutate(data))} className="space-y-4">
             <div className="space-y-2">
-              <Label>Amount ($)</Label>
+              <Label>Kiasi (TZS)</Label>
               <Input
                 type="number"
-                step="0.01"
+                step="1"
                 min="1"
-                placeholder="100.00"
+                placeholder="50000"
                 {...register("amount", { valueAsNumber: true })}
               />
               {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
             </div>
             <div className="space-y-2">
-              <Label>Reason</Label>
-              <Input placeholder="Medical emergency, rent, etc." {...register("description")} />
+              <Label>Sababu</Label>
+              <Input placeholder="Hospitali, kodi ya nyumba, n.k." {...register("description")} />
               {errors.description && (
                 <p className="text-xs text-destructive">{errors.description.message}</p>
               )}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setAdvanceOpen(false)}>
-                Cancel
+                Ghairi
               </Button>
               <Button type="submit" disabled={advanceMutation.isPending}>
                 {advanceMutation.isPending ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting...</>
-                ) : "Submit Request"}
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Inatuma...</>
+                ) : "Tuma Ombi"}
               </Button>
             </DialogFooter>
           </form>

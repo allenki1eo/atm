@@ -125,8 +125,8 @@ export default function EmployeesPage() {
       type: emp.type,
       department: emp.department,
       supervisor_id: emp.supervisor_id,
-      daily_rate: emp.daily_rate / 100,
-      monthly_salary: emp.monthly_salary / 100,
+      daily_rate: emp.daily_rate,
+      monthly_salary: emp.monthly_salary,
       overtime_rule: emp.overtime_rule as "all_days" | "holidays_only" | "none",
     });
     setDialogOpen(true);
@@ -148,8 +148,8 @@ export default function EmployeesPage() {
   const onSubmit = (data: EmployeeForm) => {
     const payload = {
       ...data,
-      daily_rate: data.type === "casual" ? Math.round((data.daily_rate ?? 0) * 100) : 0,
-      monthly_salary: data.type === "fulltime" ? Math.round((data.monthly_salary ?? 0) * 100) : 0,
+      daily_rate: data.type === "casual" ? Math.round(data.daily_rate ?? 0) : 0,
+      monthly_salary: data.type === "fulltime" ? Math.round(data.monthly_salary ?? 0) : 0,
     };
     createMutation.mutate(payload);
   };
@@ -250,8 +250,8 @@ export default function EmployeesPage() {
                   </TableCell>
                   <TableCell>
                     {emp.type === "casual"
-                      ? `${formatCurrency(emp.daily_rate)}/day`
-                      : `${formatCurrency(emp.monthly_salary)}/mo`}
+                      ? `${formatCurrency(emp.daily_rate)}/siku`
+                      : `${formatCurrency(emp.monthly_salary)}/mwezi`}
                   </TableCell>
                   <TableCell>
                     <Button variant="ghost" size="icon" onClick={() => openEdit(emp)}>
@@ -283,14 +283,14 @@ export default function EmployeesPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Phone Number</Label>
-              <Input placeholder="+254712345678" {...register("phone")} />
+              <Label>Nambari ya Simu</Label>
+              <Input placeholder="+255712345678" {...register("phone")} />
               {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Employee Type</Label>
+                <Label>Aina ya Mfanyakazi</Label>
                 <Select
                   value={type}
                   onValueChange={(v) => setValue("type", v as "casual" | "fulltime")}
@@ -299,36 +299,36 @@ export default function EmployeesPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="casual">Casual</SelectItem>
-                    <SelectItem value="fulltime">Full-time</SelectItem>
+                    <SelectItem value="casual">Mkataba (Casual)</SelectItem>
+                    <SelectItem value="fulltime">Kudumu (Full-time)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label>Department</Label>
-                <Input placeholder="Operations" {...register("department")} />
+                <Label>Idara</Label>
+                <Input placeholder="Uendeshaji" {...register("department")} />
               </div>
             </div>
 
             {type === "casual" ? (
               <div className="space-y-2">
-                <Label>Daily Rate ($)</Label>
+                <Label>Kiwango cha Siku (TZS)</Label>
                 <Input
                   type="number"
-                  step="0.01"
-                  placeholder="15.00"
+                  step="1"
+                  placeholder="15000"
                   {...register("daily_rate", { valueAsNumber: true })}
                 />
               </div>
             ) : (
               <>
                 <div className="space-y-2">
-                  <Label>Monthly Salary ($)</Label>
+                  <Label>Mshahara wa Mwezi (TZS)</Label>
                   <Input
                     type="number"
-                    step="0.01"
-                    placeholder="3000.00"
+                    step="1"
+                    placeholder="800000"
                     {...register("monthly_salary", { valueAsNumber: true })}
                   />
                 </div>

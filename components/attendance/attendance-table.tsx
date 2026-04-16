@@ -33,10 +33,10 @@ interface AttendanceTableProps {
 }
 
 const statusConfig = {
-  present: { label: "Present", icon: Check, color: "bg-green-100 text-green-800 border-green-200", btnColor: "bg-green-500 hover:bg-green-600 text-white" },
-  absent: { label: "Absent", icon: X, color: "bg-red-100 text-red-800 border-red-200", btnColor: "bg-red-500 hover:bg-red-600 text-white" },
-  late: { label: "Late", icon: Clock, color: "bg-amber-100 text-amber-800 border-amber-200", btnColor: "bg-amber-500 hover:bg-amber-600 text-white" },
-  half_day: { label: "Half Day", icon: Minus, color: "bg-blue-100 text-blue-800 border-blue-200", btnColor: "bg-blue-500 hover:bg-blue-600 text-white" },
+  present: { label: "Alikuwepo", icon: Check, color: "bg-green-100 text-green-800 border-green-200", btnColor: "bg-green-500 hover:bg-green-600 text-white" },
+  absent: { label: "Hakuwepo", icon: X, color: "bg-red-100 text-red-800 border-red-200", btnColor: "bg-red-500 hover:bg-red-600 text-white" },
+  late: { label: "Alichelewa", icon: Clock, color: "bg-amber-100 text-amber-800 border-amber-200", btnColor: "bg-amber-500 hover:bg-amber-600 text-white" },
+  half_day: { label: "Nusu Siku", icon: Minus, color: "bg-blue-100 text-blue-800 border-blue-200", btnColor: "bg-blue-500 hover:bg-blue-600 text-white" },
 };
 
 export function AttendanceTable({ records, isLoading, date, isLocked = false }: AttendanceTableProps) {
@@ -116,10 +116,10 @@ export function AttendanceTable({ records, isLoading, date, isLocked = false }: 
     <div className="space-y-4">
       {/* Summary badges */}
       <div className="flex flex-wrap gap-2">
-        <Badge variant="success">{summary.present} Present</Badge>
-        <Badge variant="destructive">{summary.absent} Absent</Badge>
-        <Badge variant="warning">{summary.late} Late</Badge>
-        <Badge variant="outline">{summary.unmarked} Unmarked</Badge>
+        <Badge variant="success">{summary.present} Walikuwepo</Badge>
+        <Badge variant="destructive">{summary.absent} Hawakuwepo</Badge>
+        <Badge variant="warning">{summary.late} Walichelewa</Badge>
+        <Badge variant="outline">{summary.unmarked} Hawajawekwa</Badge>
       </div>
 
       {/* Search and bulk actions */}
@@ -127,7 +127,7 @@ export function AttendanceTable({ records, isLoading, date, isLocked = false }: 
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name or department..."
+            placeholder="Tafuta kwa jina au idara..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -143,7 +143,7 @@ export function AttendanceTable({ records, isLoading, date, isLocked = false }: 
               className="text-green-700 border-green-200 hover:bg-green-50"
             >
               <CheckSquare className="h-4 w-4 mr-1" />
-              Mark Present ({selected.size})
+              Walikuwepo ({selected.size})
             </Button>
             <Button
               variant="outline"
@@ -152,7 +152,7 @@ export function AttendanceTable({ records, isLoading, date, isLocked = false }: 
               disabled={selected.size === 0}
               className="text-red-700 border-red-200 hover:bg-red-50"
             >
-              Mark Absent
+              Hawakuwepo
             </Button>
           </div>
         )}
@@ -172,11 +172,11 @@ export function AttendanceTable({ records, isLoading, date, isLocked = false }: 
                   />
                 </TableHead>
               )}
-              <TableHead>Employee</TableHead>
-              <TableHead className="hidden sm:table-cell">Department</TableHead>
+              <TableHead>Mfanyakazi</TableHead>
+              <TableHead className="hidden sm:table-cell">Idara</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="hidden md:table-cell">Notes</TableHead>
-              {!isLocked && <TableHead className="w-40">Actions</TableHead>}
+              <TableHead className="hidden md:table-cell">Maelezo</TableHead>
+              {!isLocked && <TableHead className="w-40">Vitendo</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -224,7 +224,7 @@ export function AttendanceTable({ records, isLoading, date, isLocked = false }: 
                           {config.label}
                         </span>
                       ) : (
-                        <span className="text-xs text-muted-foreground">Unmarked</span>
+                        <span className="text-xs text-muted-foreground">Bado</span>
                       )}
                       {isSaving && <span className="ml-2 text-xs text-muted-foreground animate-pulse">saving...</span>}
                     </TableCell>
@@ -260,7 +260,7 @@ export function AttendanceTable({ records, isLoading, date, isLocked = false }: 
                             }
                           }}
                         >
-                          {record.notes ?? (isLocked ? "—" : "Add note...")}
+                          {record.notes ?? (isLocked ? "—" : "Ongeza maelezo...")}
                         </button>
                       )}
                     </TableCell>

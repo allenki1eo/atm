@@ -29,13 +29,14 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["supervisor", "hr", "admin"] },
-  { href: "/attendance/today", label: "Today's Attendance", icon: ClipboardList, roles: ["supervisor", "hr", "admin"] },
-  { href: "/attendance/history", label: "Attendance History", icon: Calendar, roles: ["supervisor", "hr", "admin"] },
-  { href: "/employees", label: "Employees", icon: Users, roles: ["hr", "admin"] },
-  { href: "/payroll/periods", label: "Payroll Periods", icon: DollarSign, roles: ["hr", "admin"] },
-  { href: "/payroll/casual", label: "Casual Payroll", icon: DollarSign, roles: ["hr", "admin"] },
-  { href: "/me", label: "My Dashboard", icon: UserCircle, roles: ["supervisor", "hr", "admin"] },
+  { href: "/", label: "Dashibodi", icon: LayoutDashboard, roles: ["supervisor", "hr", "admin"] },
+  { href: "/attendance/today", label: "Mahudhurio ya Leo", icon: ClipboardList, roles: ["supervisor", "hr", "admin"] },
+  { href: "/attendance/history", label: "Historia ya Mahudhurio", icon: Calendar, roles: ["supervisor", "hr", "admin"] },
+  { href: "/employees", label: "Wafanyakazi", icon: Users, roles: ["hr", "admin"] },
+  { href: "/advances", label: "Mikopo", icon: DollarSign, roles: ["hr", "admin"] },
+  { href: "/payroll/periods", label: "Vipindi vya Mshahara", icon: DollarSign, roles: ["hr", "admin"] },
+  { href: "/payroll/casual", label: "Mshahara wa Mkataba", icon: DollarSign, roles: ["hr", "admin"] },
+  { href: "/me", label: "Dashibodi Yangu", icon: UserCircle, roles: ["supervisor", "hr", "admin"] },
 ];
 
 interface SidebarProps {

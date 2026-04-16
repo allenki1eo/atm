@@ -16,10 +16,10 @@ const STATUS_COLORS = {
 };
 
 const STATUS_LABELS = {
-  present: "Present",
-  absent: "Absent",
-  late: "Late",
-  half_day: "Half Day",
+  present: "Alikuwepo",
+  absent: "Hakuwepo",
+  late: "Alichelewa",
+  half_day: "Nusu Siku",
 };
 
 interface AttendanceCalendarProps {
