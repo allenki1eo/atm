@@ -16,6 +16,7 @@ import {
   Building2,
   Palmtree,
   Upload,
+  UserCog,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -38,6 +39,7 @@ const navItems: NavItem[] = [
   { href: "/attendance/import", label: "Ingiza Mahudhurio", icon: Upload, roles: ["admin"] },
   { href: "/employees", label: "Wafanyakazi", icon: Users, roles: ["hr", "admin"] },
   { href: "/companies", label: "Makampuni & Sehemu", icon: Building2, roles: ["admin"] },
+  { href: "/users", label: "Watumiaji wa Mfumo", icon: UserCog, roles: ["admin"] },
   { href: "/leave", label: "Likizo", icon: Palmtree, roles: ["supervisor", "hr", "admin", "employee"] },
   { href: "/advances", label: "Mikopo", icon: DollarSign, roles: ["hr", "admin"] },
   { href: "/payroll/periods", label: "Vipindi vya Mshahara", icon: DollarSign, roles: ["hr", "admin"] },

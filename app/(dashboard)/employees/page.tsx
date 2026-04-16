@@ -67,6 +67,8 @@ interface ImportSummary {
   smsSent: number;
 }
 
+const nanToZero = (v: unknown) => (typeof v === "number" && isNaN(v) ? 0 : v);
+
 const employeeSchema = z.object({
   name: z.string().min(2, "Name required"),
   phone: z.string().min(7, "Valid phone required"),
@@ -74,8 +76,8 @@ const employeeSchema = z.object({
   department: z.string().optional(),
   supervisor_id: z.string().optional(),
   company_id: z.string().optional(),
-  daily_rate: z.number().min(0).optional(),
-  monthly_salary: z.number().min(0).optional(),
+  daily_rate: z.preprocess(nanToZero, z.number().min(0).optional()),
+  monthly_salary: z.preprocess(nanToZero, z.number().min(0).optional()),
   overtime_rule: z.enum(["all_days", "holidays_only", "none"]).optional(),
 });
 
@@ -574,7 +576,7 @@ export default function EmployeesPage() {
                 <div className="space-y-2">
                   <Label>Sheria ya Overtime</Label>
                   <Select
-                    defaultValue="none"
+                    value={watch("overtime_rule") ?? "none"}
                     onValueChange={(v) =>
                       setValue("overtime_rule", v as "all_days" | "holidays_only" | "none")
                     }
