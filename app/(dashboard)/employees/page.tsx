@@ -6,28 +6,22 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Search, Users, Pencil, Upload, Download, FileText, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import {
+  Plus, Search, Users, Pencil, Trash2, Upload, Download,
+  FileText, CheckCircle2, XCircle, Loader2, KeyRound, MessageSquare,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
@@ -43,6 +37,12 @@ interface Employee {
   monthly_salary: number;
   overtime_rule: string;
   active: number;
+}
+
+interface SupervisorUser {
+  id: string;
+  name: string;
+  role: string;
 }
 
 interface ImportResult {
@@ -108,6 +108,8 @@ export default function EmployeesPage() {
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
+  const [newCredentials, setNewCredentials] = useState<{ name: string; phone: string; pin: string } | null>(null);
 
   // CSV import state
   const [importOpen, setImportOpen] = useState(false);
@@ -120,6 +122,7 @@ export default function EmployeesPage() {
 
   const role = (session?.user as { role?: string })?.role;
   const isAdmin = role === "admin";
+  const canManage = role === "admin" || role === "hr";
 
   const { data: employees, isLoading } = useQuery({
     queryKey: ["employees"],
@@ -130,14 +133,19 @@ export default function EmployeesPage() {
     },
   });
 
-  const { data: supervisors } = useQuery({
-    queryKey: ["users", "supervisors"],
+  const { data: allUsers } = useQuery({
+    queryKey: ["users"],
     queryFn: async () => {
       const res = await fetch("/api/users");
       if (!res.ok) return [];
-      return res.json();
+      return res.json() as Promise<SupervisorUser[]>;
     },
+    enabled: canManage,
   });
+
+  const supervisors = (allUsers ?? []).filter(
+    (u) => u.role === "supervisor" || u.role === "admin" || u.role === "hr"
+  );
 
   const {
     register,
@@ -164,12 +172,45 @@ export default function EmployeesPage() {
       if (!res.ok) throw new Error(json.error ?? "Failed");
       return json;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       setDialogOpen(false);
       setEditingEmployee(null);
       reset();
-      toast({ title: editingEmployee ? "Employee updated" : "Employee created" });
+
+      if (!editingEmployee && data.pin) {
+        // Show credentials dialog for new employee
+        setNewCredentials({ name: data.name, phone: data.phone, pin: data.pin });
+        toast({
+          title: "Mfanyakazi ameongezwa",
+          description: data.smsSent
+            ? "Akaunti imeundwa. SMS imetumwa kwa mfanyakazi."
+            : "Akaunti imeundwa. SMS itumwe baadaye (hakuna muunganiko).",
+        });
+      } else {
+        toast({ title: editingEmployee ? "Employee updated" : "Employee created" });
+      }
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch("/api/employees", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed");
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      setDeleteTarget(null);
+      toast({ title: "Employee removed", description: "Record deactivated. History preserved." });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -183,7 +224,7 @@ export default function EmployeesPage() {
       phone: emp.phone,
       type: emp.type,
       department: emp.department,
-      supervisor_id: emp.supervisor_id,
+      supervisor_id: emp.supervisor_id ?? "",
       daily_rate: emp.daily_rate,
       monthly_salary: emp.monthly_salary,
       overtime_rule: emp.overtime_rule as "all_days" | "holidays_only" | "none",
@@ -207,24 +248,24 @@ export default function EmployeesPage() {
   const onSubmit = (data: EmployeeForm) => {
     const payload = {
       ...data,
+      supervisor_id: data.supervisor_id || undefined,
       daily_rate: data.type === "casual" ? Math.round(data.daily_rate ?? 0) : 0,
       monthly_salary: data.type === "fulltime" ? Math.round(data.monthly_salary ?? 0) : 0,
     };
     createMutation.mutate(payload);
   };
 
+  // CSV import handlers
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setCsvFile(file);
     setImportResults(null);
     setImportSummary(null);
-
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
-      const preview = parseCSVPreview(text);
-      setCsvPreview(preview);
+      setCsvPreview(parseCSVPreview(text));
     };
     reader.readAsText(file);
   };
@@ -234,31 +275,23 @@ export default function EmployeesPage() {
     setImporting(true);
     setImportResults(null);
     setImportSummary(null);
-
     const formData = new FormData();
     formData.append("file", csvFile);
-
     try {
-      const res = await fetch("/api/employees/import", {
-        method: "POST",
-        body: formData,
-      });
+      const res = await fetch("/api/employees/import", { method: "POST", body: formData });
       const data = await res.json();
-
       if (!res.ok) {
         toast({ title: "Import failed", description: data.error, variant: "destructive" });
         return;
       }
-
       setImportResults(data.results);
       setImportSummary(data.summary);
       queryClient.invalidateQueries({ queryKey: ["employees"] });
-
       toast({
         title: `Import done: ${data.summary.succeeded}/${data.summary.total} succeeded`,
         description: data.summary.smsSent > 0
           ? `SMS imetumwa kwa wafanyakazi ${data.summary.smsSent}`
-          : "SMS zitumwe baadaye (hazikuweza kutumwa sasa)",
+          : "SMS hazikutumwa — angalia muunganiko wa Africa's Talking",
       });
     } catch {
       toast({ title: "Network error", variant: "destructive" });
@@ -275,15 +308,18 @@ export default function EmployeesPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const supervisorName = (id: string) =>
+    supervisors.find((s) => s.id === id)?.name ?? "—";
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-muted-foreground" />
-            <h1 className="text-2xl font-bold">Employees</h1>
+            <h1 className="text-2xl font-bold">Wafanyakazi</h1>
           </div>
-          <p className="text-muted-foreground mt-1">Manage your workforce</p>
+          <p className="text-muted-foreground mt-1">Dhibiti wafanyakazi wako</p>
         </div>
         <div className="flex gap-2">
           {isAdmin && (
@@ -292,10 +328,12 @@ export default function EmployeesPage() {
               Ingiza CSV
             </Button>
           )}
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Employee
-          </Button>
+          {canManage && (
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4 mr-2" />
+              Ongeza Mfanyakazi
+            </Button>
+          )}
         </div>
       </div>
 
@@ -303,7 +341,7 @@ export default function EmployeesPage() {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search employees..."
+          placeholder="Tafuta wafanyakazi..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-9"
@@ -312,28 +350,22 @@ export default function EmployeesPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-2xl font-bold">{employees?.length ?? 0}</p>
-            <p className="text-xs text-muted-foreground">Total</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-2xl font-bold text-blue-600">
-              {employees?.filter((e) => e.type === "casual").length ?? 0}
-            </p>
-            <p className="text-xs text-muted-foreground">Casual</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-2xl font-bold text-green-600">
-              {employees?.filter((e) => e.type === "fulltime").length ?? 0}
-            </p>
-            <p className="text-xs text-muted-foreground">Full-time</p>
-          </CardContent>
-        </Card>
+        <Card><CardContent className="p-4">
+          <p className="text-2xl font-bold">{employees?.length ?? 0}</p>
+          <p className="text-xs text-muted-foreground">Jumla</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <p className="text-2xl font-bold text-blue-600">
+            {employees?.filter((e) => e.type === "casual").length ?? 0}
+          </p>
+          <p className="text-xs text-muted-foreground">Mkataba</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <p className="text-2xl font-bold text-green-600">
+            {employees?.filter((e) => e.type === "fulltime").length ?? 0}
+          </p>
+          <p className="text-xs text-muted-foreground">Kudumu</p>
+        </CardContent></Card>
       </div>
 
       {/* Table */}
@@ -341,25 +373,26 @@ export default function EmployeesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead className="hidden sm:table-cell">Department</TableHead>
-              <TableHead className="hidden md:table-cell">Phone</TableHead>
-              <TableHead>Rate</TableHead>
-              <TableHead className="w-12"></TableHead>
+              <TableHead>Jina</TableHead>
+              <TableHead>Aina</TableHead>
+              <TableHead className="hidden sm:table-cell">Idara</TableHead>
+              <TableHead className="hidden md:table-cell">Simu</TableHead>
+              <TableHead className="hidden lg:table-cell">Msimamizi</TableHead>
+              <TableHead>Kiwango</TableHead>
+              {canManage && <TableHead className="w-20"></TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  Loading...
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  Inapakia...
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  No employees found
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  Hakuna wafanyakazi
                 </TableCell>
               </TableRow>
             ) : (
@@ -368,25 +401,40 @@ export default function EmployeesPage() {
                   <TableCell className="font-medium">{emp.name}</TableCell>
                   <TableCell>
                     <Badge variant={emp.type === "casual" ? "info" : "success"} className="capitalize">
-                      {emp.type}
+                      {emp.type === "casual" ? "Mkataba" : "Kudumu"}
                     </Badge>
                   </TableCell>
                   <TableCell className="hidden sm:table-cell text-muted-foreground">
                     {emp.department ?? "—"}
                   </TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground">
+                  <TableCell className="hidden md:table-cell text-muted-foreground text-xs">
                     {emp.phone}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden lg:table-cell text-muted-foreground text-xs">
+                    {emp.supervisor_id ? supervisorName(emp.supervisor_id) : "—"}
+                  </TableCell>
+                  <TableCell className="text-sm">
                     {emp.type === "casual"
                       ? `${formatCurrency(emp.daily_rate)}/siku`
                       : `${formatCurrency(emp.monthly_salary)}/mwezi`}
                   </TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(emp)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
+                  {canManage && (
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(emp)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setDeleteTarget(emp)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}
@@ -398,16 +446,18 @@ export default function EmployeesPage() {
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingEmployee(null); }}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingEmployee ? "Edit Employee" : "Add New Employee"}</DialogTitle>
+            <DialogTitle>{editingEmployee ? "Hariri Mfanyakazi" : "Ongeza Mfanyakazi Mpya"}</DialogTitle>
             <DialogDescription>
-              {editingEmployee ? "Update employee information" : "Add a new employee to the system"}
+              {editingEmployee
+                ? "Sasisha taarifa za mfanyakazi"
+                : "Akaunti ya kuingia itaundwa na PIN itatumwa kwa SMS"}
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label>Full Name</Label>
-              <Input placeholder="John Doe" {...register("name")} />
+              <Label>Jina Kamili</Label>
+              <Input placeholder="Juma Salim" {...register("name")} />
               {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
             </div>
 
@@ -424,9 +474,7 @@ export default function EmployeesPage() {
                   value={type}
                   onValueChange={(v) => setValue("type", v as "casual" | "fulltime")}
                 >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="casual">Mkataba (Casual)</SelectItem>
                     <SelectItem value="fulltime">Kudumu (Full-time)</SelectItem>
@@ -438,6 +486,27 @@ export default function EmployeesPage() {
                 <Label>Idara</Label>
                 <Input placeholder="Uendeshaji" {...register("department")} />
               </div>
+            </div>
+
+            {/* Supervisor assignment */}
+            <div className="space-y-2">
+              <Label>Msimamizi</Label>
+              <Select
+                value={watch("supervisor_id") ?? ""}
+                onValueChange={(v) => setValue("supervisor_id", v === "none" ? "" : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Chagua msimamizi..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— Hakuna msimamizi —</SelectItem>
+                  {supervisors.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name} ({s.role})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {type === "casual" ? (
@@ -462,20 +531,18 @@ export default function EmployeesPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Overtime Rule</Label>
+                  <Label>Sheria ya Overtime</Label>
                   <Select
                     defaultValue="none"
                     onValueChange={(v) =>
                       setValue("overtime_rule", v as "all_days" | "holidays_only" | "none")
                     }
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">No Overtime</SelectItem>
-                      <SelectItem value="all_days">All Days</SelectItem>
-                      <SelectItem value="holidays_only">Holidays Only</SelectItem>
+                      <SelectItem value="none">Hakuna Overtime</SelectItem>
+                      <SelectItem value="all_days">Siku Zote</SelectItem>
+                      <SelectItem value="holidays_only">Likizo tu</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -484,13 +551,76 @@ export default function EmployeesPage() {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancel
+                Ghairi
               </Button>
               <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Saving..." : editingEmployee ? "Update" : "Create"}
+                {createMutation.isPending ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Inahifadhi...</>
+                ) : editingEmployee ? "Hifadhi Mabadiliko" : "Ongeza Mfanyakazi"}
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Futa Mfanyakazi</DialogTitle>
+            <DialogDescription>
+              Una uhakika unataka kuondoa <strong>{deleteTarget?.name}</strong>? Historia ya mahudhurio na malipo itahifadhiwa.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Ghairi</Button>
+            <Button
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+            >
+              {deleteMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Inafuta...</>
+              ) : "Ndio, Futa"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* New employee credentials dialog */}
+      <Dialog open={!!newCredentials} onOpenChange={(open) => { if (!open) setNewCredentials(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-green-600" />
+              Akaunti Imeundwa
+            </DialogTitle>
+            <DialogDescription>
+              Hifadhi maelezo haya. PIN itaonekana mara moja tu hapa.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Jina</span>
+              <span className="font-medium">{newCredentials?.name}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Simu (jina la mtumiaji)</span>
+              <span className="font-medium font-mono">{newCredentials?.phone}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">PIN ya Siri</span>
+              <span className="font-bold font-mono text-lg tracking-widest text-primary">
+                {newCredentials?.pin}
+              </span>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            PIN pia imetumwa kwa SMS kwa nambari ya mfanyakazi (kama muunganiko ulipatikana).
+          </p>
+          <DialogFooter>
+            <Button onClick={() => setNewCredentials(null)}>Imeeleweka</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -503,38 +633,28 @@ export default function EmployeesPage() {
               Ingiza Wafanyakazi kwa CSV
             </DialogTitle>
             <DialogDescription>
-              Pakia faili ya CSV yenye orodha ya wafanyakazi. Kila mfanyakazi atapata PIN ya siri kupitia SMS.
+              Pakia faili ya CSV. Kila mfanyakazi atapewa PIN ya siri kupitia SMS.
             </DialogDescription>
           </DialogHeader>
 
-          {/* Results view */}
           {importResults ? (
             <div className="space-y-4">
-              {/* Summary cards */}
               {importSummary && (
                 <div className="grid grid-cols-3 gap-3">
-                  <Card>
-                    <CardContent className="p-3 text-center">
-                      <p className="text-2xl font-bold text-green-600">{importSummary.succeeded}</p>
-                      <p className="text-xs text-muted-foreground">Wamefanikiwa</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-3 text-center">
-                      <p className="text-2xl font-bold text-red-600">{importSummary.failed}</p>
-                      <p className="text-xs text-muted-foreground">Wameshindwa</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-3 text-center">
-                      <p className="text-2xl font-bold text-blue-600">{importSummary.smsSent}</p>
-                      <p className="text-xs text-muted-foreground">SMS Zimetumwa</p>
-                    </CardContent>
-                  </Card>
+                  <Card><CardContent className="p-3 text-center">
+                    <p className="text-2xl font-bold text-green-600">{importSummary.succeeded}</p>
+                    <p className="text-xs text-muted-foreground">Wamefanikiwa</p>
+                  </CardContent></Card>
+                  <Card><CardContent className="p-3 text-center">
+                    <p className="text-2xl font-bold text-red-600">{importSummary.failed}</p>
+                    <p className="text-xs text-muted-foreground">Wameshindwa</p>
+                  </CardContent></Card>
+                  <Card><CardContent className="p-3 text-center">
+                    <p className="text-2xl font-bold text-blue-600">{importSummary.smsSent}</p>
+                    <p className="text-xs text-muted-foreground">SMS Zimetumwa</p>
+                  </CardContent></Card>
                 </div>
               )}
-
-              {/* Per-row results */}
               <div className="max-h-64 overflow-y-auto rounded-lg border">
                 <Table>
                   <TableHeader>
@@ -555,9 +675,7 @@ export default function EmployeesPage() {
                           {r.status === "success" ? (
                             <div className="flex items-center gap-1 text-green-600">
                               <CheckCircle2 className="h-4 w-4" />
-                              <span className="text-xs">
-                                {r.smsSent ? "OK + SMS" : "OK (SMS pending)"}
-                              </span>
+                              <span className="text-xs">{r.smsSent ? "OK + SMS" : "OK (SMS pending)"}</span>
                             </div>
                           ) : (
                             <div className="flex items-center gap-1 text-red-600">
@@ -571,17 +689,13 @@ export default function EmployeesPage() {
                   </TableBody>
                 </Table>
               </div>
-
               <DialogFooter>
-                <Button variant="outline" onClick={resetImport}>
-                  Ingiza Zaidi
-                </Button>
+                <Button variant="outline" onClick={resetImport}>Ingiza Zaidi</Button>
                 <Button onClick={() => setImportOpen(false)}>Maliza</Button>
               </DialogFooter>
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Template download */}
               <Card className="border-dashed">
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -594,13 +708,10 @@ export default function EmployeesPage() {
                     </div>
                   </div>
                   <Button variant="outline" size="sm" onClick={downloadTemplate}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Kiolezo
+                    <Download className="h-4 w-4 mr-2" />Kiolezo
                   </Button>
                 </CardContent>
               </Card>
-
-              {/* File input */}
               <div className="space-y-2">
                 <Label>Chagua Faili ya CSV</Label>
                 <Input
@@ -611,8 +722,6 @@ export default function EmployeesPage() {
                   className="cursor-pointer"
                 />
               </div>
-
-              {/* Preview */}
               {csvPreview.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -626,57 +735,40 @@ export default function EmployeesPage() {
                           <TableHead>Jina</TableHead>
                           <TableHead>Simu</TableHead>
                           <TableHead>Aina</TableHead>
-                          <TableHead>Idara</TableHead>
                           <TableHead>Kiwango</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {csvPreview.map((row, i) => (
                           <TableRow key={i}>
-                            <TableCell className="font-medium">{row.name || <span className="text-destructive">—</span>}</TableCell>
+                            <TableCell className="font-medium">{row.name || "—"}</TableCell>
                             <TableCell className="text-xs text-muted-foreground">{row.phone}</TableCell>
                             <TableCell>
                               {row.type ? (
                                 <Badge variant={row.type === "casual" ? "info" : "success"} className="text-xs capitalize">
                                   {row.type}
                                 </Badge>
-                              ) : <span className="text-destructive text-xs">—</span>}
+                              ) : "—"}
                             </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">{row.department || "—"}</TableCell>
                             <TableCell className="text-xs text-muted-foreground">
                               {row.type === "casual"
-                                ? row.daily_rate ? `${row.daily_rate}/siku` : "—"
-                                : row.monthly_salary ? `${row.monthly_salary}/mwezi` : "—"}
+                                ? (row.daily_rate ? `${row.daily_rate}/siku` : "—")
+                                : (row.monthly_salary ? `${row.monthly_salary}/mwezi` : "—")}
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Kila mfanyakazi atapewa PIN ya nasibu na kutumwa SMS ya maelezo ya kuingia.
-                  </p>
                 </div>
               )}
-
               <DialogFooter>
-                <Button variant="outline" onClick={() => setImportOpen(false)}>
-                  Ghairi
-                </Button>
-                <Button
-                  onClick={handleImport}
-                  disabled={!csvFile || csvPreview.length === 0 || importing}
-                >
+                <Button variant="outline" onClick={() => setImportOpen(false)}>Ghairi</Button>
+                <Button onClick={handleImport} disabled={!csvFile || csvPreview.length === 0 || importing}>
                   {importing ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Inaingiza...
-                    </>
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Inaingiza...</>
                   ) : (
-                    <>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Ingiza Wafanyakazi {csvPreview.length > 0 ? `(${csvPreview.length})` : ""}
-                    </>
+                    <><Upload className="h-4 w-4 mr-2" />Ingiza {csvPreview.length > 0 ? `(${csvPreview.length})` : ""}</>
                   )}
                 </Button>
               </DialogFooter>
