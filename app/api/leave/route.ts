@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, ensureDatabase } from "@/lib/db";
 import { nanoid } from "nanoid";
 
 export async function GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  await ensureDatabase();
   const role = (session.user as { role: string }).role;
   const userId = session.user.id!;
   const currentYear = new Date().getFullYear();
@@ -92,6 +93,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await ensureDatabase();
 
   const body = await request.json();
   const { employee_id, start_date, end_date, reason } = body;

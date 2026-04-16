@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, ensureDatabase } from "@/lib/db";
 import { nanoid } from "nanoid";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  await ensureDatabase();
   const { searchParams } = new URL(request.url);
   const company_id = searchParams.get("company_id");
 
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await ensureDatabase();
 
   const role = (session.user as { role: string }).role;
   if (role !== "admin") {

@@ -8,6 +8,16 @@ export const db = createClient({
   authToken,
 });
 
+// Module-level flag so we only run migrations once per server cold-start,
+// not on every request. Routes call ensureDatabase() instead of
+// initializeDatabase() directly.
+let _initialized = false;
+export async function ensureDatabase() {
+  if (_initialized) return;
+  await initializeDatabase();
+  _initialized = true;
+}
+
 export async function initializeDatabase() {
   await db.executeMultiple(`
     CREATE TABLE IF NOT EXISTS users (
