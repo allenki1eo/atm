@@ -273,7 +273,8 @@ export default function LeavePage() {
     LEAVE_TYPES.find((t) => t.value === val)?.label ?? val ?? "—";
 
   const renderRequestsTable = (rows: LeaveRequest[], showEmployee = false) => (
-    <Card>
+    <Card className="overflow-hidden">
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -362,6 +363,7 @@ export default function LeavePage() {
           )}
         </TableBody>
       </Table>
+      </div>
     </Card>
   );
 
@@ -371,7 +373,7 @@ export default function LeavePage() {
     return (
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
               <CalendarDays className="h-5 w-5 text-muted-foreground" />
@@ -379,7 +381,7 @@ export default function LeavePage() {
             </div>
             <p className="text-muted-foreground mt-1">Omba na fuatilia likizo yako</p>
           </div>
-          <Button onClick={openRequest}>
+          <Button onClick={openRequest} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             Omba Likizo
           </Button>
@@ -427,7 +429,7 @@ export default function LeavePage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
             <CalendarDays className="h-5 w-5 text-muted-foreground" />
@@ -435,14 +437,14 @@ export default function LeavePage() {
           </div>
           <p className="text-muted-foreground mt-1">Kagua na idhinisha maombi ya likizo</p>
         </div>
-        <Button onClick={openRequest}>
+        <Button onClick={openRequest} className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
           Omba Likizo Yangu
         </Button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4">
             <p className="text-2xl font-bold text-amber-600">
@@ -644,7 +646,7 @@ export default function LeavePage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Tarehe ya Kuanza</Label>
                 <Input

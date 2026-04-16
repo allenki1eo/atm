@@ -367,7 +367,7 @@ export default function CompaniesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
             <Building2 className="h-5 w-5 text-muted-foreground" />
@@ -375,7 +375,7 @@ export default function CompaniesPage() {
           </div>
           <p className="text-muted-foreground mt-1">Dhibiti makampuni na sehemu zao</p>
         </div>
-        <Button onClick={openCreateCompany}>
+        <Button onClick={openCreateCompany} className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" />
           Ongeza Kampuni
         </Button>
@@ -434,26 +434,26 @@ export default function CompaniesPage() {
                       </div>
                     </button>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                       <Badge variant="info" className="text-xs">
                         <Layers className="h-3 w-3 mr-1" />
-                        {companySections.length} sehemu
+                        {companySections.length}
                       </Badge>
-                      <Badge variant="secondary" className="text-xs">
+                      <Badge variant="secondary" className="text-xs hidden sm:flex">
                         COTWU {company.cotwu_rate}%
                       </Badge>
                       {isAdmin && (
                         <>
-                          <Button variant="ghost" size="icon" onClick={() => openEditCompany(company)}>
-                            <Pencil className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditCompany(company)}>
+                            <Pencil className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="text-destructive hover:text-destructive"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
                             onClick={() => setDeleteCompanyTarget(company)}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </>
                       )}

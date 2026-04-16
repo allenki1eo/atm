@@ -254,7 +254,7 @@ export default function AdvancesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
             <DollarSign className="h-5 w-5 text-muted-foreground" />
@@ -264,7 +264,7 @@ export default function AdvancesPage() {
             Fuatilia mikopo na malipo ya wafanyakazi
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => { resetSched(); setScheduleDialogOpen(true); }}>
             <CalendarClock className="h-4 w-4 mr-2" />
             Ratiba ya Mkopo
@@ -277,7 +277,7 @@ export default function AdvancesPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card className="border-l-4 border-l-green-500">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -336,7 +336,8 @@ export default function AdvancesPage() {
             />
           </div>
 
-          <Card>
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -400,12 +401,14 @@ export default function AdvancesPage() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </Card>
         </TabsContent>
 
         {/* Schedules tab */}
         <TabsContent value="schedules" className="mt-4 space-y-4">
-          <Card>
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -480,6 +483,7 @@ export default function AdvancesPage() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </Card>
 
           {/* Summary per employee */}
@@ -541,7 +545,7 @@ export default function AdvancesPage() {
               />
             </div>
             <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="Wafanyakazi wote" />
               </SelectTrigger>
               <SelectContent>
@@ -553,7 +557,8 @@ export default function AdvancesPage() {
             </Select>
           </div>
 
-          <Card>
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -600,6 +605,7 @@ export default function AdvancesPage() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </Card>
         </TabsContent>
       </Tabs>

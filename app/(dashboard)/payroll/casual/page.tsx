@@ -110,7 +110,7 @@ export default function CasualPayrollPage() {
           />
         </div>
         <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-full sm:w-40">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -124,7 +124,7 @@ export default function CasualPayrollPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Gross Total</p>
@@ -146,7 +146,8 @@ export default function CasualPayrollPage() {
       </div>
 
       {/* Table */}
-      <Card>
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -199,6 +200,7 @@ export default function CasualPayrollPage() {
             )}
           </TableBody>
         </Table>
+        </div>
       </Card>
     </div>
   );

@@ -161,7 +161,7 @@ export default function AttendanceImportPage() {
         /* Results view */
         <div className="space-y-4">
           {summary && (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Card><CardContent className="p-4 text-center">
                 <p className="text-2xl font-bold text-green-600">{summary.total_records_written}</p>
                 <p className="text-xs text-muted-foreground">Rekodi Zilizoingizwa</p>
@@ -177,7 +177,8 @@ export default function AttendanceImportPage() {
             </div>
           )}
 
-          <Card>
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -209,6 +210,7 @@ export default function AttendanceImportPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </Card>
 
           <div className="flex gap-3">

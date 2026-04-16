@@ -94,7 +94,7 @@ export default function PayrollPeriodsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
             <DollarSign className="h-5 w-5 text-muted-foreground" />
@@ -133,7 +133,8 @@ export default function PayrollPeriodsPage() {
       </Card>
 
       {/* Periods table */}
-      <Card>
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -195,6 +196,7 @@ export default function PayrollPeriodsPage() {
             )}
           </TableBody>
         </Table>
+        </div>
       </Card>
 
       {/* Lock confirmation dialog */}

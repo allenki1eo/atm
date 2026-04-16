@@ -331,7 +331,7 @@ export default function EmployeesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-muted-foreground" />
@@ -339,7 +339,7 @@ export default function EmployeesPage() {
           </div>
           <p className="text-muted-foreground mt-1">Dhibiti wafanyakazi wako</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {isAdmin && (
             <Button variant="outline" onClick={() => { resetImport(); setImportOpen(true); }}>
               <Upload className="h-4 w-4 mr-2" />
@@ -367,7 +367,7 @@ export default function EmployeesPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card><CardContent className="p-4">
           <p className="text-2xl font-bold">{employees?.length ?? 0}</p>
           <p className="text-xs text-muted-foreground">Jumla</p>
@@ -387,7 +387,8 @@ export default function EmployeesPage() {
       </div>
 
       {/* Table */}
-      <Card>
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -458,6 +459,7 @@ export default function EmployeesPage() {
             )}
           </TableBody>
         </Table>
+        </div>
       </Card>
 
       {/* Create/Edit Dialog */}
