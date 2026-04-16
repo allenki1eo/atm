@@ -160,8 +160,9 @@ export default function EmployeesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editingEmployee ? { ...data, id: editingEmployee.id } : data),
       });
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed");
+      return json;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
@@ -170,8 +171,8 @@ export default function EmployeesPage() {
       reset();
       toast({ title: editingEmployee ? "Employee updated" : "Employee created" });
     },
-    onError: () => {
-      toast({ title: "Error", variant: "destructive" });
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 

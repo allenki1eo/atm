@@ -66,11 +66,26 @@ export async function POST(request: NextRequest) {
   }
 
   const id = nanoid();
-  await db.execute({
-    sql: `INSERT INTO employees (id, name, phone, type, department, supervisor_id, daily_rate, monthly_salary, overtime_rule)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [id, name, phone, type, department, supervisor_id, daily_rate, monthly_salary, overtime_rule],
-  });
+  try {
+    await db.execute({
+      sql: `INSERT INTO employees (id, name, phone, type, department, supervisor_id, daily_rate, monthly_salary, overtime_rule)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        id, name, phone, type,
+        department ?? null,
+        supervisor_id ?? null,
+        daily_rate ?? 0,
+        monthly_salary ?? 0,
+        overtime_rule ?? "none",
+      ],
+    });
+  } catch (err) {
+    console.error("Employee insert error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Database error" },
+      { status: 500 }
+    );
+  }
 
   const result = await db.execute({ sql: "SELECT * FROM employees WHERE id = ?", args: [id] });
   return NextResponse.json(result.rows[0], { status: 201 });
@@ -90,10 +105,18 @@ export async function PUT(request: NextRequest) {
 
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
-  await db.execute({
-    sql: `UPDATE employees SET name=?, phone=?, type=?, department=?, supervisor_id=?, daily_rate=?, monthly_salary=?, overtime_rule=?, active=? WHERE id=?`,
-    args: [name, phone, type, department, supervisor_id, daily_rate, monthly_salary, overtime_rule, active ?? 1, id],
-  });
+  try {
+    await db.execute({
+      sql: `UPDATE employees SET name=?, phone=?, type=?, department=?, supervisor_id=?, daily_rate=?, monthly_salary=?, overtime_rule=?, active=? WHERE id=?`,
+      args: [name, phone, type, department ?? null, supervisor_id ?? null, daily_rate ?? 0, monthly_salary ?? 0, overtime_rule ?? "none", active ?? 1, id],
+    });
+  } catch (err) {
+    console.error("Employee update error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Database error" },
+      { status: 500 }
+    );
+  }
 
   const result = await db.execute({ sql: "SELECT * FROM employees WHERE id = ?", args: [id] });
   return NextResponse.json(result.rows[0]);
