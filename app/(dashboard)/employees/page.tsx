@@ -1,16 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { useSession } from "next-auth/react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Search, Users, Pencil } from "lucide-react";
+import { Plus, Search, Users, Pencil, Upload, Download, FileText, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
@@ -44,6 +45,22 @@ interface Employee {
   active: number;
 }
 
+interface ImportResult {
+  row: number;
+  name: string;
+  phone: string;
+  status: "success" | "error";
+  error?: string;
+  smsSent?: boolean;
+}
+
+interface ImportSummary {
+  total: number;
+  succeeded: number;
+  failed: number;
+  smsSent: number;
+}
+
 const employeeSchema = z.object({
   name: z.string().min(2, "Name required"),
   phone: z.string().min(7, "Valid phone required"),
@@ -57,11 +74,52 @@ const employeeSchema = z.object({
 
 type EmployeeForm = z.infer<typeof employeeSchema>;
 
+const CSV_TEMPLATE =
+  "name,phone,type,department,daily_rate,monthly_salary,overtime_rule\n" +
+  "Juma Salim,+255712345001,casual,Uendeshaji,15000,,none\n" +
+  "Fatuma Hassan,+255712345002,casual,Uendeshaji,15000,,none\n" +
+  "Robert Mwangi,+255712345003,fulltime,Fedha,,800000,all_days\n";
+
+function downloadTemplate() {
+  const blob = new Blob([CSV_TEMPLATE], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "trusttrack_import_template.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function parseCSVPreview(text: string): Record<string, string>[] {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+  return lines.slice(1).map((line) => {
+    const values = line.split(",").map((v) => v.trim());
+    const record: Record<string, string> = {};
+    headers.forEach((h, i) => { record[h] = values[i] ?? ""; });
+    return record;
+  });
+}
+
 export default function EmployeesPage() {
+  const { data: session } = useSession();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+
+  // CSV import state
+  const [importOpen, setImportOpen] = useState(false);
+  const [csvPreview, setCsvPreview] = useState<Record<string, string>[]>([]);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [importResults, setImportResults] = useState<ImportResult[] | null>(null);
+  const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const role = (session?.user as { role?: string })?.role;
+  const isAdmin = role === "admin";
 
   const { data: employees, isLoading } = useQuery({
     queryKey: ["employees"],
@@ -154,6 +212,68 @@ export default function EmployeesPage() {
     createMutation.mutate(payload);
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCsvFile(file);
+    setImportResults(null);
+    setImportSummary(null);
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      const preview = parseCSVPreview(text);
+      setCsvPreview(preview);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImport = async () => {
+    if (!csvFile) return;
+    setImporting(true);
+    setImportResults(null);
+    setImportSummary(null);
+
+    const formData = new FormData();
+    formData.append("file", csvFile);
+
+    try {
+      const res = await fetch("/api/employees/import", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast({ title: "Import failed", description: data.error, variant: "destructive" });
+        return;
+      }
+
+      setImportResults(data.results);
+      setImportSummary(data.summary);
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+
+      toast({
+        title: `Import done: ${data.summary.succeeded}/${data.summary.total} succeeded`,
+        description: data.summary.smsSent > 0
+          ? `SMS imetumwa kwa wafanyakazi ${data.summary.smsSent}`
+          : "SMS zitumwe baadaye (hazikuweza kutumwa sasa)",
+      });
+    } catch {
+      toast({ title: "Network error", variant: "destructive" });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const resetImport = () => {
+    setCsvFile(null);
+    setCsvPreview([]);
+    setImportResults(null);
+    setImportSummary(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -164,10 +284,18 @@ export default function EmployeesPage() {
           </div>
           <p className="text-muted-foreground mt-1">Manage your workforce</p>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Employee
-        </Button>
+        <div className="flex gap-2">
+          {isAdmin && (
+            <Button variant="outline" onClick={() => { resetImport(); setImportOpen(true); }}>
+              <Upload className="h-4 w-4 mr-2" />
+              Ingiza CSV
+            </Button>
+          )}
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Employee
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -362,6 +490,197 @@ export default function EmployeesPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* CSV Import Dialog */}
+      <Dialog open={importOpen} onOpenChange={(open) => { setImportOpen(open); if (!open) resetImport(); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Ingiza Wafanyakazi kwa CSV
+            </DialogTitle>
+            <DialogDescription>
+              Pakia faili ya CSV yenye orodha ya wafanyakazi. Kila mfanyakazi atapata PIN ya siri kupitia SMS.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Results view */}
+          {importResults ? (
+            <div className="space-y-4">
+              {/* Summary cards */}
+              {importSummary && (
+                <div className="grid grid-cols-3 gap-3">
+                  <Card>
+                    <CardContent className="p-3 text-center">
+                      <p className="text-2xl font-bold text-green-600">{importSummary.succeeded}</p>
+                      <p className="text-xs text-muted-foreground">Wamefanikiwa</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-3 text-center">
+                      <p className="text-2xl font-bold text-red-600">{importSummary.failed}</p>
+                      <p className="text-xs text-muted-foreground">Wameshindwa</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-3 text-center">
+                      <p className="text-2xl font-bold text-blue-600">{importSummary.smsSent}</p>
+                      <p className="text-xs text-muted-foreground">SMS Zimetumwa</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {/* Per-row results */}
+              <div className="max-h-64 overflow-y-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">Row</TableHead>
+                      <TableHead>Jina</TableHead>
+                      <TableHead>Simu</TableHead>
+                      <TableHead>Hali</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {importResults.map((r) => (
+                      <TableRow key={r.row}>
+                        <TableCell className="text-muted-foreground text-xs">{r.row}</TableCell>
+                        <TableCell className="font-medium">{r.name}</TableCell>
+                        <TableCell className="text-muted-foreground text-xs">{r.phone}</TableCell>
+                        <TableCell>
+                          {r.status === "success" ? (
+                            <div className="flex items-center gap-1 text-green-600">
+                              <CheckCircle2 className="h-4 w-4" />
+                              <span className="text-xs">
+                                {r.smsSent ? "OK + SMS" : "OK (SMS pending)"}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 text-red-600">
+                              <XCircle className="h-4 w-4" />
+                              <span className="text-xs">{r.error}</span>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={resetImport}>
+                  Ingiza Zaidi
+                </Button>
+                <Button onClick={() => setImportOpen(false)}>Maliza</Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Template download */}
+              <Card className="border-dashed">
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-8 w-8 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Pakua kiolezo cha CSV</p>
+                      <p className="text-xs text-muted-foreground">
+                        Safu: name, phone, type, department, daily_rate, monthly_salary, overtime_rule
+                      </p>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={downloadTemplate}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Kiolezo
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* File input */}
+              <div className="space-y-2">
+                <Label>Chagua Faili ya CSV</Label>
+                <Input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={handleFileChange}
+                  className="cursor-pointer"
+                />
+              </div>
+
+              {/* Preview */}
+              {csvPreview.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">Hakiki ({csvPreview.length} safu)</p>
+                    <Badge variant="secondary">{csvPreview.length} wafanyakazi</Badge>
+                  </div>
+                  <div className="max-h-56 overflow-y-auto rounded-lg border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Jina</TableHead>
+                          <TableHead>Simu</TableHead>
+                          <TableHead>Aina</TableHead>
+                          <TableHead>Idara</TableHead>
+                          <TableHead>Kiwango</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {csvPreview.map((row, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="font-medium">{row.name || <span className="text-destructive">—</span>}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{row.phone}</TableCell>
+                            <TableCell>
+                              {row.type ? (
+                                <Badge variant={row.type === "casual" ? "info" : "success"} className="text-xs capitalize">
+                                  {row.type}
+                                </Badge>
+                              ) : <span className="text-destructive text-xs">—</span>}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{row.department || "—"}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {row.type === "casual"
+                                ? row.daily_rate ? `${row.daily_rate}/siku` : "—"
+                                : row.monthly_salary ? `${row.monthly_salary}/mwezi` : "—"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Kila mfanyakazi atapewa PIN ya nasibu na kutumwa SMS ya maelezo ya kuingia.
+                  </p>
+                </div>
+              )}
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setImportOpen(false)}>
+                  Ghairi
+                </Button>
+                <Button
+                  onClick={handleImport}
+                  disabled={!csvFile || csvPreview.length === 0 || importing}
+                >
+                  {importing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Inaingiza...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Ingiza Wafanyakazi {csvPreview.length > 0 ? `(${csvPreview.length})` : ""}
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

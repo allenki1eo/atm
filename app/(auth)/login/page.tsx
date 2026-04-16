@@ -14,8 +14,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "@/hooks/use-toast";
 
 const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  identifier: z.string().min(3, "Ingiza barua pepe au nambari ya simu"),
+  password: z.string().min(4, "PIN/Password inahitajika"),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
@@ -37,18 +37,19 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       const result = await signIn("credentials", {
-        email: data.email,
+        email: data.identifier,
         password: data.password,
         redirect: false,
       });
 
       if (result?.error) {
         toast({
-          title: "Login failed",
-          description: "Invalid email or password. Please try again.",
+          title: "Imeshindwa kuingia",
+          description: "Barua pepe/simu au nywila si sahihi. Jaribu tena.",
           variant: "destructive",
         });
       } else {
+        // The middleware will redirect employees to /me automatically
         router.push("/");
         router.refresh();
       }
@@ -73,29 +74,29 @@ export default function LoginPage() {
 
         <Card className="border-0 shadow-2xl">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-xl">Welcome back</CardTitle>
+            <CardTitle className="text-xl">Karibu</CardTitle>
             <CardDescription>
-              Sign in to your account to continue
+              Ingia kwenye akaunti yako ili kuendelea
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="identifier">Barua Pepe / Nambari ya Simu</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  autoComplete="email"
-                  {...register("email")}
+                  id="identifier"
+                  type="text"
+                  placeholder="+255712345678 au you@example.com"
+                  autoComplete="username"
+                  {...register("identifier")}
                 />
-                {errors.email && (
-                  <p className="text-xs text-destructive">{errors.email.message}</p>
+                {errors.identifier && (
+                  <p className="text-xs text-destructive">{errors.identifier.message}</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">Nywila / PIN</Label>
                 <div className="relative">
                   <Input
                     id="password"
@@ -121,10 +122,10 @@ export default function LoginPage() {
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Signing in...
+                    Inaingiza...
                   </>
                 ) : (
-                  "Sign in"
+                  "Ingia"
                 )}
               </Button>
             </form>
@@ -136,6 +137,7 @@ export default function LoginPage() {
                 <p><span className="font-medium">Admin:</span> admin@trusttrack.com / admin123</p>
                 <p><span className="font-medium">Supervisor:</span> supervisor@trusttrack.com / supervisor123</p>
                 <p><span className="font-medium">HR:</span> hr@trusttrack.com / hr123</p>
+                <p><span className="font-medium">Mfanyakazi:</span> nambari ya simu / PIN iliyotumwa</p>
               </div>
             </div>
           </CardContent>

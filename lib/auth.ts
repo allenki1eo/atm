@@ -8,8 +8,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     Credentials({
       name: "credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
+        email: { label: "Email / Simu", type: "text" },
+        password: { label: "Password / PIN", type: "password" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
@@ -18,18 +18,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           await initializeDatabase();
           await seedDemoData();
 
+          const identifier = (credentials.email as string).trim();
+
+          // Try login by email first, then by phone number
           const result = await db.execute({
-            sql: "SELECT * FROM users WHERE email = ?",
-            args: [credentials.email as string],
+            sql: "SELECT * FROM users WHERE email = ? OR phone = ?",
+            args: [identifier, identifier],
           });
 
           const user = result.rows[0] as unknown as {
             id: string;
-            email: string;
+            email: string | null;
             name: string;
             role: string;
-            phone: string;
+            phone: string | null;
             password_hash: string;
+            employee_id: string | null;
           } | undefined;
 
           if (!user) return null;
@@ -43,10 +47,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
           return {
             id: user.id,
-            email: user.email,
+            email: user.email ?? user.phone ?? "",
             name: user.name,
             role: user.role,
-            phone: user.phone,
+            phone: user.phone ?? "",
+            employeeId: user.employee_id ?? user.id,
           };
         } catch (error) {
           console.error("Auth error:", error);
@@ -61,6 +66,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.id = user.id;
         token.role = (user as { role: string }).role;
         token.phone = (user as { phone: string }).phone;
+        token.employeeId = (user as { employeeId: string }).employeeId;
       }
       return token;
     },
@@ -69,6 +75,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.id = token.id as string;
         (session.user as { role: string }).role = token.role as string;
         (session.user as { phone: string }).phone = token.phone as string;
+        (session.user as { employeeId: string }).employeeId = token.employeeId as string;
       }
       return session;
     },

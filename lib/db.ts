@@ -12,11 +12,12 @@ export async function initializeDatabase() {
   await db.executeMultiple(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
-      email TEXT UNIQUE NOT NULL,
+      email TEXT UNIQUE,
       name TEXT NOT NULL,
-      role TEXT CHECK(role IN ('supervisor', 'hr', 'admin')) NOT NULL,
-      phone TEXT,
+      role TEXT CHECK(role IN ('supervisor', 'hr', 'admin', 'employee')) NOT NULL,
+      phone TEXT UNIQUE,
       password_hash TEXT NOT NULL,
+      employee_id TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
