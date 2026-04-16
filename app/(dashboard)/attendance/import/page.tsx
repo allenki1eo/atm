@@ -161,18 +161,18 @@ export default function AttendanceImportPage() {
         /* Results view */
         <div className="space-y-4">
           {summary && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Card><CardContent className="p-4 text-center">
-                <p className="text-2xl font-bold text-green-600">{summary.total_records_written}</p>
-                <p className="text-xs text-muted-foreground">Rekodi Zilizoingizwa</p>
+            <div className="grid grid-cols-3 gap-2">
+              <Card><CardContent className="p-3 text-center">
+                <p className="text-xl font-bold text-green-600">{summary.total_records_written}</p>
+                <p className="text-xs text-muted-foreground">Zilizoingizwa</p>
               </CardContent></Card>
-              <Card><CardContent className="p-4 text-center">
-                <p className="text-2xl font-bold text-blue-600">{summary.total_employees}</p>
+              <Card><CardContent className="p-3 text-center">
+                <p className="text-xl font-bold text-blue-600">{summary.total_employees}</p>
                 <p className="text-xs text-muted-foreground">Wafanyakazi</p>
               </CardContent></Card>
-              <Card><CardContent className="p-4 text-center">
-                <p className="text-2xl font-bold text-amber-600">{summary.skipped_locked}</p>
-                <p className="text-xs text-muted-foreground">Zilizorukwa (Imefungwa)</p>
+              <Card><CardContent className="p-3 text-center">
+                <p className="text-xl font-bold text-amber-600">{summary.skipped_locked}</p>
+                <p className="text-xs text-muted-foreground">Zilizorukwa</p>
               </CardContent></Card>
             </div>
           )}

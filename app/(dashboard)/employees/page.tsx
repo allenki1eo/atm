@@ -369,19 +369,19 @@ export default function EmployeesPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card><CardContent className="p-4">
-          <p className="text-2xl font-bold">{employees?.length ?? 0}</p>
+      <div className="grid grid-cols-3 gap-2">
+        <Card><CardContent className="p-3">
+          <p className="text-xl font-bold">{employees?.length ?? 0}</p>
           <p className="text-xs text-muted-foreground">Jumla</p>
         </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <p className="text-2xl font-bold text-blue-600">
+        <Card><CardContent className="p-3">
+          <p className="text-xl font-bold text-blue-600">
             {employees?.filter((e) => e.type === "casual").length ?? 0}
           </p>
           <p className="text-xs text-muted-foreground">Mkataba</p>
         </CardContent></Card>
-        <Card><CardContent className="p-4">
-          <p className="text-2xl font-bold text-green-600">
+        <Card><CardContent className="p-3">
+          <p className="text-xl font-bold text-green-600">
             {employees?.filter((e) => e.type === "fulltime").length ?? 0}
           </p>
           <p className="text-xs text-muted-foreground">Kudumu</p>
@@ -399,8 +399,8 @@ export default function EmployeesPage() {
               <TableHead className="hidden sm:table-cell">Idara</TableHead>
               <TableHead className="hidden md:table-cell">Simu</TableHead>
               <TableHead className="hidden lg:table-cell">Msimamizi</TableHead>
-              <TableHead>Kiwango</TableHead>
-              {canManage && <TableHead className="w-20"></TableHead>}
+              <TableHead className="hidden sm:table-cell">Kiwango</TableHead>
+              {canManage && <TableHead className="w-16"></TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -419,7 +419,16 @@ export default function EmployeesPage() {
             ) : (
               filtered.map((emp) => (
                 <TableRow key={emp.id}>
-                  <TableCell className="font-medium">{emp.name}</TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium leading-tight">{emp.name}</p>
+                      <p className="text-xs text-muted-foreground sm:hidden">
+                        {emp.type === "casual"
+                          ? `${formatCurrency(emp.daily_rate)}/siku`
+                          : `${formatCurrency(emp.monthly_salary)}/mwezi`}
+                      </p>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <Badge variant={emp.type === "casual" ? "info" : "success"} className="capitalize">
                       {emp.type === "casual" ? "Mkataba" : "Kudumu"}
@@ -434,7 +443,7 @@ export default function EmployeesPage() {
                   <TableCell className="hidden lg:table-cell text-muted-foreground text-xs">
                     {emp.supervisor_id ? supervisorName(emp.supervisor_id) : "—"}
                   </TableCell>
-                  <TableCell className="text-sm">
+                  <TableCell className="hidden sm:table-cell text-sm">
                     {emp.type === "casual"
                       ? `${formatCurrency(emp.daily_rate)}/siku`
                       : `${formatCurrency(emp.monthly_salary)}/mwezi`}

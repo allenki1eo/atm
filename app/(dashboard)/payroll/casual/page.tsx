@@ -124,21 +124,21 @@ export default function CasualPayrollPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2">
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Gross Total</p>
             <p className="text-xl font-bold text-blue-700">{formatCurrency(totalGross)}</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Advances</p>
             <p className="text-xl font-bold text-red-600">-{formatCurrency(totalAdvances)}</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Net Payable</p>
             <p className="text-xl font-bold text-green-700">{formatCurrency(totalNet)}</p>
           </CardContent>
@@ -151,13 +151,13 @@ export default function CasualPayrollPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Employee</TableHead>
-              <TableHead>Days</TableHead>
-              <TableHead>Rate/Day</TableHead>
-              <TableHead>Gross</TableHead>
-              <TableHead>Advances</TableHead>
-              <TableHead>Net</TableHead>
-              <TableHead>SMS</TableHead>
+              <TableHead>Mfanyakazi</TableHead>
+              <TableHead>Siku</TableHead>
+              <TableHead className="hidden sm:table-cell">Kiwango</TableHead>
+              <TableHead className="hidden sm:table-cell">Jumla</TableHead>
+              <TableHead className="hidden sm:table-cell">Mikopo</TableHead>
+              <TableHead>Malipo</TableHead>
+              <TableHead className="hidden sm:table-cell">SMS</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -173,8 +173,8 @@ export default function CasualPayrollPage() {
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   {data
-                    ? "No casual employees found"
-                    : "Lock the period first to generate payslips"}
+                    ? "Hakuna wafanyakazi wa mkataba"
+                    : "Funga kipindi kwanza ili kupata malipo"}
                 </TableCell>
               </TableRow>
             ) : (
@@ -182,17 +182,17 @@ export default function CasualPayrollPage() {
                 <TableRow key={row.employee_id}>
                   <TableCell className="font-medium">{row.employee_name}</TableCell>
                   <TableCell>{row.days_worked}</TableCell>
-                  <TableCell>{formatCurrency(row.daily_rate)}</TableCell>
-                  <TableCell className="text-blue-700">{formatCurrency(row.gross_amount)}</TableCell>
-                  <TableCell className="text-red-600">
+                  <TableCell className="hidden sm:table-cell">{formatCurrency(row.daily_rate)}</TableCell>
+                  <TableCell className="hidden sm:table-cell text-blue-700">{formatCurrency(row.gross_amount)}</TableCell>
+                  <TableCell className="hidden sm:table-cell text-red-600">
                     {row.total_advances > 0 ? `-${formatCurrency(row.total_advances)}` : "—"}
                   </TableCell>
                   <TableCell className="font-semibold text-green-700">
                     {formatCurrency(row.net_amount)}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden sm:table-cell">
                     <Badge variant={row.sent_sms ? "success" : "outline"}>
-                      {row.sent_sms ? "Sent" : "Pending"}
+                      {row.sent_sms ? "Imetumwa" : "Inasubiri"}
                     </Badge>
                   </TableCell>
                 </TableRow>

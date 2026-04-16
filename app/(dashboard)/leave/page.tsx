@@ -444,26 +444,26 @@ export default function LeavePage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2">
         <Card>
-          <CardContent className="p-4">
-            <p className="text-2xl font-bold text-amber-600">
+          <CardContent className="p-3">
+            <p className="text-xl font-bold text-amber-600">
               {requests.filter((r) => r.status === "pending").length}
             </p>
             <p className="text-xs text-muted-foreground">Inasubiri</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <p className="text-2xl font-bold text-green-600">
+          <CardContent className="p-3">
+            <p className="text-xl font-bold text-green-600">
               {requests.filter((r) => r.status === "approved").length}
             </p>
             <p className="text-xs text-muted-foreground">Imeidhinishwa</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4">
-            <p className="text-2xl font-bold text-red-600">
+          <CardContent className="p-3">
+            <p className="text-xl font-bold text-red-600">
               {requests.filter((r) => r.status === "denied").length}
             </p>
             <p className="text-xs text-muted-foreground">Imekataliwa</p>
