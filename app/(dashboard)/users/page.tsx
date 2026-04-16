@@ -34,16 +34,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
 
 interface SystemUser {
@@ -441,26 +431,26 @@ export default function UsersPage() {
       </Dialog>
 
       {/* Delete confirmation */}
-      <AlertDialog open={!!deleteUser} onOpenChange={(o) => !o && setDeleteUser(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Futa Mtumiaji</AlertDialogTitle>
-            <AlertDialogDescription>
+      <Dialog open={!!deleteUser} onOpenChange={(o) => !o && setDeleteUser(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Futa Mtumiaji</DialogTitle>
+            <DialogDescription>
               Una uhakika wa kufuta <strong>{deleteUser?.name}</strong>? Hatua hii haiwezi kutenduliwa.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Ghairi</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive hover:bg-destructive/90"
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteUser(null)}>Ghairi</Button>
+            <Button
+              variant="destructive"
               onClick={() => deleteUser && deleteMutation.mutate(deleteUser.id)}
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? "Inafuta..." : "Futa"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* New credentials display */}
       <Dialog open={!!newCredentials} onOpenChange={(o) => !o && setNewCredentials(null)}>
