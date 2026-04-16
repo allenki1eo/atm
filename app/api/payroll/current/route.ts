@@ -1,0 +1,96 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+
+export async function GET(request: NextRequest) {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { searchParams } = new URL(request.url);
+  const employeeId = searchParams.get("employee_id") ?? session.user.id;
+  const now = new Date();
+  const year = parseInt(searchParams.get("year") ?? String(now.getFullYear()));
+  const month = parseInt(searchParams.get("month") ?? String(now.getMonth() + 1));
+
+  const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+  const endDate = new Date(year, month, 0).toISOString().split("T")[0];
+
+  // Get employee info
+  const empResult = await db.execute({
+    sql: "SELECT * FROM employees WHERE id = ?",
+    args: [employeeId!],
+  });
+
+  if (!empResult.rows.length) {
+    return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+  }
+
+  const emp = empResult.rows[0] as unknown as {
+    id: string;
+    name: string;
+    type: string;
+    daily_rate: number;
+    monthly_salary: number;
+    overtime_rule: string;
+  };
+
+  // Get attendance for the period
+  const attendResult = await db.execute({
+    sql: `SELECT status, date FROM attendance
+          WHERE employee_id = ? AND date >= ? AND date <= ?`,
+    args: [employeeId!, startDate, endDate],
+  });
+
+  const records = attendResult.rows as unknown as { status: string; date: string }[];
+  const presentDays = records.filter((r) =>
+    ["present", "late"].includes(r.status)
+  ).length;
+  const halfDays = records.filter((r) => r.status === "half_day").length;
+  const effectiveDays = presentDays + halfDays * 0.5;
+
+  // Calculate gross
+  let grossAmount = 0;
+  if (emp.type === "casual") {
+    grossAmount = Math.round(effectiveDays * emp.daily_rate);
+  } else {
+    grossAmount = emp.monthly_salary;
+  }
+
+  // Get advances
+  const advanceResult = await db.execute({
+    sql: `SELECT SUM(amount) as total FROM transactions
+          WHERE employee_id = ? AND type = 'advance_given'
+          AND created_at >= ? AND created_at <= ?`,
+    args: [employeeId!, startDate + " 00:00:00", endDate + " 23:59:59"],
+  });
+  const totalAdvances = Math.abs((advanceResult.rows[0] as unknown as { total: number }).total ?? 0);
+
+  // Net amount
+  const netAmount = grossAmount - totalAdvances;
+
+  // Get period info
+  const periodResult = await db.execute({
+    sql: "SELECT * FROM payroll_periods WHERE month = ? AND year = ?",
+    args: [month, year],
+  });
+  const period = periodResult.rows[0] ?? null;
+
+  return NextResponse.json({
+    employee: emp,
+    period: { month, year, start_date: startDate, end_date: endDate, info: period },
+    attendance: {
+      present: presentDays,
+      half_day: halfDays,
+      absent: records.filter((r) => r.status === "absent").length,
+      effective_days: effectiveDays,
+      total_records: records.length,
+    },
+    financial: {
+      daily_rate: emp.daily_rate,
+      monthly_salary: emp.monthly_salary,
+      gross_amount: grossAmount,
+      total_advances: totalAdvances,
+      net_amount: netAmount,
+    },
+  });
+}
