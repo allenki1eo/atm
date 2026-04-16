@@ -10,53 +10,56 @@ const STATUS_MAP: Record<string, string> = {
   h: "half_day",
 };
 
-/**
- * Parses a phone number from various formats including scientific notation.
- * Excel converts +255... to 2.557E+11 format when saving CSV.
- * We need to convert it back to proper phone format.
- */
+function detectSeparator(line: string): string {
+  const tabs = (line.match(/\t/g) ?? []).length;
+  const commas = (line.match(/,/g) ?? []).length;
+  return tabs > commas ? "\t" : ",";
+}
+
+// Convert M/D/YYYY or MM/DD/YYYY → YYYY-MM-DD; pass through YYYY-MM-DD unchanged
+function normalizeDate(raw: string): string {
+  const s = raw.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const parts = s.split("/");
+  if (parts.length === 3) {
+    const [m, d, y] = parts;
+    return `${y.padStart(4, "0")}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+  return s;
+}
+
+// Normalize phone to +255... format, handling:
+// - scientific notation (Excel: 2.557E+11)
+// - bare digits without +
+// - already correct +255... format
 function parsePhoneNumber(raw: string): string | null {
-  // Remove quotes (Excel sometimes wraps cells in quotes)
   const trimmed = raw.trim().replace(/^["']|["']$/g, "");
 
-  // Already in correct format
-  if (trimmed.startsWith("+")) {
-    return trimmed;
+  if (trimmed.startsWith("+")) return trimmed;
+
+  // Scientific notation (Excel: 2.557E+11)
+  const sci = trimmed.match(/^([\d.]+)[eE]([+-]?\d+)$/);
+  if (sci) {
+    const full = Math.round(parseFloat(sci[1]) * Math.pow(10, parseInt(sci[2], 10))).toString();
+    if (full.startsWith("255") && full.length >= 12) return `+${full}`;
+    if (full.startsWith("0") && full.length >= 10) return `+255${full.substring(1)}`;
+    return full.length >= 9 ? `+${full}` : null;
   }
 
-  // Check if it's scientific notation (e.g., 2.557E+11)
-  const sciNotationMatch = trimmed.match(/^([\d.]+)[eE]([+-]?\d+)$/);
-  if (sciNotationMatch) {
-    const mantissa = parseFloat(sciNotationMatch[1]);
-    const exponent = parseInt(sciNotationMatch[2], 10);
-    // Convert to full number string
-    const fullNumber = mantissa * Math.pow(10, exponent);
-    const numStr = Math.round(fullNumber).toString();
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.startsWith("255") && digits.length >= 12) return `+${digits}`;
+  if (digits.startsWith("0") && digits.length >= 10) return `+255${digits.substring(1)}`;
+  return digits.length >= 9 ? digits : null;
+}
 
-    // If it looks like a Tanzanian phone number (starts with 255)
-    if (numStr.startsWith("255") && numStr.length >= 12) {
-      return `+${numStr}`;
-    }
-
-    // If it starts with 0, convert to +255 format
-    if (numStr.startsWith("0") && numStr.length >= 10) {
-      return `+255${numStr.substring(1)}`;
-    }
-
-    return numStr.length >= 9 ? `+${numStr}` : null;
-  }
-
-  // Plain number format - check if it needs +255 prefix
-  const digitsOnly = trimmed.replace(/\D/g, "");
-  if (digitsOnly.startsWith("255") && digitsOnly.length >= 12) {
-    return `+${digitsOnly}`;
-  }
-  if (digitsOnly.startsWith("0") && digitsOnly.length >= 10) {
-    return `+255${digitsOnly.substring(1)}`;
-  }
-
-  // Return as-is if it's a valid phone number
-  return trimmed.length >= 9 ? trimmed : null;
+// Look up employee by phone, trying exact, with +, and without +
+async function findEmployeeByPhone(phone: string) {
+  const cleaned = phone.replace(/^\+/, "");
+  const result = await db.execute({
+    sql: "SELECT id, name FROM employees WHERE phone = ? OR phone = ? OR phone = ?",
+    args: [phone, "+" + cleaned, cleaned],
+  });
+  return result.rows[0] as unknown as { id: string; name: string } | undefined;
 }
 
 export async function POST(request: NextRequest) {
@@ -87,7 +90,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "CSV must have a header row and at least one data row" }, { status: 400 });
   }
 
-  const headerCols = lines[0].split(",").map((h) => h.trim());
+  const sep = detectSeparator(lines[0]);
+  const headerCols = lines[0].split(sep).map((h) => h.trim());
+
   if (headerCols[0].toLowerCase() !== "phone") {
     return NextResponse.json(
       { error: "First column of CSV header must be 'phone'" },
@@ -95,7 +100,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const dateCols = headerCols.slice(1);
+  // Normalize all date headers from M/D/YYYY → YYYY-MM-DD
+  const dateCols = headerCols.slice(1).map(normalizeDate);
   const today = new Date().toISOString().substring(0, 10);
   const markedBy = session.user.id!;
 
@@ -110,12 +116,11 @@ export async function POST(request: NextRequest) {
   }[] = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(",").map((c) => c.trim());
+    const cols = lines[i].split(sep).map((c) => c.trim());
     const rawPhone = cols[0];
 
     if (!rawPhone) continue;
 
-    // Parse phone number (handles scientific notation from Excel)
     const phone = parsePhoneNumber(rawPhone);
 
     if (!phone) {
@@ -123,13 +128,7 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
-    // Look up employee by phone
-    const empResult = await db.execute({
-      sql: "SELECT id, name FROM employees WHERE phone = ?",
-      args: [phone],
-    });
-
-    const emp = empResult.rows[0] as unknown as { id: string; name: string } | undefined;
+    const emp = await findEmployeeByPhone(phone);
 
     if (!emp) {
       results.push({ phone, name: null, dates_processed: 0, dates_skipped: 0 });
@@ -154,7 +153,6 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Check if record is locked
       const existingResult = await db.execute({
         sql: "SELECT id, is_locked FROM attendance WHERE employee_id = ? AND date = ?",
         args: [emp.id, dateStr],
@@ -171,7 +169,6 @@ export async function POST(request: NextRequest) {
           skippedLocked++;
           continue;
         }
-
         await db.execute({
           sql: "UPDATE attendance SET status = ?, marked_by = ?, marked_at = CURRENT_TIMESTAMP WHERE id = ?",
           args: [mappedStatus, markedBy, existing.id],
