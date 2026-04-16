@@ -11,8 +11,8 @@ export async function PUT(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const role = (session.user as { role: string }).role;
-  if (role !== "hr" && role !== "admin") {
-    return NextResponse.json({ error: "Forbidden: HR or admin only" }, { status: 403 });
+  if (role !== "hr" && role !== "admin" && role !== "supervisor") {
+    return NextResponse.json({ error: "Forbidden: HR, admin, or supervisor only" }, { status: 403 });
   }
 
   const { id } = await params;

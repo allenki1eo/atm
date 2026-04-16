@@ -33,10 +33,16 @@ interface Employee {
   type: "casual" | "fulltime";
   department: string;
   supervisor_id: string;
+  company_id: string | null;
   daily_rate: number;
   monthly_salary: number;
   overtime_rule: string;
   active: number;
+}
+
+interface Company {
+  id: string;
+  name: string;
 }
 
 interface SupervisorUser {
@@ -67,6 +73,7 @@ const employeeSchema = z.object({
   type: z.enum(["casual", "fulltime"]),
   department: z.string().optional(),
   supervisor_id: z.string().optional(),
+  company_id: z.string().optional(),
   daily_rate: z.number().min(0).optional(),
   monthly_salary: z.number().min(0).optional(),
   overtime_rule: z.enum(["all_days", "holidays_only", "none"]).optional(),
@@ -147,6 +154,16 @@ export default function EmployeesPage() {
     (u) => u.role === "supervisor" || u.role === "admin" || u.role === "hr"
   );
 
+  const { data: companies } = useQuery({
+    queryKey: ["companies"],
+    queryFn: async () => {
+      const res = await fetch("/api/companies");
+      if (!res.ok) return [];
+      return res.json() as Promise<Company[]>;
+    },
+    enabled: canManage,
+  });
+
   const {
     register,
     handleSubmit,
@@ -225,6 +242,7 @@ export default function EmployeesPage() {
       type: emp.type,
       department: emp.department,
       supervisor_id: emp.supervisor_id ?? "",
+      company_id: emp.company_id ?? "",
       daily_rate: emp.daily_rate,
       monthly_salary: emp.monthly_salary,
       overtime_rule: emp.overtime_rule as "all_days" | "holidays_only" | "none",
@@ -503,6 +521,27 @@ export default function EmployeesPage() {
                   {supervisors.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.name} ({s.role})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Company assignment */}
+            <div className="space-y-2">
+              <Label>Kampuni</Label>
+              <Select
+                value={watch("company_id") ?? ""}
+                onValueChange={(v) => setValue("company_id", v === "none" ? "" : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Chagua kampuni..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— Hakuna kampuni —</SelectItem>
+                  {(companies ?? []).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -160,6 +160,19 @@ export async function initializeDatabase() {
       UNIQUE(employee_id, year),
       FOREIGN KEY (employee_id) REFERENCES employees(id)
     );
+
+    CREATE TABLE IF NOT EXISTS advance_schedules (
+      id TEXT PRIMARY KEY,
+      employee_id TEXT NOT NULL,
+      total_debt INTEGER NOT NULL,
+      monthly_deduction INTEGER NOT NULL,
+      remaining_debt INTEGER NOT NULL,
+      notes TEXT,
+      status TEXT CHECK(status IN ('active','cleared')) DEFAULT 'active',
+      created_by TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (employee_id) REFERENCES employees(id)
+    );
   `);
 
   await migrateDatabase();
@@ -175,6 +188,11 @@ export async function migrateDatabase() {
     "ALTER TABLE employees ADD COLUMN heslb_amount INTEGER DEFAULT 0",
   ];
 
+  const leaveColumns = [
+    "ALTER TABLE leave_requests ADD COLUMN leave_type TEXT",
+    "ALTER TABLE leave_requests ADD COLUMN employee_phone TEXT",
+  ];
+
   const payslipColumns = [
     "ALTER TABLE payslips ADD COLUMN nssf_amount INTEGER DEFAULT 0",
     "ALTER TABLE payslips ADD COLUMN cotwu_amount INTEGER DEFAULT 0",
@@ -184,7 +202,7 @@ export async function migrateDatabase() {
     "ALTER TABLE payslips ADD COLUMN leave_days INTEGER DEFAULT 0",
   ];
 
-  for (const sql of [...employeeColumns, ...payslipColumns]) {
+  for (const sql of [...employeeColumns, ...payslipColumns, ...leaveColumns]) {
     try {
       await db.execute(sql);
     } catch {

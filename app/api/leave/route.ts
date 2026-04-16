@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
   await ensureDatabase();
 
   const body = await request.json();
-  const { employee_id, start_date, end_date, reason } = body;
+  const { employee_id, start_date, end_date, reason, leave_type, employee_phone } = body;
 
   if (!employee_id || !start_date || !end_date) {
     return NextResponse.json(
@@ -148,9 +148,9 @@ export async function POST(request: NextRequest) {
   const requestId = nanoid();
 
   await db.execute({
-    sql: `INSERT INTO leave_requests (id, employee_id, start_date, end_date, days, reason, status)
-          VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
-    args: [requestId, employee_id, start_date, end_date, days, reason ?? null],
+    sql: `INSERT INTO leave_requests (id, employee_id, start_date, end_date, days, reason, leave_type, employee_phone, status)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+    args: [requestId, employee_id, start_date, end_date, days, reason ?? null, leave_type ?? null, employee_phone ?? null],
   });
 
   // Upsert leave_balances for the year

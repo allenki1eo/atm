@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { DollarSign, Plus, Search, TrendingDown, TrendingUp, Loader2, History } from "lucide-react";
+import { DollarSign, Plus, Search, TrendingDown, TrendingUp, Loader2, History, CalendarClock, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +43,18 @@ interface Transaction {
   description: string;
   created_at: string;
 }
+interface AdvanceSchedule {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  employee_phone: string;
+  total_debt: number;
+  monthly_deduction: number;
+  remaining_debt: number;
+  notes: string | null;
+  status: "active" | "cleared";
+  created_at: string;
+}
 
 const txSchema = z.object({
   employee_id: z.string().min(1, "Chagua mfanyakazi"),
@@ -51,6 +63,14 @@ const txSchema = z.object({
   description: z.string().optional(),
 });
 type TxForm = z.infer<typeof txSchema>;
+
+const scheduleSchema = z.object({
+  employee_id: z.string().min(1, "Chagua mfanyakazi"),
+  total_debt: z.number().min(1, "Deni lazima liwe zaidi ya 0"),
+  monthly_deduction: z.number().min(1, "Kiasi cha kila mwezi lazima kiwe zaidi ya 0"),
+  notes: z.string().optional(),
+});
+type ScheduleForm = z.infer<typeof scheduleSchema>;
 
 const TX_LABELS: Record<string, string> = {
   advance_given: "Mkopo Uliotolewa",
@@ -62,6 +82,7 @@ export default function AdvancesPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<string>("");
 
   const { data: employees, isLoading: empLoading } = useQuery({
@@ -92,6 +113,15 @@ export default function AdvancesPage() {
     enabled: !!selectedEmployee,
   });
 
+  const { data: schedules, isLoading: schedLoading } = useQuery({
+    queryKey: ["advance-schedules"],
+    queryFn: async () => {
+      const res = await fetch("/api/advances/schedule");
+      if (!res.ok) throw new Error("Failed");
+      return res.json() as Promise<AdvanceSchedule[]>;
+    },
+  });
+
   const {
     register,
     handleSubmit,
@@ -105,6 +135,78 @@ export default function AdvancesPage() {
   });
 
   const txType = watch("type");
+
+  const {
+    register: regSched,
+    handleSubmit: handleSchedSubmit,
+    setValue: setSchedValue,
+    watch: watchSched,
+    reset: resetSched,
+    formState: { errors: schedErrors },
+  } = useForm<ScheduleForm>({ resolver: zodResolver(scheduleSchema) });
+
+  const watchSchedEmployee = watchSched("employee_id");
+  const watchTotalDebt = watchSched("total_debt");
+  const watchMonthly = watchSched("monthly_deduction");
+  const monthsToRepay =
+    watchTotalDebt > 0 && watchMonthly > 0
+      ? Math.ceil(watchTotalDebt / watchMonthly)
+      : 0;
+
+  // Active schedules for the selected employee (for warning)
+  const existingActive = (schedules ?? []).filter(
+    (s) => s.employee_id === watchSchedEmployee && s.status === "active"
+  );
+  const existingDebt = existingActive.reduce((s, sc) => s + sc.remaining_debt, 0);
+
+  const scheduleMutation = useMutation({
+    mutationFn: async (data: ScheduleForm) => {
+      const res = await fetch("/api/advances/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...data,
+          total_debt: Math.round(data.total_debt),
+          monthly_deduction: Math.round(data.monthly_deduction),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed");
+      return json;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["advance-schedules"] });
+      setScheduleDialogOpen(false);
+      resetSched();
+      toast({
+        title: data.warning ? "Ratiba Imeundwa (Tahadhari)" : "Ratiba Imeundwa",
+        description: data.warning ?? "Ratiba ya mkopo imehifadhiwa.",
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Hitilafu", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const clearScheduleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch("/api/advances/schedule", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status: "cleared", remaining_debt: 0 }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed");
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["advance-schedules"] });
+      toast({ title: "Imefutwa", description: "Deni limewekwa kama limelipwa." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Hitilafu", description: err.message, variant: "destructive" });
+    },
+  });
 
   const createMutation = useMutation({
     mutationFn: async (data: TxForm) => {
@@ -162,10 +264,16 @@ export default function AdvancesPage() {
             Fuatilia mikopo na malipo ya wafanyakazi
           </p>
         </div>
-        <Button onClick={() => { reset({ type: "advance_given" }); setDialogOpen(true); }}>
-          <Plus className="h-4 w-4 mr-2" />
-          Muamala Mpya
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => { resetSched(); setScheduleDialogOpen(true); }}>
+            <CalendarClock className="h-4 w-4 mr-2" />
+            Ratiba ya Mkopo
+          </Button>
+          <Button onClick={() => { reset({ type: "advance_given" }); setDialogOpen(true); }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Muamala Mpya
+          </Button>
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -212,6 +320,7 @@ export default function AdvancesPage() {
       <Tabs defaultValue="balances">
         <TabsList>
           <TabsTrigger value="balances">Bakaa za Wafanyakazi</TabsTrigger>
+          <TabsTrigger value="schedules">Ratiba za Mikopo</TabsTrigger>
           <TabsTrigger value="history">Historia ya Miamala</TabsTrigger>
         </TabsList>
 
@@ -294,6 +403,131 @@ export default function AdvancesPage() {
           </Card>
         </TabsContent>
 
+        {/* Schedules tab */}
+        <TabsContent value="schedules" className="mt-4 space-y-4">
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Mfanyakazi</TableHead>
+                  <TableHead>Deni la Jumla</TableHead>
+                  <TableHead>Iliyobaki</TableHead>
+                  <TableHead>Kila Mwezi</TableHead>
+                  <TableHead>Miezi Iliyobaki</TableHead>
+                  <TableHead>Hali</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {schedLoading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {[1,2,3,4,5,6,7].map((j) => (
+                        <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : (schedules ?? []).length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      Hakuna ratiba za mikopo. Bonyeza &ldquo;Ratiba ya Mkopo&rdquo; kuongeza.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  (schedules ?? []).map((s) => {
+                    const monthsLeft = s.remaining_debt > 0
+                      ? Math.ceil(s.remaining_debt / s.monthly_deduction)
+                      : 0;
+                    return (
+                      <TableRow key={s.id} className={s.status === "cleared" ? "opacity-50" : ""}>
+                        <TableCell className="font-medium">{s.employee_name}</TableCell>
+                        <TableCell>{formatCurrency(s.total_debt)}</TableCell>
+                        <TableCell className={s.remaining_debt > 0 ? "text-red-700 font-semibold" : "text-green-700"}>
+                          {formatCurrency(s.remaining_debt)}
+                        </TableCell>
+                        <TableCell>{formatCurrency(s.monthly_deduction)}</TableCell>
+                        <TableCell>
+                          {s.status === "cleared" ? (
+                            <Badge variant="success">Imelipwa</Badge>
+                          ) : (
+                            <Badge variant={monthsLeft <= 2 ? "warning" : "secondary"}>
+                              {monthsLeft} mwezi{monthsLeft !== 1 ? "" : ""}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={s.status === "active" ? "destructive" : "success"}>
+                            {s.status === "active" ? "Inaendelea" : "Imelipwa"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {s.status === "active" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-xs text-green-700 hover:text-green-700 hover:bg-green-50"
+                              disabled={clearScheduleMutation.isPending}
+                              onClick={() => clearScheduleMutation.mutate(s.id)}
+                            >
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Lipa
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+
+          {/* Summary per employee */}
+          {(schedules ?? []).filter((s) => s.status === "active").length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  Muhtasari wa Madeni Yanayoendelea
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {Object.entries(
+                  (schedules ?? [])
+                    .filter((s) => s.status === "active")
+                    .reduce<Record<string, { name: string; total: number; monthly: number; count: number }>>(
+                      (acc, s) => {
+                        if (!acc[s.employee_id]) {
+                          acc[s.employee_id] = { name: s.employee_name, total: 0, monthly: 0, count: 0 };
+                        }
+                        acc[s.employee_id].total += s.remaining_debt;
+                        acc[s.employee_id].monthly += s.monthly_deduction;
+                        acc[s.employee_id].count += 1;
+                        return acc;
+                      },
+                      {}
+                    )
+                ).map(([empId, info]) => (
+                  <div key={empId} className="flex items-center justify-between py-2 border-b last:border-0 text-sm">
+                    <div>
+                      <span className="font-medium">{info.name}</span>
+                      {info.count > 1 && (
+                        <Badge variant="warning" className="ml-2 text-xs">{info.count} madeni</Badge>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-red-700 font-semibold">{formatCurrency(info.total)} iliyobaki</p>
+                      <p className="text-muted-foreground text-xs">
+                        {formatCurrency(info.monthly)}/mwezi · Inaisha baada ya miezi {Math.ceil(info.total / info.monthly)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
         {/* History tab */}
         <TabsContent value="history" className="mt-4 space-y-4">
           <div className="flex gap-3">
@@ -369,6 +603,104 @@ export default function AdvancesPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* New deduction schedule dialog */}
+      <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarClock className="h-5 w-5" />
+              Ratiba ya Mkopo
+            </DialogTitle>
+            <DialogDescription>
+              Weka kiasi cha deni na kiasi cha kukatwa kila mwezi
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSchedSubmit((d) => scheduleMutation.mutate(d))} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Mfanyakazi</Label>
+              <Select
+                value={watchSched("employee_id") ?? ""}
+                onValueChange={(v) => setSchedValue("employee_id", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Chagua mfanyakazi..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {(employees ?? []).map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {schedErrors.employee_id && (
+                <p className="text-xs text-destructive">{schedErrors.employee_id.message}</p>
+              )}
+
+              {/* Warning if existing debt */}
+              {existingActive.length > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                  <span>
+                    Mfanyakazi huyu ana deni linaloendelea la {formatCurrency(existingDebt)}.
+                    Deni jipya litaongezwa juu ya lililopo.
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Jumla ya Deni (TZS)</Label>
+              <Input
+                type="number"
+                step="1"
+                min="1"
+                placeholder="500000"
+                {...regSched("total_debt", { valueAsNumber: true })}
+              />
+              {schedErrors.total_debt && (
+                <p className="text-xs text-destructive">{schedErrors.total_debt.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Kiasi cha Kila Mwezi (TZS)</Label>
+              <Input
+                type="number"
+                step="1"
+                min="1"
+                placeholder="50000"
+                {...regSched("monthly_deduction", { valueAsNumber: true })}
+              />
+              {schedErrors.monthly_deduction && (
+                <p className="text-xs text-destructive">{schedErrors.monthly_deduction.message}</p>
+              )}
+              {monthsToRepay > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Deni litaisha baada ya miezi{" "}
+                  <span className="font-semibold text-foreground">{monthsToRepay}</span>
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Maelezo (hiari)</Label>
+              <Input placeholder="Sababu ya mkopo..." {...regSched("notes")} />
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setScheduleDialogOpen(false)}>
+                Ghairi
+              </Button>
+              <Button type="submit" disabled={scheduleMutation.isPending}>
+                {scheduleMutation.isPending ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Inahifadhi...</>
+                ) : "Hifadhi Ratiba"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* New transaction dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

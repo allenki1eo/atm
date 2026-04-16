@@ -35,6 +35,8 @@ interface LeaveRequest {
   start_date: string;
   end_date: string;
   days: number;
+  leave_type: string | null;
+  employee_phone: string | null;
   reason: string | null;
   status: "pending" | "approved" | "denied";
   submitted_at: string;
@@ -55,18 +57,36 @@ interface LeaveData {
   balance: LeaveBalance | null;
 }
 
+// ─── Leave types ──────────────────────────────────────────────────────────────
+
+const LEAVE_TYPES = [
+  { value: "annual", label: "Likizo ya Mwaka" },
+  { value: "sick", label: "Likizo ya Ugonjwa" },
+  { value: "maternity", label: "Likizo ya Uzazi" },
+  { value: "wedding", label: "Ruhusa ya Harusi" },
+  { value: "unpaid", label: "Likizo bila Malipo" },
+  { value: "emergency", label: "Dharura au Ruhusa Ingine" },
+] as const;
+
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
 const leaveRequestSchema = z.object({
   employee_id: z.string().min(1),
   start_date: z.string().min(1, "Tarehe ya kuanza inahitajika"),
   end_date: z.string().min(1, "Tarehe ya kuisha inahitajika"),
+  leave_type: z.string().min(1, "Chagua aina ya likizo"),
+  employee_phone: z.string().optional(),
   reason: z.string().optional(),
 });
 type LeaveRequestForm = z.infer<typeof leaveRequestSchema>;
 
 const reviewSchema = z.object({
   review_note: z.string().optional(),
+  _action: z.enum(["approved", "denied"]).optional(),
+}).superRefine((val, ctx) => {
+  if (val._action === "denied" && !val.review_note?.trim()) {
+    ctx.addIssue({ code: "custom", path: ["review_note"], message: "Sababu ya kukataa inahitajika" });
+  }
 });
 type ReviewForm = z.infer<typeof reviewSchema>;
 
@@ -106,7 +126,8 @@ export default function LeavePage() {
   const userId = session?.user?.id;
   const isEmployee = role === "employee";
   const isHROrAdmin = role === "hr" || role === "admin";
-  const canReview = isHROrAdmin;
+  const isSupervisor = role === "supervisor";
+  const canReview = isHROrAdmin || isSupervisor;
 
   // Tabs for HR/Admin/Supervisor
   const [activeTab, setActiveTab] = useState<"requests" | "mine">("requests");
@@ -145,7 +166,7 @@ export default function LeavePage() {
     formState: { errors },
   } = useForm<LeaveRequestForm>({
     resolver: zodResolver(leaveRequestSchema),
-    defaultValues: { employee_id: userId ?? "" },
+    defaultValues: { employee_id: userId ?? "", leave_type: "" },
   });
 
   const watchedStart = watch("start_date");
@@ -159,6 +180,7 @@ export default function LeavePage() {
     register: registerReview,
     handleSubmit: handleReviewSubmit,
     reset: resetReview,
+    formState: { errors: reviewErrors },
   } = useForm<ReviewForm>({ resolver: zodResolver(reviewSchema) });
 
   // ── Mutations ──────────────────────────────────────────────────────────────
@@ -223,7 +245,7 @@ export default function LeavePage() {
   const openReview = (req: LeaveRequest, action: "approved" | "denied") => {
     setReviewTarget(req);
     setReviewAction(action);
-    resetReview();
+    resetReview({ review_note: "", _action: action });
     setReviewDialogOpen(true);
   };
 
@@ -241,11 +263,14 @@ export default function LeavePage() {
   };
 
   const openRequest = () => {
-    reset({ employee_id: userId ?? "", start_date: "", end_date: "", reason: "" });
+    reset({ employee_id: userId ?? "", start_date: "", end_date: "", leave_type: "", employee_phone: "", reason: "" });
     setRequestDialogOpen(true);
   };
 
   // ── Render helpers ─────────────────────────────────────────────────────────
+
+  const leaveTypeLabel = (val: string | null) =>
+    LEAVE_TYPES.find((t) => t.value === val)?.label ?? val ?? "—";
 
   const renderRequestsTable = (rows: LeaveRequest[], showEmployee = false) => (
     <Card>
@@ -253,9 +278,9 @@ export default function LeavePage() {
         <TableHeader>
           <TableRow>
             {showEmployee && <TableHead>Mfanyakazi</TableHead>}
+            <TableHead>Aina</TableHead>
             <TableHead>Tarehe</TableHead>
             <TableHead>Siku</TableHead>
-            <TableHead>Sababu</TableHead>
             <TableHead>Hali</TableHead>
             {canReview && <TableHead className="w-32"></TableHead>}
           </TableRow>
@@ -263,13 +288,13 @@ export default function LeavePage() {
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={showEmployee ? 6 : 5} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={showEmployee ? 7 : 6} className="text-center py-8 text-muted-foreground">
                 Inapakia...
               </TableCell>
             </TableRow>
           ) : rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={showEmployee ? 6 : 5} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={showEmployee ? 7 : 6} className="text-center py-8 text-muted-foreground">
                 Hakuna maombi
               </TableCell>
             </TableRow>
@@ -280,13 +305,13 @@ export default function LeavePage() {
                   <TableCell className="font-medium">{req.employee_name}</TableCell>
                 )}
                 <TableCell className="text-sm text-muted-foreground">
+                  {leaveTypeLabel(req.leave_type)}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
                   {formatDate(req.start_date)} — {formatDate(req.end_date)}
                 </TableCell>
                 <TableCell>
                   <Badge variant="secondary">{req.days} siku</Badge>
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
-                  {req.reason ?? "—"}
                 </TableCell>
                 <TableCell>
                   <StatusBadge status={req.status} />
@@ -524,13 +549,23 @@ export default function LeavePage() {
           )}
 
           <form onSubmit={handleReviewSubmit(onReviewSubmit)} className="space-y-4">
+            <input type="hidden" {...registerReview("_action")} value={reviewAction} />
             <div className="space-y-2">
-              <Label>Maelezo (hiari)</Label>
+              <Label>
+                {reviewAction === "denied" ? (
+                  <>Sababu ya Kukataa <span className="text-destructive">*</span></>
+                ) : (
+                  "Maelezo (hiari)"
+                )}
+              </Label>
               <Textarea
-                placeholder="Ongeza maelezo ya uamuzi wako..."
+                placeholder={reviewAction === "denied" ? "Eleza sababu ya kukataa ombi hili..." : "Ongeza maelezo ya uamuzi wako..."}
                 {...registerReview("review_note")}
                 rows={3}
               />
+              {reviewErrors.review_note && (
+                <p className="text-xs text-destructive">{reviewErrors.review_note.message}</p>
+              )}
             </div>
 
             <DialogFooter>
@@ -576,6 +611,39 @@ export default function LeavePage() {
           </DialogHeader>
 
           <form onSubmit={handleSubmit(onRequestSubmit)} className="space-y-4">
+            {/* Leave type */}
+            <div className="space-y-2">
+              <Label>Aina ya Likizo <span className="text-destructive">*</span></Label>
+              <div className="grid grid-cols-1 gap-1.5">
+                {LEAVE_TYPES.map((lt) => (
+                  <label
+                    key={lt.value}
+                    className="flex items-center gap-2 cursor-pointer rounded-md border px-3 py-2 text-sm hover:bg-muted/50 has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+                  >
+                    <input
+                      type="radio"
+                      value={lt.value}
+                      {...register("leave_type")}
+                      className="accent-primary"
+                    />
+                    {lt.label}
+                  </label>
+                ))}
+              </div>
+              {errors.leave_type && (
+                <p className="text-xs text-destructive">{errors.leave_type.message}</p>
+              )}
+            </div>
+
+            {/* Phone */}
+            <div className="space-y-2">
+              <Label>Nambari ya Simu</Label>
+              <Input
+                placeholder="+255712345678"
+                {...register("employee_phone")}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Tarehe ya Kuanza</Label>
@@ -621,11 +689,11 @@ export default function LeavePage() {
             )}
 
             <div className="space-y-2">
-              <Label>Sababu (hiari)</Label>
+              <Label>Maelezo (hiari)</Label>
               <Textarea
                 placeholder="Eleza sababu ya likizo yako..."
                 {...register("reason")}
-                rows={3}
+                rows={2}
               />
             </div>
 
