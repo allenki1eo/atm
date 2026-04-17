@@ -63,7 +63,7 @@ const createSchema = z.object({
   name: z.string().min(2, "Jina linahitajika"),
   phone: z.string().optional(),
   email: z.string().email("Barua pepe si sahihi").optional().or(z.literal("")),
-  role: z.enum(ROLES, { required_error: "Chagua wadhifa" }),
+  role: z.enum(ROLES, { error: "Chagua wadhifa" }),
   password: z.string().min(6, "Nywila lazima iwe herufi 6+"),
 }).refine((d) => d.phone || d.email, {
   message: "Simu au barua pepe inahitajika",

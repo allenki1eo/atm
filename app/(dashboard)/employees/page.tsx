@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -184,7 +184,7 @@ export default function EmployeesPage() {
     reset,
     formState: { errors },
   } = useForm<EmployeeForm>({
-    resolver: zodResolver(employeeSchema),
+    resolver: zodResolver(employeeSchema) as unknown as Resolver<EmployeeForm>,
     defaultValues: { type: "casual", overtime_rule: "none" },
   });
 
