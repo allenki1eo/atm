@@ -7,7 +7,8 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await ensureDatabase();
 
-  const employeeId = session.user.id;
+  const employeeId =
+    (session.user as { employeeId?: string | null }).employeeId ?? null;
   if (!employeeId) return NextResponse.json([]);
 
   const res = await db.execute({

@@ -7,7 +7,12 @@ export async function GET(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
-  const employeeId = searchParams.get("employee_id") ?? session.user.id;
+  const sessionEmployeeId =
+    (session.user as { employeeId?: string | null }).employeeId ?? null;
+  const employeeId = searchParams.get("employee_id") ?? sessionEmployeeId;
+  if (!employeeId) {
+    return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+  }
   const now = new Date();
   const year = parseInt(searchParams.get("year") ?? String(now.getFullYear()));
   const month = parseInt(searchParams.get("month") ?? String(now.getMonth() + 1));

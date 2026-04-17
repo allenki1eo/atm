@@ -36,7 +36,13 @@ export async function GET(
     generated_at: string;
   };
 
-  if (role !== "hr" && role !== "admin" && payslip.employee_id !== session.user.id) {
+  const sessionEmployeeId =
+    (session.user as { employeeId?: string | null }).employeeId ?? null;
+  if (
+    role !== "hr" &&
+    role !== "admin" &&
+    payslip.employee_id !== sessionEmployeeId
+  ) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

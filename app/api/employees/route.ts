@@ -18,10 +18,20 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search");
   const supervisorId = searchParams.get("supervisor_id");
 
+  const role = (session.user as { role: string }).role;
+  const employeeId =
+    (session.user as { employeeId?: string | null }).employeeId ?? null;
+
   let sql = "SELECT * FROM employees WHERE active = 1";
   const args: string[] = [];
 
-  if (session.user && (session.user as { role: string }).role === "supervisor") {
+  if (role === "employee") {
+    // Employees only see their own record.
+    if (!employeeId) return NextResponse.json([]);
+    sql += " AND id = ?";
+    args.push(employeeId);
+  } else if (role === "supervisor") {
+    // Supervisors see only employees they supervise.
     sql += " AND supervisor_id = ?";
     args.push(session.user.id!);
   } else if (supervisorId) {

@@ -45,6 +45,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
           if (!passwordValid) return null;
 
+          // Block login if the linked employee record was deactivated.
+          if (user.employee_id) {
+            const empRes = await db.execute({
+              sql: "SELECT active FROM employees WHERE id = ?",
+              args: [user.employee_id],
+            });
+            const empRow = empRes.rows[0] as unknown as { active: number } | undefined;
+            if (empRow && empRow.active !== 1) return null;
+          }
+
           return {
             id: user.id,
             email: user.email ?? user.phone ?? "",
