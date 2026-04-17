@@ -7,8 +7,13 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await ensureDatabase();
 
+  const userRes = await db.execute({
+    sql: "SELECT employee_id FROM users WHERE id = ?",
+    args: [session.user.id!],
+  });
   const employeeId =
-    (session.user as { employeeId?: string | null }).employeeId ?? null;
+    (userRes.rows[0] as unknown as { employee_id: string | null } | undefined)
+      ?.employee_id ?? null;
   if (!employeeId) return NextResponse.json([]);
 
   const res = await db.execute({

@@ -19,14 +19,19 @@ export async function GET(request: NextRequest) {
   const supervisorId = searchParams.get("supervisor_id");
 
   const role = (session.user as { role: string }).role;
-  const employeeId =
-    (session.user as { employeeId?: string | null }).employeeId ?? null;
 
   let sql = "SELECT * FROM employees WHERE active = 1";
   const args: string[] = [];
 
   if (role === "employee") {
-    // Employees only see their own record.
+    // Employees only see their own record. Resolve from DB (JWT may be stale).
+    const userRes = await db.execute({
+      sql: "SELECT employee_id FROM users WHERE id = ?",
+      args: [session.user.id!],
+    });
+    const employeeId =
+      (userRes.rows[0] as unknown as { employee_id: string | null } | undefined)
+        ?.employee_id ?? null;
     if (!employeeId) return NextResponse.json([]);
     sql += " AND id = ?";
     args.push(employeeId);
