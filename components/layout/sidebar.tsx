@@ -17,6 +17,8 @@ import {
   Palmtree,
   Upload,
   UserCog,
+  Megaphone,
+  MessageSquareWarning,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -44,6 +46,8 @@ const navItems: NavItem[] = [
   { href: "/advances", label: "Mikopo", icon: DollarSign, roles: ["hr", "admin"] },
   { href: "/payroll/periods", label: "Vipindi vya Mshahara", icon: DollarSign, roles: ["hr", "admin"] },
   { href: "/payroll/casual", label: "Mshahara wa Mkataba", icon: DollarSign, roles: ["hr", "admin"] },
+  { href: "/announcements", label: "Matangazo", icon: Megaphone, roles: ["supervisor", "hr", "admin", "employee"] },
+  { href: "/complaints", label: "Malalamiko", icon: MessageSquareWarning, roles: ["hr", "admin", "employee"] },
   { href: "/me", label: "Dashibodi Yangu", icon: UserCircle, roles: ["supervisor", "hr", "admin", "employee"] },
 ];
 

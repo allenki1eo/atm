@@ -250,6 +250,8 @@ export default function LeavePage() {
   };
 
   const onRequestSubmit = (data: LeaveRequestForm) => {
+    // employee_id is resolved server-side from session for employees;
+    // keep field in payload for HR/admin flows that might submit on behalf.
     requestMutation.mutate({ ...data, employee_id: userId ?? "" });
   };
 

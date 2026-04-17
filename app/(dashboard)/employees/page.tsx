@@ -34,6 +34,7 @@ interface Employee {
   department: string;
   supervisor_id: string;
   company_id: string | null;
+  section_id: string | null;
   daily_rate: number;
   monthly_salary: number;
   overtime_rule: string;
@@ -43,6 +44,12 @@ interface Employee {
 interface Company {
   id: string;
   name: string;
+}
+
+interface Section {
+  id: string;
+  name: string;
+  company_id: string;
 }
 
 interface SupervisorUser {
@@ -76,6 +83,7 @@ const employeeSchema = z.object({
   department: z.string().optional(),
   supervisor_id: z.string().optional(),
   company_id: z.string().optional(),
+  section_id: z.string().optional(),
   daily_rate: z.preprocess(nanToZero, z.number().min(0).optional()),
   monthly_salary: z.preprocess(nanToZero, z.number().min(0).optional()),
   overtime_rule: z.enum(["all_days", "holidays_only", "none"]).optional(),
@@ -88,6 +96,7 @@ type EmployeeForm = {
   department?: string;
   supervisor_id?: string;
   company_id?: string;
+  section_id?: string;
   daily_rate?: number;
   monthly_salary?: number;
   overtime_rule?: "all_days" | "holidays_only" | "none";
@@ -176,6 +185,16 @@ export default function EmployeesPage() {
     enabled: canManage,
   });
 
+  const { data: sections } = useQuery({
+    queryKey: ["sections"],
+    queryFn: async () => {
+      const res = await fetch("/api/sections");
+      if (!res.ok) return [];
+      return res.json() as Promise<Section[]>;
+    },
+    enabled: canManage,
+  });
+
   const {
     register,
     handleSubmit,
@@ -255,6 +274,7 @@ export default function EmployeesPage() {
       department: emp.department,
       supervisor_id: emp.supervisor_id ?? "",
       company_id: emp.company_id ?? "",
+      section_id: emp.section_id ?? "",
       daily_rate: emp.daily_rate,
       monthly_salary: emp.monthly_salary,
       overtime_rule: emp.overtime_rule as "all_days" | "holidays_only" | "none",
@@ -279,6 +299,8 @@ export default function EmployeesPage() {
     const payload = {
       ...data,
       supervisor_id: data.supervisor_id || undefined,
+      company_id: data.company_id || undefined,
+      section_id: data.section_id || undefined,
       daily_rate: data.type === "casual" ? Math.round(data.daily_rate ?? 0) : 0,
       monthly_salary: data.type === "fulltime" ? Math.round(data.monthly_salary ?? 0) : 0,
     };
@@ -555,7 +577,12 @@ export default function EmployeesPage() {
               <Label>Kampuni</Label>
               <Select
                 value={watch("company_id") ?? ""}
-                onValueChange={(v) => setValue("company_id", v === "none" ? "" : v)}
+                onValueChange={(v) => {
+                  const next = v === "none" ? "" : v;
+                  setValue("company_id", next);
+                  // Clear section when company changes
+                  setValue("section_id", "");
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Chagua kampuni..." />
@@ -567,6 +594,30 @@ export default function EmployeesPage() {
                       {c.name}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Section assignment (filtered by selected company) */}
+            <div className="space-y-2">
+              <Label>Sehemu</Label>
+              <Select
+                value={watch("section_id") ?? ""}
+                onValueChange={(v) => setValue("section_id", v === "none" ? "" : v)}
+                disabled={!watch("company_id")}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={watch("company_id") ? "Chagua sehemu..." : "Chagua kampuni kwanza"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— Hakuna sehemu —</SelectItem>
+                  {(sections ?? [])
+                    .filter((s) => s.company_id === watch("company_id"))
+                    .map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

@@ -32,17 +32,43 @@ const MONTHS = [
   "Julai","Agosti","Septemba","Oktoba","Novemba","Desemba",
 ];
 
+interface CompanyOpt { id: string; name: string }
+interface SectionOpt { id: string; name: string; company_id: string }
+
 export default function CasualPayrollPage() {
   const now = new Date();
   const [search, setSearch] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(String(now.getMonth() + 1));
   const [selectedYear] = useState(now.getFullYear());
+  const [companyFilter, setCompanyFilter] = useState<string>("all");
+  const [sectionFilter, setSectionFilter] = useState<string>("all");
   const [collapsedCompanies, setCollapsedCompanies] = useState<Set<string>>(new Set());
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["payroll", "casual", selectedMonth, selectedYear],
+  const { data: companies } = useQuery({
+    queryKey: ["companies"],
     queryFn: async () => {
-      const res = await fetch(`/api/payroll/casual?month=${selectedMonth}&year=${selectedYear}`);
+      const res = await fetch("/api/companies");
+      if (!res.ok) return [];
+      return res.json() as Promise<CompanyOpt[]>;
+    },
+  });
+
+  const { data: sections } = useQuery({
+    queryKey: ["sections"],
+    queryFn: async () => {
+      const res = await fetch("/api/sections");
+      if (!res.ok) return [];
+      return res.json() as Promise<SectionOpt[]>;
+    },
+  });
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["payroll", "casual", selectedMonth, selectedYear, companyFilter, sectionFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams({ month: selectedMonth, year: String(selectedYear) });
+      if (companyFilter !== "all") params.set("company_id", companyFilter);
+      if (sectionFilter !== "all") params.set("section_id", sectionFilter);
+      const res = await fetch(`/api/payroll/casual?${params.toString()}`);
       if (!res.ok) throw new Error("Failed");
       return res.json() as Promise<{ employees: EmployeeRow[]; month: number; year: number }>;
     },
@@ -118,8 +144,8 @@ export default function CasualPayrollPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[12rem]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Tafuta mfanyakazi, kampuni au sehemu..."
@@ -128,6 +154,40 @@ export default function CasualPayrollPage() {
             className="pl-9"
           />
         </div>
+        <Select
+          value={companyFilter}
+          onValueChange={(v) => {
+            setCompanyFilter(v);
+            setSectionFilter("all");
+          }}
+        >
+          <SelectTrigger className="w-full sm:w-52">
+            <SelectValue placeholder="Kampuni" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Makampuni Yote</SelectItem>
+            {(companies ?? []).map((c) => (
+              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={sectionFilter}
+          onValueChange={setSectionFilter}
+          disabled={companyFilter === "all"}
+        >
+          <SelectTrigger className="w-full sm:w-52">
+            <SelectValue placeholder="Sehemu" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Sehemu Zote</SelectItem>
+            {(sections ?? [])
+              .filter((s) => companyFilter === "all" || s.company_id === companyFilter)
+              .map((s) => (
+                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
         <Select value={selectedMonth} onValueChange={setSelectedMonth}>
           <SelectTrigger className="w-full sm:w-40">
             <SelectValue />

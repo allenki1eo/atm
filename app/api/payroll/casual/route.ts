@@ -14,24 +14,36 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const month = parseInt(searchParams.get("month") ?? String(new Date().getMonth() + 1));
   const year = parseInt(searchParams.get("year") ?? String(new Date().getFullYear()));
+  const companyId = searchParams.get("company_id");
+  const sectionId = searchParams.get("section_id");
 
   const mm = String(month).padStart(2, "0");
   const yyyy = String(year);
   const datePrefix = `${yyyy}-${mm}`;
 
-  // Get all active casual employees with company and section info
-  const empResult = await db.execute({
-    sql: `SELECT
-            e.id, e.name, e.daily_rate, e.company_id, e.section_id,
-            c.name as company_name,
-            s.name as section_name
-          FROM employees e
-          LEFT JOIN companies c ON c.id = e.company_id
-          LEFT JOIN sections s ON s.id = e.section_id
-          WHERE e.type = 'casual' AND e.active = 1
-          ORDER BY c.name, s.name, e.name`,
-    args: [],
-  });
+  // Get active casual employees with company and section info, optionally
+  // filtered by company_id / section_id so HR can run payroll for a
+  // specific company or section only.
+  let sql = `SELECT
+        e.id, e.name, e.daily_rate, e.company_id, e.section_id,
+        c.name as company_name,
+        s.name as section_name
+      FROM employees e
+      LEFT JOIN companies c ON c.id = e.company_id
+      LEFT JOIN sections s ON s.id = e.section_id
+      WHERE e.type = 'casual' AND e.active = 1`;
+  const args: string[] = [];
+  if (companyId) {
+    sql += " AND e.company_id = ?";
+    args.push(companyId);
+  }
+  if (sectionId) {
+    sql += " AND e.section_id = ?";
+    args.push(sectionId);
+  }
+  sql += " ORDER BY c.name, s.name, e.name";
+
+  const empResult = await db.execute({ sql, args });
 
   if (!empResult.rows.length) {
     return NextResponse.json({ employees: [], month, year });

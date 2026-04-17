@@ -173,6 +173,38 @@ export async function initializeDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (employee_id) REFERENCES employees(id)
     );
+
+    CREATE TABLE IF NOT EXISTS complaints (
+      id TEXT PRIMARY KEY,
+      employee_id TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      message TEXT NOT NULL,
+      status TEXT CHECK(status IN ('open','resolved')) DEFAULT 'open',
+      response TEXT,
+      responded_by TEXT,
+      responded_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (employee_id) REFERENCES employees(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS announcements (
+      id TEXT PRIMARY KEY,
+      subject TEXT NOT NULL,
+      message TEXT NOT NULL,
+      audience_type TEXT CHECK(audience_type IN ('all','company','section','role')) NOT NULL,
+      audience_id TEXT,
+      send_sms INTEGER DEFAULT 0,
+      created_by TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS announcement_reads (
+      announcement_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (announcement_id, user_id)
+    );
   `);
 
   await migrateDatabase();
