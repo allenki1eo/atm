@@ -11,13 +11,14 @@ import { sendSMS } from "@/lib/at";
  * Employees see only announcements whose audience matches their
  * company/section/role or is broadcast to "all". HR/Admin see everything.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await ensureDatabase();
 
   const role = (session.user as { role: string }).role;
   const userId = session.user.id!;
+  const unreadOnly = request.nextUrl.searchParams.get("unread") === "1";
 
   // Look up the employee row (if any) for audience targeting.
   const userResult = await db.execute({
@@ -63,7 +64,9 @@ export async function GET() {
   }
 
   const result = await db.execute({ sql, args });
-  return NextResponse.json(result.rows);
+  const rows = result.rows as unknown as { is_read: number }[];
+  const filtered = unreadOnly ? rows.filter((r) => !r.is_read) : rows;
+  return NextResponse.json(filtered);
 }
 
 export async function POST(request: NextRequest) {
@@ -127,7 +130,10 @@ export async function POST(request: NextRequest) {
 
     for (const r of recipients.rows as unknown as { phone: string }[]) {
       if (r.phone) {
-        await sendSMS(r.phone, smsText);
+        await sendSMS(r.phone, smsText, {
+          sentBy: session.user.id ?? null,
+          source: "announcement",
+        });
         smsQueued++;
       }
     }

@@ -22,6 +22,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { formatDate } from "@/lib/utils";
 
@@ -34,6 +41,13 @@ interface PayrollPeriod {
   status: "open" | "locked" | "paid";
   locked_at: string | null;
   locked_by: string | null;
+  company_id: string | null;
+  company_name: string | null;
+}
+
+interface Company {
+  id: string;
+  name: string;
 }
 
 const MONTHS = [
@@ -52,6 +66,7 @@ export default function PayrollPeriodsPage() {
   const [lockDialogOpen, setLockDialogOpen] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<{ month: number; year: number } | null>(null);
   const [sendSms, setSendSms] = useState(true);
+  const [lockCompanyId, setLockCompanyId] = useState<string>("__all__");
 
   const now = new Date();
 
@@ -64,12 +79,26 @@ export default function PayrollPeriodsPage() {
     },
   });
 
+  const { data: companies } = useQuery({
+    queryKey: ["companies"],
+    queryFn: async () => {
+      const res = await fetch("/api/companies");
+      if (!res.ok) throw new Error("Failed");
+      return res.json() as Promise<Company[]>;
+    },
+  });
+
   const lockMutation = useMutation({
     mutationFn: async ({ month, year }: { month: number; year: number }) => {
       const res = await fetch("/api/payroll/lock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ month, year, send_sms: sendSms }),
+        body: JSON.stringify({
+          month,
+          year,
+          send_sms: sendSms,
+          company_id: lockCompanyId === "__all__" ? null : lockCompanyId,
+        }),
       });
       if (!res.ok) throw new Error("Failed to lock period");
       return res.json();
@@ -139,6 +168,7 @@ export default function PayrollPeriodsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Period</TableHead>
+              <TableHead>Company</TableHead>
               <TableHead>Dates</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="hidden md:table-cell">Locked At</TableHead>
@@ -148,13 +178,13 @@ export default function PayrollPeriodsPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   Loading...
                 </TableCell>
               </TableRow>
             ) : !periods?.length ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   No payroll periods yet. Lock the current month to create one.
                 </TableCell>
               </TableRow>
@@ -165,6 +195,9 @@ export default function PayrollPeriodsPage() {
                   <TableRow key={period.id}>
                     <TableCell className="font-medium">
                       {MONTHS[period.month - 1]} {period.year}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {period.company_name ?? "Makampuni yote"}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {formatDate(period.start_date)} — {formatDate(period.end_date)}
@@ -217,13 +250,33 @@ export default function PayrollPeriodsPage() {
           </DialogHeader>
 
           <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Company</label>
+              <Select value={lockCompanyId} onValueChange={setLockCompanyId}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All companies (global lock)</SelectItem>
+                  {companies?.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Locking per company keeps other companies&apos; months open.
+              </p>
+            </div>
+
             <div className="rounded-lg border p-3 bg-muted/20 text-sm space-y-1">
               <p className="font-medium">What happens when you lock:</p>
               <ul className="list-disc list-inside text-muted-foreground space-y-0.5 text-xs">
-                <li>All attendance records for the period are frozen</li>
-                <li>Payslips are calculated for every employee</li>
-                <li>SMS notifications sent to all employees (if enabled)</li>
-                <li>No further attendance edits allowed for this period</li>
+                <li>Attendance for this scope and period is frozen</li>
+                <li>Payslips are calculated for the selected employees</li>
+                <li>SMS notifications sent (if enabled)</li>
+                <li>No further attendance edits for this scope and period</li>
               </ul>
             </div>
 

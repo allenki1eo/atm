@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { DollarSign, Plus, Search, TrendingDown, TrendingUp, Loader2, History, CalendarClock, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { DollarSign, Plus, Search, TrendingDown, TrendingUp, Loader2, History, CalendarClock, AlertTriangle, CheckCircle2, Inbox, X } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +54,18 @@ interface AdvanceSchedule {
   notes: string | null;
   status: "active" | "cleared";
   created_at: string;
+}
+
+interface AdvanceRequestRow {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  employee_phone: string;
+  amount: number;
+  description: string | null;
+  status: "pending" | "approved" | "denied";
+  requested_at: string;
+  review_note: string | null;
 }
 
 const txSchema = z.object({
@@ -119,6 +131,47 @@ export default function AdvancesPage() {
       const res = await fetch("/api/advances/schedule");
       if (!res.ok) throw new Error("Failed");
       return res.json() as Promise<AdvanceSchedule[]>;
+    },
+  });
+
+  const { data: advanceRequests } = useQuery({
+    queryKey: ["advance-requests", "pending"],
+    queryFn: async () => {
+      const res = await fetch("/api/advance-requests?status=pending");
+      if (!res.ok) throw new Error("Failed");
+      return res.json() as Promise<AdvanceRequestRow[]>;
+    },
+    refetchInterval: 30_000,
+  });
+
+  const reviewRequestMutation = useMutation({
+    mutationFn: async ({
+      id,
+      status,
+      review_note,
+    }: {
+      id: string;
+      status: "approved" | "denied";
+      review_note?: string;
+    }) => {
+      const res = await fetch(`/api/advance-requests/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, review_note }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed");
+      return json;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["advance-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      toast({
+        title: vars.status === "approved" ? "Ombi limeidhinishwa" : "Ombi limekataliwa",
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Hitilafu", description: err.message, variant: "destructive" });
     },
   });
 
@@ -317,12 +370,97 @@ export default function AdvancesPage() {
         </Card>
       </div>
 
-      <Tabs defaultValue="balances">
+      <Tabs defaultValue={(advanceRequests?.length ?? 0) > 0 ? "requests" : "balances"}>
         <TabsList>
+          <TabsTrigger value="requests" className="relative">
+            <Inbox className="h-3.5 w-3.5 mr-1" />
+            Maombi
+            {(advanceRequests?.length ?? 0) > 0 && (
+              <Badge className="ml-1.5 h-5 px-1.5 text-xs" variant="destructive">
+                {advanceRequests!.length}
+              </Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="balances">Bakaa za Wafanyakazi</TabsTrigger>
           <TabsTrigger value="schedules">Ratiba za Mikopo</TabsTrigger>
           <TabsTrigger value="history">Historia ya Miamala</TabsTrigger>
         </TabsList>
+
+        {/* Pending advance requests */}
+        <TabsContent value="requests" className="mt-4 space-y-4">
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Mfanyakazi</TableHead>
+                  <TableHead>Kiasi</TableHead>
+                  <TableHead>Sababu</TableHead>
+                  <TableHead>Tarehe</TableHead>
+                  <TableHead>Vitendo</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {!advanceRequests?.length ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      Hakuna maombi yanayosubiri
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  advanceRequests.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-medium">{r.employee_name}</TableCell>
+                      <TableCell className="text-red-700 font-semibold">
+                        {formatCurrency(r.amount)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {r.description ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatDate(r.requested_at)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs text-green-700 hover:bg-green-50"
+                            disabled={reviewRequestMutation.isPending}
+                            onClick={() =>
+                              reviewRequestMutation.mutate({ id: r.id, status: "approved" })
+                            }
+                          >
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Idhinisha
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs text-red-700 hover:bg-red-50"
+                            disabled={reviewRequestMutation.isPending}
+                            onClick={() => {
+                              const note = window.prompt("Sababu ya kukataa (hiari):") ?? undefined;
+                              reviewRequestMutation.mutate({
+                                id: r.id,
+                                status: "denied",
+                                review_note: note,
+                              });
+                            }}
+                          >
+                            <X className="h-3 w-3 mr-1" />
+                            Kataa
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+            </div>
+          </Card>
+        </TabsContent>
 
         {/* Balances tab */}
         <TabsContent value="balances" className="mt-4 space-y-4">

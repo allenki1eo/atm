@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { UserCircle, DollarSign, Calendar as CalendarIcon, Loader2, FileText } from "lucide-react";
+import { UserCircle, DollarSign, Calendar as CalendarIcon, Loader2, FileText, Inbox, Megaphone, MessageSquareWarning } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,28 +73,74 @@ export default function MePage() {
 
   const advanceMutation = useMutation({
     mutationFn: async (data: AdvanceForm) => {
-      const res = await fetch("/api/transactions/advance", {
+      const res = await fetch("/api/advance-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          employee_id: userId,
-          type: "advance_given",
-          amount: Math.round(data.amount * 100),
+          amount: Math.round(data.amount),
           description: data.description,
         }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["advance-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["payroll", "current"] });
+      setAdvanceOpen(false);
+      reset();
+      toast({
+        title: "Ombi limetumwa",
+        description: "Ombi lako la mkopo limetumwa kwa HR.",
+      });
+    },
+    onError: (e: Error) => {
+      toast({
+        title: "Error",
+        description: e.message || "Failed to submit request",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Inbox: announcements + complaint responses
+  const { data: inbox } = useQuery({
+    queryKey: ["me-inbox"],
+    queryFn: async () => {
+      const [annRes, compRes] = await Promise.all([
+        fetch("/api/announcements?unread=1"),
+        fetch("/api/complaints?mine=1"),
+      ]);
+      const announcements = annRes.ok ? await annRes.json() : [];
+      const complaints = compRes.ok ? await compRes.json() : [];
+      return { announcements, complaints };
+    },
+    enabled: !!userId,
+  });
+
+  const unreadCount =
+    (inbox?.announcements?.length ?? 0) +
+    (Array.isArray(inbox?.complaints)
+      ? inbox.complaints.filter(
+          (c: { status: string; response: string | null }) =>
+            c.status === "resolved" && c.response
+        ).length
+      : 0);
+
+  const markAnnouncementRead = useMutation({
+    mutationFn: async (announcementId: string) => {
+      const res = await fetch(`/api/announcements/${announcementId}/read`, {
+        method: "POST",
       });
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["payroll", "current"] });
-      setAdvanceOpen(false);
-      reset();
-      toast({ title: "Request submitted", description: "Your advance request has been submitted." });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to submit request", variant: "destructive" });
+      queryClient.invalidateQueries({ queryKey: ["me-inbox"] });
     },
   });
 
@@ -118,11 +164,20 @@ export default function MePage() {
         </div>
       </div>
 
-      <Tabs defaultValue="financial">
-        <TabsList className="grid w-full grid-cols-3 max-w-sm">
+      <Tabs defaultValue={unreadCount > 0 ? "inbox" : "financial"}>
+        <TabsList className="grid w-full grid-cols-4 max-w-xl">
           <TabsTrigger value="financial">Financial</TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
+          <TabsTrigger value="inbox" className="relative">
+            <Inbox className="h-3.5 w-3.5 mr-1" />
+            Sanduku
+            {unreadCount > 0 && (
+              <Badge className="ml-1.5 h-5 px-1.5 text-xs" variant="destructive">
+                {unreadCount}
+              </Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {/* Financial Tab */}
@@ -216,6 +271,101 @@ export default function MePage() {
                       {formatCurrency(txData.balance)}
                     </span>
                   </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Inbox Tab */}
+        <TabsContent value="inbox" className="mt-4 space-y-4">
+          {/* Announcements */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Megaphone className="h-4 w-4" />
+                Matangazo Mapya
+              </CardTitle>
+              <CardDescription>Ujumbe kutoka kwa HR/Admin ambao haujasomwa</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!inbox?.announcements?.length ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Hakuna matangazo mapya.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {inbox.announcements.map(
+                    (a: {
+                      id: string;
+                      subject: string;
+                      message: string;
+                      created_at: string;
+                    }) => (
+                      <div
+                        key={a.id}
+                        className="rounded-lg border p-3 hover:bg-muted/30 transition cursor-pointer"
+                        onClick={() => markAnnouncementRead.mutate(a.id)}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-semibold">{a.subject}</p>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {formatDate(a.created_at)}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
+                          {a.message}
+                        </p>
+                        <p className="text-xs text-primary mt-2">
+                          Gonga ili kuweka alama ya kusomwa
+                        </p>
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Complaint responses */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <MessageSquareWarning className="h-4 w-4" />
+                Majibu ya Malalamiko
+              </CardTitle>
+              <CardDescription>Majibu kutoka kwa HR juu ya malalamiko yako</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!Array.isArray(inbox?.complaints) || inbox.complaints.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Hakuna malalamiko yaliyojibiwa.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {inbox.complaints
+                    .filter(
+                      (c: { status: string; response: string | null }) =>
+                        c.status === "resolved" && c.response
+                    )
+                    .map(
+                      (c: {
+                        id: string;
+                        subject: string;
+                        response: string;
+                        responded_at: string;
+                      }) => (
+                        <div key={c.id} className="rounded-lg border p-3">
+                          <p className="text-sm font-semibold">{c.subject}</p>
+                          <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
+                            {c.response}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            {formatDate(c.responded_at)}
+                          </p>
+                        </div>
+                      )
+                    )}
                 </div>
               )}
             </CardContent>

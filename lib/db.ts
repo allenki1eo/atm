@@ -205,6 +205,40 @@ export async function initializeDatabase() {
       read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (announcement_id, user_id)
     );
+
+    CREATE TABLE IF NOT EXISTS holidays (
+      id TEXT PRIMARY KEY,
+      date DATE NOT NULL,
+      name TEXT NOT NULL,
+      company_id TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(date, company_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS advance_requests (
+      id TEXT PRIMARY KEY,
+      employee_id TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      description TEXT,
+      status TEXT CHECK(status IN ('pending','approved','denied')) DEFAULT 'pending',
+      requested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      reviewed_by TEXT,
+      reviewed_at DATETIME,
+      review_note TEXT,
+      transaction_id TEXT,
+      FOREIGN KEY (employee_id) REFERENCES employees(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS sms_log (
+      id TEXT PRIMARY KEY,
+      recipient_phone TEXT NOT NULL,
+      message TEXT NOT NULL,
+      sent_by TEXT,
+      source TEXT,
+      status TEXT,
+      error TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   await migrateDatabase();
@@ -234,12 +268,64 @@ export async function migrateDatabase() {
     "ALTER TABLE payslips ADD COLUMN leave_days INTEGER DEFAULT 0",
   ];
 
-  for (const sql of [...employeeColumns, ...payslipColumns, ...leaveColumns]) {
+  const payrollPeriodColumns = [
+    "ALTER TABLE payroll_periods ADD COLUMN company_id TEXT",
+  ];
+
+  const leaveBalanceColumns = [
+    "ALTER TABLE leave_balances ADD COLUMN carryover_days INTEGER DEFAULT 0",
+  ];
+
+  const employeeLeaveColumns = [
+    "ALTER TABLE employees ADD COLUMN leave_allowance_days INTEGER DEFAULT 28",
+  ];
+
+  for (const sql of [
+    ...employeeColumns,
+    ...payslipColumns,
+    ...leaveColumns,
+    ...payrollPeriodColumns,
+    ...leaveBalanceColumns,
+    ...employeeLeaveColumns,
+  ]) {
     try {
       await db.execute(sql);
     } catch {
       // Silently ignore duplicate column errors
     }
+  }
+
+  // Rebuild payroll_periods with a (month, year, company_id) unique key so
+  // the same month can be locked independently per company. SQLite cannot
+  // drop a UNIQUE constraint in place, so we recreate the table.
+  try {
+    const info = await db.execute("PRAGMA index_list(payroll_periods)");
+    const hasOldUnique = info.rows.some((r) => {
+      const row = r as unknown as { name: string; unique: number };
+      return row.unique === 1 && row.name.startsWith("sqlite_autoindex_payroll_periods");
+    });
+    if (hasOldUnique) {
+      await db.executeMultiple(`
+        CREATE TABLE IF NOT EXISTS payroll_periods_new (
+          id TEXT PRIMARY KEY,
+          month INTEGER NOT NULL,
+          year INTEGER NOT NULL,
+          start_date DATE NOT NULL,
+          end_date DATE NOT NULL,
+          status TEXT CHECK(status IN ('open', 'locked', 'paid')) DEFAULT 'open',
+          locked_at DATETIME,
+          locked_by TEXT,
+          company_id TEXT,
+          UNIQUE(month, year, company_id)
+        );
+        INSERT INTO payroll_periods_new (id, month, year, start_date, end_date, status, locked_at, locked_by, company_id)
+          SELECT id, month, year, start_date, end_date, status, locked_at, locked_by, company_id FROM payroll_periods;
+        DROP TABLE payroll_periods;
+        ALTER TABLE payroll_periods_new RENAME TO payroll_periods;
+      `);
+    }
+  } catch {
+    // if rebuild fails (already rebuilt, no data, etc) leave as-is
   }
 }
 

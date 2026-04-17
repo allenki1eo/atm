@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
 import { nanoid } from "nanoid";
+import { calcWorkingDays } from "@/lib/utils";
 
 export async function GET() {
   const session = await auth();
@@ -47,11 +48,31 @@ export async function GET() {
       year: number;
       allowed_days: number;
       used_days: number;
+      carryover_days: number | null;
     } | undefined;
+
+    // If no balance row yet, use per-employee allowance from employees table
+    let fallbackAllowance = 28;
+    if (!balance) {
+      const emp = await db.execute({
+        sql: "SELECT leave_allowance_days FROM employees WHERE id = ?",
+        args: [employeeId],
+      });
+      const empRow = emp.rows[0] as unknown as {
+        leave_allowance_days: number | null;
+      } | undefined;
+      fallbackAllowance = empRow?.leave_allowance_days ?? 28;
+    }
 
     return NextResponse.json({
       requests: requestsResult.rows,
-      balance: balance ?? { employee_id: employeeId, year: currentYear, allowed_days: 28, used_days: 0 },
+      balance: balance ?? {
+        employee_id: employeeId,
+        year: currentYear,
+        allowed_days: fallbackAllowance,
+        used_days: 0,
+        carryover_days: 0,
+      },
     });
   } else if (role === "supervisor") {
     // Get sections this supervisor manages
@@ -146,7 +167,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Mfanyakazi hajapatikana" }, { status: 404 });
   }
 
-  // Calculate days (inclusive)
+  // Calculate days (inclusive, excluding weekends + holidays)
   const startMs = new Date(start_date).getTime();
   const endMs = new Date(end_date).getTime();
 
@@ -158,10 +179,40 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "end_date must be on or after start_date" }, { status: 400 });
   }
 
-  const days = Math.round((endMs - startMs) / (1000 * 60 * 60 * 24)) + 1;
   const currentYear = new Date(start_date).getFullYear();
 
-  // Check balance
+  // Load employee's company for scoped holidays + per-employee allowance
+  const empInfo = await db.execute({
+    sql: "SELECT company_id, leave_allowance_days FROM employees WHERE id = ?",
+    args: [employee_id],
+  });
+  const empInfoRow = empInfo.rows[0] as unknown as {
+    company_id: string | null;
+    leave_allowance_days: number | null;
+  } | undefined;
+  const companyId = empInfoRow?.company_id ?? null;
+  const perEmployeeAllowance = empInfoRow?.leave_allowance_days ?? 28;
+
+  // Pull holidays that apply (global + company-scoped) between start and end
+  const holidayRows = await db.execute({
+    sql: companyId
+      ? `SELECT date FROM holidays WHERE date BETWEEN ? AND ? AND (company_id IS NULL OR company_id = ?)`
+      : `SELECT date FROM holidays WHERE date BETWEEN ? AND ? AND company_id IS NULL`,
+    args: companyId ? [start_date, end_date, companyId] : [start_date, end_date],
+  });
+  const holidayDates = (holidayRows.rows as unknown as { date: string }[]).map(
+    (r) => r.date
+  );
+
+  const days = calcWorkingDays(start_date, end_date, holidayDates);
+  if (days <= 0) {
+    return NextResponse.json(
+      { error: "Likizo haihesabiki — tarehe ni za wikendi au sikukuu." },
+      { status: 400 }
+    );
+  }
+
+  // Check balance — carryover from previous year adds to this year's allowance
   const balanceResult = await db.execute({
     sql: "SELECT * FROM leave_balances WHERE employee_id = ? AND year = ?",
     args: [employee_id, currentYear],
@@ -171,16 +222,42 @@ export async function POST(request: NextRequest) {
     id: string;
     allowed_days: number;
     used_days: number;
+    carryover_days: number | null;
   } | undefined;
 
-  const allowedDays = balance?.allowed_days ?? 28;
+  let carryover = balance?.carryover_days ?? 0;
+  if (!balance) {
+    // First time this year — compute carryover from previous year's unused
+    const prev = await db.execute({
+      sql: "SELECT allowed_days, used_days, carryover_days FROM leave_balances WHERE employee_id = ? AND year = ?",
+      args: [employee_id, currentYear - 1],
+    });
+    const prevRow = prev.rows[0] as unknown as {
+      allowed_days: number;
+      used_days: number;
+      carryover_days: number | null;
+    } | undefined;
+    if (prevRow) {
+      const prevAllowed = prevRow.allowed_days + (prevRow.carryover_days ?? 0);
+      // Cap carryover at half the annual allowance so it can't accrue forever
+      carryover = Math.max(
+        0,
+        Math.min(
+          Math.floor(perEmployeeAllowance / 2),
+          prevAllowed - prevRow.used_days
+        )
+      );
+    }
+  }
+
+  const allowedDays = balance?.allowed_days ?? perEmployeeAllowance;
   const usedDays = balance?.used_days ?? 0;
-  const remaining = allowedDays - usedDays;
+  const remaining = allowedDays + carryover - usedDays;
 
   if (days > remaining) {
     return NextResponse.json(
       {
-        error: `Insufficient leave balance. Requested ${days} days but only ${remaining} days remaining.`,
+        error: `Insufficient leave balance. Requested ${days} working days but only ${remaining} days remaining.`,
       },
       { status: 400 }
     );
@@ -194,14 +271,12 @@ export async function POST(request: NextRequest) {
     args: [requestId, employee_id, start_date, end_date, days, reason ?? null, leave_type ?? null, employee_phone ?? null],
   });
 
-  // Upsert leave_balances for the year
-  if (balance) {
-    // Already exists, no change to used_days until approved
-  } else {
+  // Upsert leave_balances for the year with per-employee allowance + carryover
+  if (!balance) {
     await db.execute({
-      sql: `INSERT OR IGNORE INTO leave_balances (id, employee_id, year, allowed_days, used_days)
-            VALUES (?, ?, ?, 28, 0)`,
-      args: [nanoid(), employee_id, currentYear],
+      sql: `INSERT OR IGNORE INTO leave_balances (id, employee_id, year, allowed_days, used_days, carryover_days)
+            VALUES (?, ?, ?, ?, 0, ?)`,
+      args: [nanoid(), employee_id, currentYear, perEmployeeAllowance, carryover],
     });
   }
 

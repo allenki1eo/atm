@@ -95,7 +95,10 @@ export async function POST(request: NextRequest) {
       formatCurrency(Math.abs(amount)),
       formatCurrency(newBalance)
     );
-    sendSMS(emp.phone, message).catch(console.error);
+    sendSMS(emp.phone, message, {
+      sentBy: session.user.id ?? null,
+      source: "advance_approved",
+    }).catch(console.error);
   }
 
   return NextResponse.json({ success: true, id, amount: adjustedAmount });

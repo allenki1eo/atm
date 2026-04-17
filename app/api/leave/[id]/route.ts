@@ -108,7 +108,10 @@ export async function PUT(
       status === "approved"
         ? `TrustTrack: Likizo yako (${row.days} siku, ${dates}) IMEIDHINISHWA.${review_note ? ` ${review_note}` : ""}`
         : `TrustTrack: Likizo yako (${dates}) IMEKATALIWA.${review_note ? ` Sababu: ${review_note}` : ""}`;
-    await sendSMS(row.employee_phone, msg);
+    await sendSMS(row.employee_phone, msg, {
+      sentBy: session.user.id ?? null,
+      source: "leave_decision",
+    });
   }
 
   return NextResponse.json(result.rows[0]);

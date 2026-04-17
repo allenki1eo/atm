@@ -10,6 +10,39 @@ export interface SMSResult {
   queued?: boolean;
 }
 
+export interface SMSOptions {
+  /** User id who initiated the send (nullable for system-triggered). */
+  sentBy?: string | null;
+  /** Feature source, e.g. "announcement", "leave_decision", "advance_request". */
+  source?: string | null;
+}
+
+async function logSMS(
+  phone: string,
+  message: string,
+  status: string,
+  error: string | null,
+  options?: SMSOptions
+) {
+  try {
+    await db.execute({
+      sql: `INSERT INTO sms_log (id, recipient_phone, message, sent_by, source, status, error)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        nanoid(),
+        phone,
+        message,
+        options?.sentBy ?? null,
+        options?.source ?? null,
+        status,
+        error,
+      ],
+    });
+  } catch (e) {
+    console.error("[SMS] Failed to audit-log message:", e);
+  }
+}
+
 /**
  * Send an SMS via Africa's Talking REST API.
  *
@@ -20,7 +53,11 @@ export interface SMSResult {
  *
  * If AT_API_KEY is missing the message is queued in the DB for later retry.
  */
-export async function sendSMS(phone: string, message: string): Promise<SMSResult> {
+export async function sendSMS(
+  phone: string,
+  message: string,
+  options?: SMSOptions
+): Promise<SMSResult> {
   const apiKey = process.env.AT_API_KEY?.trim();
   const username = (process.env.AT_USERNAME ?? "sandbox").trim();
   const senderId = process.env.AT_SENDER_ID?.trim();
@@ -28,6 +65,7 @@ export async function sendSMS(phone: string, message: string): Promise<SMSResult
   if (!apiKey) {
     console.warn("[SMS] AT_API_KEY not set — queuing message for later");
     await queueSMS(phone, message);
+    await logSMS(phone, message, "queued", "AT_API_KEY not configured", options);
     return { success: false, error: "AT_API_KEY not configured", queued: true };
   }
 
@@ -79,11 +117,13 @@ export async function sendSMS(phone: string, message: string): Promise<SMSResult
 
     if (recipient?.status === "Success") {
       console.log(`[SMS] Delivered — messageId: ${recipient.messageId}`);
+      await logSMS(phone, message, "sent", null, options);
       return { success: true, messageId: recipient.messageId, statusCode: recipient.statusCode };
     }
 
     // Some networks return "Sent" as status
     if (recipient?.statusCode === 101 || recipient?.status === "Sent") {
+      await logSMS(phone, message, "sent", null, options);
       return { success: true, messageId: recipient.messageId, statusCode: recipient.statusCode };
     }
 
@@ -92,6 +132,7 @@ export async function sendSMS(phone: string, message: string): Promise<SMSResult
     const msg = error instanceof Error ? error.message : String(error);
     console.error(`[SMS] Failed to send to ${normalizedPhone}:`, msg);
     await queueSMS(phone, message);
+    await logSMS(phone, message, "failed", msg, options);
     return { success: false, error: msg, queued: true };
   }
 }
