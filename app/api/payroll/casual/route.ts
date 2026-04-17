@@ -31,7 +31,11 @@ export async function GET(request: NextRequest) {
       FROM employees e
       LEFT JOIN companies c ON c.id = e.company_id
       LEFT JOIN sections s ON s.id = e.section_id
-      WHERE e.type = 'casual' AND e.active = 1`;
+      WHERE e.type = 'casual' AND e.active = 1
+        AND NOT EXISTS (
+          SELECT 1 FROM users u
+          WHERE u.employee_id = e.id AND u.role IN ('admin','hr')
+        )`;
   const args: string[] = [];
   if (companyId) {
     sql += " AND e.company_id = ?";
