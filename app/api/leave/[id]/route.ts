@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { nanoid } from "nanoid";
+import { sendSMS } from "@/lib/at";
+import { formatDate } from "@/lib/utils";
 
 export async function PUT(
   request: NextRequest,
@@ -42,6 +44,7 @@ export async function PUT(
     days: number;
     status: string;
     start_date: string;
+    end_date: string;
   };
 
   if (leaveRequest.status !== "pending") {
@@ -84,12 +87,29 @@ export async function PUT(
   }
 
   const result = await db.execute({
-    sql: `SELECT lr.*, e.name as employee_name
+    sql: `SELECT lr.*, e.name as employee_name, e.phone as employee_phone
           FROM leave_requests lr
           JOIN employees e ON lr.employee_id = e.id
           WHERE lr.id = ?`,
     args: [id],
   });
+
+  // Notify the employee of the decision via SMS
+  const row = result.rows[0] as unknown as {
+    employee_name: string;
+    employee_phone: string | null;
+    start_date: string;
+    end_date: string;
+    days: number;
+  } | undefined;
+  if (row?.employee_phone) {
+    const dates = `${formatDate(row.start_date)} - ${formatDate(row.end_date)}`;
+    const msg =
+      status === "approved"
+        ? `TrustTrack: Likizo yako (${row.days} siku, ${dates}) IMEIDHINISHWA.${review_note ? ` ${review_note}` : ""}`
+        : `TrustTrack: Likizo yako (${dates}) IMEKATALIWA.${review_note ? ` Sababu: ${review_note}` : ""}`;
+    await sendSMS(row.employee_phone, msg);
+  }
 
   return NextResponse.json(result.rows[0]);
 }

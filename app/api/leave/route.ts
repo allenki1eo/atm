@@ -96,13 +96,54 @@ export async function POST(request: NextRequest) {
   await ensureDatabase();
 
   const body = await request.json();
-  const { employee_id, start_date, end_date, reason, leave_type, employee_phone } = body;
+  const { start_date, end_date, reason, leave_type, employee_phone } = body;
+  const role = (session.user as { role: string }).role;
+  const userId = session.user.id!;
+
+  // Resolve the employee_id server-side for employees (ignore any client value).
+  // Other roles may submit on behalf by passing employee_id; they still must
+  // resolve to a real employee row.
+  let employee_id: string | null = null;
+  if (role === "employee") {
+    const userResult = await db.execute({
+      sql: "SELECT employee_id FROM users WHERE id = ?",
+      args: [userId],
+    });
+    const userRow = userResult.rows[0] as unknown as { employee_id: string | null } | undefined;
+    employee_id = userRow?.employee_id ?? null;
+    if (!employee_id) {
+      return NextResponse.json(
+        { error: "Akaunti yako haijaunganishwa na rekodi ya mfanyakazi. Wasiliana na HR." },
+        { status: 400 }
+      );
+    }
+  } else {
+    employee_id = body.employee_id ?? null;
+    if (!employee_id) {
+      // HR/supervisor can also submit their own leave — fall back to session linkage
+      const userResult = await db.execute({
+        sql: "SELECT employee_id FROM users WHERE id = ?",
+        args: [userId],
+      });
+      const userRow = userResult.rows[0] as unknown as { employee_id: string | null } | undefined;
+      employee_id = userRow?.employee_id ?? null;
+    }
+  }
 
   if (!employee_id || !start_date || !end_date) {
     return NextResponse.json(
       { error: "employee_id, start_date, and end_date are required" },
       { status: 400 }
     );
+  }
+
+  // Verify employee exists (prevents orphan rows from bad client input)
+  const empCheck = await db.execute({
+    sql: "SELECT id FROM employees WHERE id = ? AND active = 1",
+    args: [employee_id],
+  });
+  if (empCheck.rows.length === 0) {
+    return NextResponse.json({ error: "Mfanyakazi hajapatikana" }, { status: 404 });
   }
 
   // Calculate days (inclusive)

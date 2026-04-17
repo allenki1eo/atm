@@ -25,12 +25,14 @@ export default auth((req: NextRequest & { auth: { user?: { role?: string } } | n
     return NextResponse.redirect(new URL(`/login?callbackUrl=${encodeURIComponent(nextUrl.pathname)}`, nextUrl));
   }
 
-  // Employees can only access /me and /leave
+  // Employees can access /me, /leave, /announcements, /complaints
   const role = session?.user?.role;
   if (
     role === "employee" &&
     !nextUrl.pathname.startsWith("/me") &&
-    !nextUrl.pathname.startsWith("/leave")
+    !nextUrl.pathname.startsWith("/leave") &&
+    !nextUrl.pathname.startsWith("/announcements") &&
+    !nextUrl.pathname.startsWith("/complaints")
   ) {
     return NextResponse.redirect(new URL("/me", nextUrl));
   }

@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
     department,
     supervisor_id,
     company_id,
+    section_id,
     daily_rate = 0,
     monthly_salary = 0,
     overtime_rule = "none",
@@ -76,13 +77,14 @@ export async function POST(request: NextRequest) {
   // 1. Create employee record
   try {
     await db.execute({
-      sql: `INSERT INTO employees (id, name, phone, type, department, supervisor_id, company_id, daily_rate, monthly_salary, overtime_rule)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO employees (id, name, phone, type, department, supervisor_id, company_id, section_id, daily_rate, monthly_salary, overtime_rule)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         employeeId, name, phone, type,
         department ?? null,
         supervisor_id ?? null,
         company_id ?? null,
+        section_id ?? null,
         daily_rate ?? 0,
         monthly_salary ?? 0,
         overtime_rule ?? "none",
@@ -150,14 +152,14 @@ export async function PUT(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { id, name, phone, type, department, supervisor_id, company_id, daily_rate, monthly_salary, overtime_rule, active } = body;
+  const { id, name, phone, type, department, supervisor_id, company_id, section_id, daily_rate, monthly_salary, overtime_rule, active } = body;
 
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   try {
     await db.execute({
-      sql: `UPDATE employees SET name=?, phone=?, type=?, department=?, supervisor_id=?, company_id=?, daily_rate=?, monthly_salary=?, overtime_rule=?, active=? WHERE id=?`,
-      args: [name, phone, type, department ?? null, supervisor_id ?? null, company_id ?? null, daily_rate ?? 0, monthly_salary ?? 0, overtime_rule ?? "none", active ?? 1, id],
+      sql: `UPDATE employees SET name=?, phone=?, type=?, department=?, supervisor_id=?, company_id=?, section_id=?, daily_rate=?, monthly_salary=?, overtime_rule=?, active=? WHERE id=?`,
+      args: [name, phone, type, department ?? null, supervisor_id ?? null, company_id ?? null, section_id ?? null, daily_rate ?? 0, monthly_salary ?? 0, overtime_rule ?? "none", active ?? 1, id],
     });
   } catch (err) {
     console.error("Employee update error:", err);
