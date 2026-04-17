@@ -3,18 +3,23 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { CalendarDays, RefreshCw, Lock } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AttendanceTable } from "@/components/attendance/attendance-table";
 import { LockDayDialog } from "@/components/attendance/lock-day-dialog";
-import { useTodayAttendance, useMarkAttendance } from "@/hooks/use-attendance";
+import { UnlockDayDialog } from "@/components/attendance/unlock-day-dialog";
+import { useTodayAttendance } from "@/hooks/use-attendance";
 import { getTodayDate } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 
 export default function TodayAttendancePage() {
   const today = getTodayDate();
   const queryClient = useQueryClient();
+  const { data: session } = useSession();
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  const canUnlock = role === "admin";
   const { data: records, isLoading, refetch } = useTodayAttendance();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -63,6 +68,13 @@ export default function TodayAttendancePage() {
               date={today}
               unmarkedCount={unmarkedCount}
               onLocked={() => queryClient.invalidateQueries({ queryKey: ["attendance", "today"] })}
+            />
+          )}
+
+          {isAnyLocked && canUnlock && (
+            <UnlockDayDialog
+              date={today}
+              onUnlocked={() => queryClient.invalidateQueries({ queryKey: ["attendance", "today"] })}
             />
           )}
         </div>
