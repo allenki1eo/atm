@@ -7,6 +7,7 @@ import { Menu, X, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Sidebar } from "./sidebar";
+import { NotificationsBell } from "./notifications-bell";
 
 interface MobileNavProps {
   user: {
@@ -34,14 +35,17 @@ export function MobileNav({ user }: MobileNavProps) {
           </div>
           <span className="text-sm font-bold text-sidebar-foreground">TrustTrack</span>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-sidebar-foreground"
-          onClick={() => setOpen(true)}
-        >
-          <Menu className="h-5 w-5" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <NotificationsBell role={user.role} />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-sidebar-foreground"
+            onClick={() => setOpen(true)}
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
 
       {/* Overlay */}

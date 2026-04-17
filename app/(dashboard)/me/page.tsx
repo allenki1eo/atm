@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { UserCircle, DollarSign, Calendar as CalendarIcon, Loader2, FileText, Inbox, Megaphone, MessageSquareWarning } from "lucide-react";
+import { UserCircle, DollarSign, Calendar as CalendarIcon, Loader2, FileText, Inbox, Megaphone, MessageSquareWarning, Receipt } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { FinancialCard } from "@/components/dashboard/financial-card";
 import { AttendanceCalendar } from "@/components/attendance/attendance-calendar";
+import { PayslipPdfButton } from "@/components/payroll/payslip-pdf-button";
 import { toast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
@@ -107,6 +108,28 @@ export default function MePage() {
     },
   });
 
+  // My payslips
+  const { data: myPayslips, isLoading: payslipsLoading } = useQuery({
+    queryKey: ["my-payslips"],
+    queryFn: async () => {
+      const res = await fetch("/api/payslips/mine");
+      if (!res.ok) return [];
+      return (await res.json()) as {
+        id: string;
+        month: number;
+        year: number;
+        start_date: string;
+        end_date: string;
+        days_worked: number;
+        gross_amount: number;
+        net_amount: number;
+        total_deductions: number;
+        generated_at: string;
+      }[];
+    },
+    enabled: !!userId,
+  });
+
   // Inbox: announcements + complaint responses
   const { data: inbox } = useQuery({
     queryKey: ["me-inbox"],
@@ -165,9 +188,10 @@ export default function MePage() {
       </div>
 
       <Tabs defaultValue={unreadCount > 0 ? "inbox" : "financial"}>
-        <TabsList className="grid w-full grid-cols-4 max-w-xl">
+        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
           <TabsTrigger value="financial">Financial</TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
+          <TabsTrigger value="payslips">Mishahara</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
           <TabsTrigger value="inbox" className="relative">
             <Inbox className="h-3.5 w-3.5 mr-1" />
@@ -220,6 +244,67 @@ export default function MePage() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* Payslips Tab */}
+        <TabsContent value="payslips" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Receipt className="h-4 w-4" />
+                Mishahara Yangu
+              </CardTitle>
+              <CardDescription>
+                Vielelezo vya mshahara vya vipindi vilivyofungwa. Pakua kama PDF.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {payslipsLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-14 w-full" />
+                  ))}
+                </div>
+              ) : !myPayslips?.length ? (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  Hakuna mshahara uliofungwa bado.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {myPayslips.map((ps) => {
+                    const monthNames = [
+                      "Januari", "Februari", "Machi", "Aprili", "Mei", "Juni",
+                      "Julai", "Agosti", "Septemba", "Oktoba", "Novemba", "Desemba",
+                    ];
+                    return (
+                      <div
+                        key={ps.id}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border p-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold">
+                            {monthNames[ps.month - 1]} {ps.year}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {ps.days_worked} siku · Gross {formatCurrency(ps.gross_amount)} · Makato {formatCurrency(ps.total_deductions ?? 0)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Imehifadhiwa: {formatDate(ps.generated_at)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Badge variant="success" className="text-xs whitespace-nowrap">
+                            Net {formatCurrency(ps.net_amount)}
+                          </Badge>
+                          <PayslipPdfButton payslipId={ps.id} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Transaction History Tab */}
