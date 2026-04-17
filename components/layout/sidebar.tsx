@@ -21,6 +21,7 @@ import {
   Megaphone,
   MessageSquareWarning,
   CalendarDays,
+  ClipboardEdit,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -33,7 +34,7 @@ interface NavItem {
   label: string;
   icon: React.ElementType;
   roles: string[];
-  badgeKey?: "announcements" | "complaints";
+  badgeKey?: "announcements" | "complaints" | "corrections";
 }
 
 const navItems: NavItem[] = [
@@ -41,6 +42,7 @@ const navItems: NavItem[] = [
   { href: "/attendance/today", label: "Mahudhurio ya Leo", icon: ClipboardList, roles: ["supervisor", "hr", "admin"] },
   { href: "/attendance/history", label: "Historia ya Mahudhurio", icon: Calendar, roles: ["supervisor", "hr", "admin"] },
   { href: "/attendance/import", label: "Ingiza Mahudhurio", icon: Upload, roles: ["admin"] },
+  { href: "/attendance/corrections", label: "Marekebisho", icon: ClipboardEdit, roles: ["supervisor", "hr", "admin"], badgeKey: "corrections" },
   { href: "/employees", label: "Wafanyakazi", icon: Users, roles: ["hr", "admin"] },
   { href: "/companies", label: "Makampuni & Sehemu", icon: Building2, roles: ["admin"] },
   { href: "/holidays", label: "Sikukuu", icon: CalendarDays, roles: ["hr", "admin"] },
@@ -99,9 +101,24 @@ export function Sidebar({ user }: SidebarProps) {
     enabled: user.role === "hr" || user.role === "admin" || user.role === "employee",
   });
 
-  const badgeFor = (key?: "announcements" | "complaints") => {
+  const canReviewCorrections =
+    user.role === "supervisor" || user.role === "hr" || user.role === "admin";
+
+  const { data: pendingCorrections } = useQuery({
+    queryKey: ["sidebar", "corrections-pending"],
+    queryFn: async () => {
+      const res = await fetch("/api/attendance-corrections?status=pending");
+      if (!res.ok) return [];
+      return (await res.json()) as unknown[];
+    },
+    refetchInterval: 60_000,
+    enabled: canReviewCorrections,
+  });
+
+  const badgeFor = (key?: "announcements" | "complaints" | "corrections") => {
     if (key === "announcements") return unreadAnnouncements?.length ?? 0;
     if (key === "complaints") return openComplaints?.length ?? 0;
+    if (key === "corrections") return pendingCorrections?.length ?? 0;
     return 0;
   };
 

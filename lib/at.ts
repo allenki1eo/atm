@@ -193,4 +193,10 @@ export const smsTemplates = {
 
   newEmployeeCredentials: (name: string, phone: string, pin: string) =>
     `Karibu TrustTrack! Jina: ${name}. Ingia kwa nambari yako: ${phone}. PIN ya siri: ${pin}. Usishiriki PIN hii. Ingia hapa: https://atwork.eastafricanspirit.co.tz/login`,
+
+  correctionApproved: (date: string, status: string) =>
+    `TrustTrack: Marekebisho ya mahudhurio yako ya tarehe ${date} yamekubaliwa. Hali mpya: ${status}.`,
+
+  correctionDenied: (date: string, note?: string) =>
+    `TrustTrack: Marekebisho ya mahudhurio ya tarehe ${date} yamekataliwa.${note ? ` Sababu: ${note}` : ""}`,
 };

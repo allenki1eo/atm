@@ -239,6 +239,24 @@ export async function initializeDatabase() {
       error TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS attendance_corrections (
+      id TEXT PRIMARY KEY,
+      employee_id TEXT NOT NULL,
+      date DATE NOT NULL,
+      original_attendance_id TEXT,
+      original_status TEXT,
+      requested_status TEXT NOT NULL CHECK(requested_status IN ('present','absent','late','half_day')),
+      reason TEXT NOT NULL,
+      status TEXT CHECK(status IN ('pending','approved','denied')) DEFAULT 'pending',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      reviewed_by TEXT,
+      reviewed_at DATETIME,
+      review_note TEXT,
+      applied_attendance_id TEXT,
+      FOREIGN KEY (employee_id) REFERENCES employees(id),
+      FOREIGN KEY (reviewed_by) REFERENCES users(id)
+    );
   `);
 
   await migrateDatabase();

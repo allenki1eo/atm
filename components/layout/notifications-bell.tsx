@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Bell, Megaphone, MessageSquareWarning, Palmtree, DollarSign } from "lucide-react";
+import { Bell, Megaphone, MessageSquareWarning, Palmtree, DollarSign, ClipboardEdit } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +15,7 @@ import { formatDate } from "@/lib/utils";
 
 interface NotifItem {
   id: string;
-  kind: "announcement" | "complaint" | "leave" | "advance";
+  kind: "announcement" | "complaint" | "leave" | "advance" | "correction";
   title: string;
   detail: string;
   time: string;
@@ -31,6 +31,14 @@ const iconFor: Record<NotifItem["kind"], React.ElementType> = {
   complaint: MessageSquareWarning,
   leave: Palmtree,
   advance: DollarSign,
+  correction: ClipboardEdit,
+};
+
+const STATUS_SW: Record<string, string> = {
+  present: "Alikuwepo",
+  absent: "Hakuwepo",
+  late: "Alichelewa",
+  half_day: "Nusu siku",
 };
 
 const WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -98,6 +106,28 @@ export function NotificationsBell({ role }: BellProps) {
         requested_at: string;
         employee_name?: string;
         review_note: string | null;
+      }[];
+    },
+    refetchInterval: 60_000,
+  });
+
+  const canReviewCorrections = role === "supervisor" || isHrAdmin;
+
+  const { data: corrections } = useQuery({
+    queryKey: ["bell", "corrections"],
+    queryFn: async () => {
+      const res = await fetch(
+        canReviewCorrections ? "/api/attendance-corrections?status=pending" : "/api/attendance-corrections"
+      );
+      if (!res.ok) return [];
+      return (await res.json()) as {
+        id: string;
+        employee_name?: string;
+        date: string;
+        requested_status: string;
+        status: "pending" | "approved" | "denied";
+        created_at: string;
+        reviewed_at: string | null;
       }[];
     },
     refetchInterval: 60_000,
@@ -196,8 +226,41 @@ export function NotificationsBell({ role }: BellProps) {
       }
     }
 
+    for (const cr of corrections ?? []) {
+      if (canReviewCorrections) {
+        if (cr.status === "pending") {
+          list.push({
+            id: `cr-${cr.id}`,
+            kind: "correction",
+            title: `Marekebisho: ${cr.employee_name ?? ""}`.trim(),
+            detail: `${formatDate(cr.date)} → ${STATUS_SW[cr.requested_status] ?? cr.requested_status}`,
+            time: cr.created_at,
+            href: "/attendance/corrections",
+          });
+        }
+      } else {
+        if (
+          (cr.status === "approved" || cr.status === "denied") &&
+          cr.reviewed_at &&
+          now - new Date(cr.reviewed_at).getTime() < WINDOW_MS
+        ) {
+          list.push({
+            id: `cr-${cr.id}`,
+            kind: "correction",
+            title:
+              cr.status === "approved"
+                ? "Marekebisho yamekubaliwa"
+                : "Marekebisho yamekataliwa",
+            detail: `${formatDate(cr.date)} — ${STATUS_SW[cr.requested_status] ?? cr.requested_status}`,
+            time: cr.reviewed_at,
+            href: "/me",
+          });
+        }
+      }
+    }
+
     return list.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
-  }, [announcements, complaints, leaveData, advanceRequests, isHrAdmin]);
+  }, [announcements, complaints, leaveData, advanceRequests, corrections, isHrAdmin, canReviewCorrections]);
 
   return (
     <DropdownMenu>
