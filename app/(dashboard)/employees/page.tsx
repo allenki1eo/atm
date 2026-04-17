@@ -81,7 +81,17 @@ const employeeSchema = z.object({
   overtime_rule: z.enum(["all_days", "holidays_only", "none"]).optional(),
 });
 
-type EmployeeForm = z.infer<typeof employeeSchema>;
+type EmployeeForm = {
+  name: string;
+  phone: string;
+  type: "casual" | "fulltime";
+  department?: string;
+  supervisor_id?: string;
+  company_id?: string;
+  daily_rate?: number;
+  monthly_salary?: number;
+  overtime_rule?: "all_days" | "holidays_only" | "none";
+};
 
 const CSV_TEMPLATE =
   "name,phone,type,department,daily_rate,monthly_salary,overtime_rule\n" +
