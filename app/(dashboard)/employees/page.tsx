@@ -76,18 +76,35 @@ interface ImportSummary {
 
 const nanToZero = (v: unknown) => (typeof v === "number" && isNaN(v) ? 0 : v);
 
-const employeeSchema = z.object({
-  name: z.string().min(2, "Name required"),
-  phone: z.string().min(7, "Valid phone required"),
-  type: z.enum(["casual", "fulltime"]),
-  department: z.string().optional(),
-  supervisor_id: z.string().optional(),
-  company_id: z.string().optional(),
-  section_id: z.string().optional(),
-  daily_rate: z.preprocess(nanToZero, z.number().min(0).optional()),
-  monthly_salary: z.preprocess(nanToZero, z.number().min(0).optional()),
-  overtime_rule: z.enum(["all_days", "holidays_only", "none"]).optional(),
-});
+const employeeSchema = z
+  .object({
+    name: z.string().min(2, "Name required"),
+    phone: z.string().min(7, "Valid phone required"),
+    type: z.enum(["casual", "fulltime"]),
+    department: z.string().optional(),
+    supervisor_id: z.string().optional(),
+    company_id: z.string().optional(),
+    section_id: z.string().optional(),
+    daily_rate: z.preprocess(nanToZero, z.number().min(0).optional()),
+    monthly_salary: z.preprocess(nanToZero, z.number().min(0).optional()),
+    overtime_rule: z.enum(["all_days", "holidays_only", "none"]).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.type === "casual" && !(data.daily_rate && data.daily_rate > 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["daily_rate"],
+        message: "Weka kiwango cha siku (TZS)",
+      });
+    }
+    if (data.type === "fulltime" && !(data.monthly_salary && data.monthly_salary > 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["monthly_salary"],
+        message: "Weka mshahara wa mwezi (TZS)",
+      });
+    }
+  });
 
 type EmployeeForm = {
   name: string;
@@ -631,6 +648,9 @@ export default function EmployeesPage() {
                   placeholder="15000"
                   {...register("daily_rate", { valueAsNumber: true })}
                 />
+                {errors.daily_rate && (
+                  <p className="text-xs text-destructive">{errors.daily_rate.message}</p>
+                )}
               </div>
             ) : (
               <>
@@ -642,6 +662,9 @@ export default function EmployeesPage() {
                     placeholder="800000"
                     {...register("monthly_salary", { valueAsNumber: true })}
                   />
+                  {errors.monthly_salary && (
+                    <p className="text-xs text-destructive">{errors.monthly_salary.message}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Sheria ya Overtime</Label>
