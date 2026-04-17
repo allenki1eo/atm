@@ -234,7 +234,7 @@ export default function MePage() {
                 <CardDescription>Your attendance record for the current month</CardDescription>
               </CardHeader>
               <CardContent>
-                <AttendanceCalendar employeeId={selfEmployee.id} />
+                <AttendanceCalendar employeeId={selfEmployee.id} allowCorrection />
               </CardContent>
             </Card>
           ) : (

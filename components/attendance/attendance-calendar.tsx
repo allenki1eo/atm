@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight, MessageSquareWarning, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAttendanceCalendar } from "@/hooks/use-attendance";
 import { cn } from "@/lib/utils";
+import { CorrectionRequestDialog } from "./correction-request-dialog";
 
 const STATUS_COLORS = {
   present: "bg-green-500",
@@ -24,15 +26,41 @@ const STATUS_LABELS = {
 
 interface AttendanceCalendarProps {
   employeeId: string;
+  /** When true, show a "Report issue" button for the selected day and
+   *  surface pending/resolved correction requests from the current user. */
+  allowCorrection?: boolean;
 }
 
-export function AttendanceCalendar({ employeeId }: AttendanceCalendarProps) {
+interface CorrectionRow {
+  id: string;
+  date: string;
+  requested_status: string;
+  status: "pending" | "approved" | "denied";
+}
+
+export function AttendanceCalendar({ employeeId, allowCorrection = false }: AttendanceCalendarProps) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [correctionOpen, setCorrectionOpen] = useState(false);
 
   const { data, isLoading } = useAttendanceCalendar(employeeId, year, month);
+
+  const { data: myCorrections } = useQuery({
+    queryKey: ["attendance-corrections", "mine"],
+    queryFn: async () => {
+      const res = await fetch("/api/attendance-corrections");
+      if (!res.ok) return [] as CorrectionRow[];
+      return (await res.json()) as CorrectionRow[];
+    },
+    enabled: allowCorrection,
+    refetchInterval: 60_000,
+  });
+
+  const correctionByDate = new Map(
+    (myCorrections ?? []).map((c) => [c.date, c])
+  );
 
   const monthName = new Date(year, month - 1, 1).toLocaleString("default", {
     month: "long",
@@ -156,8 +184,8 @@ export function AttendanceCalendar({ employeeId }: AttendanceCalendarProps) {
 
       {/* Selected day detail */}
       {selectedDate && (
-        <div className="rounded-lg border p-3 bg-muted/20">
-          <p className="text-sm font-medium mb-1">
+        <div className="rounded-lg border p-3 bg-muted/20 space-y-2">
+          <p className="text-sm font-medium">
             {new Date(selectedDate + "T12:00:00").toLocaleDateString("en-US", {
               weekday: "long",
               month: "long",
@@ -182,7 +210,49 @@ export function AttendanceCalendar({ employeeId }: AttendanceCalendarProps) {
           ) : (
             <p className="text-sm text-muted-foreground">No record for this day</p>
           )}
+
+          {allowCorrection && (() => {
+            const pending = correctionByDate.get(selectedDate);
+            if (pending?.status === "pending") {
+              return (
+                <div className="flex items-center gap-2 text-xs text-amber-700">
+                  <Clock className="h-3 w-3" />
+                  Ombi la marekebisho linasubiri (umeomba &ldquo;
+                  {STATUS_LABELS[pending.requested_status as keyof typeof STATUS_LABELS]}&rdquo;)
+                </div>
+              );
+            }
+            if (pending?.status === "denied") {
+              return (
+                <p className="text-xs text-red-700">Ombi lililopita lilikataliwa.</p>
+              );
+            }
+            const isFuture = new Date(selectedDate) > new Date();
+            if (isFuture) return null;
+            return (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                onClick={() => setCorrectionOpen(true)}
+              >
+                <MessageSquareWarning className="h-3 w-3 mr-1.5" />
+                Omba Marekebisho
+              </Button>
+            );
+          })()}
         </div>
+      )}
+
+      {allowCorrection && selectedDate && (
+        <CorrectionRequestDialog
+          open={correctionOpen}
+          onOpenChange={setCorrectionOpen}
+          date={selectedDate}
+          currentStatus={
+            selectedRecord ? (selectedRecord as { status: string }).status : null
+          }
+        />
       )}
 
       {/* Legend */}
