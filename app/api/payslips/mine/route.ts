@@ -1,0 +1,30 @@
+import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { db, ensureDatabase } from "@/lib/db";
+
+export async function GET() {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await ensureDatabase();
+
+  const employeeId = session.user.id;
+  if (!employeeId) return NextResponse.json([]);
+
+  const res = await db.execute({
+    sql: `
+      SELECT
+        p.id, p.employee_id, p.period_id, p.days_worked,
+        p.gross_amount, p.total_advances, p.net_amount,
+        p.nssf_amount, p.cotwu_amount, p.fadhila_amount, p.heslb_amount,
+        p.total_deductions, p.generated_at,
+        pp.month, pp.year, pp.start_date, pp.end_date
+      FROM payslips p
+      JOIN payroll_periods pp ON pp.id = p.period_id
+      WHERE p.employee_id = ?
+      ORDER BY pp.year DESC, pp.month DESC, p.generated_at DESC
+    `,
+    args: [employeeId],
+  });
+
+  return NextResponse.json(res.rows);
+}

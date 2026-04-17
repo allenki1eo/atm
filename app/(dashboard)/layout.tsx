@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { OfflineBanner } from "@/components/layout/offline-banner";
+import { NotificationsBell } from "@/components/layout/notifications-bell";
 
 export default async function DashboardLayout({
   children,
@@ -32,6 +33,11 @@ export default async function DashboardLayout({
       <div className="flex flex-1 flex-col lg:pl-64 min-w-0 overflow-hidden">
         {/* Mobile nav header */}
         <MobileNav user={user} />
+
+        {/* Desktop top bar */}
+        <div className="hidden lg:flex h-12 items-center justify-end gap-2 border-b bg-background px-6">
+          <NotificationsBell role={user.role} />
+        </div>
 
         {/* Offline banner */}
         <OfflineBanner />
