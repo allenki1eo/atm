@@ -123,6 +123,44 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Huwezi kufuta akaunti yako mwenyewe" }, { status: 400 });
   }
 
-  await db.execute({ sql: "DELETE FROM users WHERE id = ? AND employee_id IS NULL", args: [id] });
+  const check = await db.execute({
+    sql: "SELECT employee_id FROM users WHERE id = ?",
+    args: [id],
+  });
+  if (check.rows.length === 0) {
+    return NextResponse.json({ error: "Mtumiaji hajapatikana" }, { status: 404 });
+  }
+  const target = check.rows[0] as unknown as { employee_id: string | null };
+  if (target.employee_id) {
+    return NextResponse.json(
+      { error: "Huwezi kufuta mtumiaji aliyeunganishwa na mfanyakazi. Futa mfanyakazi badala yake." },
+      { status: 400 }
+    );
+  }
+
+  try {
+    await db.execute({
+      sql: "UPDATE employees SET supervisor_id = NULL WHERE supervisor_id = ?",
+      args: [id],
+    });
+    await db.execute({
+      sql: "DELETE FROM supervisor_sections WHERE supervisor_id = ?",
+      args: [id],
+    });
+    await db.execute({ sql: "DELETE FROM users WHERE id = ?", args: [id] });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Database error";
+    if (msg.toUpperCase().includes("FOREIGN KEY") || msg.includes("constraint")) {
+      return NextResponse.json(
+        {
+          error:
+            "Huwezi kufuta mtumiaji huyu kwa sababu ana kumbukumbu za mfumo (mahudhurio, matangazo, au ruhusa). Badilisha wadhifa wake badala yake.",
+        },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+
   return NextResponse.json({ success: true });
 }

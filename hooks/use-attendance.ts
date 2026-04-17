@@ -103,6 +103,32 @@ export function useLockDay() {
   });
 }
 
+export function useUnlockDay() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (date: string) => {
+      const res = await fetch("/api/attendance/reopen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "Failed to unlock day");
+      }
+      return res.json() as Promise<{ unlocked_count: number }>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["attendance"] });
+      toast({ title: "Day unlocked", description: "Attendance records can be edited again.", variant: "success" as never });
+    },
+    onError: (err) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+}
+
 export function useAttendanceCalendar(employeeId: string, year: number, month: number) {
   return useQuery({
     queryKey: ["attendance", "calendar", employeeId, year, month],
