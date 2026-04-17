@@ -78,7 +78,10 @@ export async function POST(request: NextRequest) {
       formatCurrency(grossCents)
     );
 
-    sendSMS(emp.phone, message).catch(console.error);
+    sendSMS(emp.phone, message, {
+      sentBy: session.user.id ?? null,
+      source: "attendance_mark",
+    }).catch(console.error);
   }
 
   return NextResponse.json({ success: true, status, date, employee_id });

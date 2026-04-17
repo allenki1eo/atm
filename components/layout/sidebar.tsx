@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   Users,
@@ -31,7 +32,7 @@ interface NavItem {
   label: string;
   icon: React.ElementType;
   roles: string[];
-  badge?: string;
+  badgeKey?: "announcements" | "complaints";
 }
 
 const navItems: NavItem[] = [
@@ -46,8 +47,8 @@ const navItems: NavItem[] = [
   { href: "/advances", label: "Mikopo", icon: DollarSign, roles: ["hr", "admin"] },
   { href: "/payroll/periods", label: "Vipindi vya Mshahara", icon: DollarSign, roles: ["hr", "admin"] },
   { href: "/payroll/casual", label: "Mshahara wa Mkataba", icon: DollarSign, roles: ["hr", "admin"] },
-  { href: "/announcements", label: "Matangazo", icon: Megaphone, roles: ["supervisor", "hr", "admin", "employee"] },
-  { href: "/complaints", label: "Malalamiko", icon: MessageSquareWarning, roles: ["hr", "admin", "employee"] },
+  { href: "/announcements", label: "Matangazo", icon: Megaphone, roles: ["supervisor", "hr", "admin", "employee"], badgeKey: "announcements" },
+  { href: "/complaints", label: "Malalamiko", icon: MessageSquareWarning, roles: ["hr", "admin", "employee"], badgeKey: "complaints" },
   { href: "/me", label: "Dashibodi Yangu", icon: UserCircle, roles: ["supervisor", "hr", "admin", "employee"] },
 ];
 
@@ -62,6 +63,45 @@ interface SidebarProps {
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
   const filteredNavItems = navItems.filter((item) => item.roles.includes(user.role));
+
+  // Unread badges: announcements for everyone, open complaints for HR/admin
+  const { data: unreadAnnouncements } = useQuery({
+    queryKey: ["sidebar", "announcements-unread"],
+    queryFn: async () => {
+      const res = await fetch("/api/announcements?unread=1");
+      if (!res.ok) return [];
+      return (await res.json()) as unknown[];
+    },
+    refetchInterval: 60_000,
+  });
+
+  const { data: openComplaints } = useQuery({
+    queryKey: ["sidebar", "complaints-open"],
+    queryFn: async () => {
+      const res = await fetch("/api/complaints");
+      if (!res.ok) return [];
+      const rows = (await res.json()) as { status: string; response: string | null }[];
+      // HR/admin: count open; employee: count resolved responses they haven't seen
+      if (user.role === "hr" || user.role === "admin") {
+        return rows.filter((r) => r.status === "open");
+      }
+      // Employees: show responses received in the last 7 days as "new"
+      const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      return rows.filter((r) => {
+        const resolved = r as { status: string; response: string | null; responded_at?: string };
+        if (resolved.status !== "resolved" || !resolved.response || !resolved.responded_at) return false;
+        return new Date(resolved.responded_at).getTime() > sevenDaysAgo;
+      });
+    },
+    refetchInterval: 60_000,
+    enabled: user.role === "hr" || user.role === "admin" || user.role === "employee",
+  });
+
+  const badgeFor = (key?: "announcements" | "complaints") => {
+    if (key === "announcements") return unreadAnnouncements?.length ?? 0;
+    if (key === "complaints") return openComplaints?.length ?? 0;
+    return 0;
+  };
 
   const initials = user.name
     ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
@@ -85,6 +125,7 @@ export function Sidebar({ user }: SidebarProps) {
         <ul className="space-y-1">
           {filteredNavItems.map((item) => {
             const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+            const badgeCount = badgeFor(item.badgeKey);
             return (
               <li key={item.href}>
                 <Link
@@ -98,9 +139,9 @@ export function Sidebar({ user }: SidebarProps) {
                 >
                   <item.icon className="h-4 w-4 shrink-0" />
                   <span className="flex-1">{item.label}</span>
-                  {item.badge && (
-                    <Badge className="text-xs" variant="secondary">
-                      {item.badge}
+                  {badgeCount > 0 && (
+                    <Badge className="text-xs" variant="destructive">
+                      {badgeCount}
                     </Badge>
                   )}
                   {isActive && <ChevronRight className="h-3 w-3 opacity-50" />}

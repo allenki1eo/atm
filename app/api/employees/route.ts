@@ -126,7 +126,10 @@ export async function POST(request: NextRequest) {
         `PIN: ${pin}. Usishiriki PIN hii. ` +
         `Ingia hapa: https://atwork.eastafricanspirit.co.tz/login`;
 
-      const smsResult = await sendSMS(phone, message);
+      const smsResult = await sendSMS(phone, message, {
+        sentBy: session.user.id ?? null,
+        source: "new_employee_credentials",
+      });
       smsSent = smsResult.success;
     } catch (err) {
       // User creation failed but employee was created — non-fatal

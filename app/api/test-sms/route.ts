@@ -51,7 +51,10 @@ export async function POST(request: NextRequest) {
     }, { status: 400 });
   }
 
-  const result = await sendSMS(phone, message);
+  const result = await sendSMS(phone, message, {
+    sentBy: session.user.id ?? null,
+    source: "test_sms",
+  });
 
   return NextResponse.json({
     ...result,

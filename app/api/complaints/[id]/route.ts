@@ -44,7 +44,10 @@ export async function PUT(
   const row = complaint.rows[0] as unknown as { subject: string; phone: string; name: string } | undefined;
   if (row?.phone) {
     const msg = `TrustTrack: HR amejibu malalamiko yako "${row.subject}". Tafadhali ingia mfumoni kusoma jibu.`;
-    await sendSMS(row.phone, msg);
+    await sendSMS(row.phone, msg, {
+      sentBy: session.user.id ?? null,
+      source: "complaint_response",
+    });
   }
 
   const result = await db.execute({

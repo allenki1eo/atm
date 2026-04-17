@@ -183,7 +183,10 @@ export async function POST(request: NextRequest) {
       `PIN: ${pin}. Usishiriki PIN hii. ` +
       `Ingia hapa: https://atwork.eastafricanspirit.co.tz/login`;
 
-    const smsResult = await sendSMS(phone, message);
+    const smsResult = await sendSMS(phone, message, {
+      sentBy: session.user.id ?? null,
+      source: "employee_import",
+    });
 
     results.push({
       row: rowNum,

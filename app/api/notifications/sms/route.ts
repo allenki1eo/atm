@@ -18,6 +18,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Phone and message required" }, { status: 400 });
   }
 
-  const result = await sendSMS(phone, message);
+  const result = await sendSMS(phone, message, {
+    sentBy: session.user.id ?? null,
+    source: "manual_notification",
+  });
   return NextResponse.json(result);
 }

@@ -61,6 +61,36 @@ export function getMonthDays(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }
 
+/**
+ * Count working days between start and end (inclusive), excluding Saturdays,
+ * Sundays, and any date strings in `holidays` (YYYY-MM-DD).
+ */
+export function calcWorkingDays(
+  start: string | Date,
+  end: string | Date,
+  holidays: string[] = []
+): number {
+  const holidaySet = new Set(holidays);
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  if (endDate < startDate) return 0;
+
+  let count = 0;
+  const cursor = new Date(startDate);
+  cursor.setHours(0, 0, 0, 0);
+  const endMs = new Date(endDate).setHours(0, 0, 0, 0);
+
+  while (cursor.getTime() <= endMs) {
+    const day = cursor.getDay();
+    const iso = cursor.toISOString().split("T")[0];
+    if (day !== 0 && day !== 6 && !holidaySet.has(iso)) {
+      count++;
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return count;
+}
+
 // ── Swahili i18n strings ──────────────────────────────────────────────────
 export const sw = {
   // Status labels
