@@ -40,20 +40,19 @@ export default function MePage() {
   const [advanceOpen, setAdvanceOpen] = useState(false);
 
   const userId = session?.user?.id;
-  const employeeId =
-    (session?.user as { employeeId?: string | null } | undefined)?.employeeId ?? null;
 
-  // Fetch the current user's own employee record (null for admin/HR with no link).
+  // Resolve the current user's employee record server-side — returns
+  // null for admin/HR without a linked profile.
   const { data: selfEmployee } = useQuery({
-    queryKey: ["me", "employee", employeeId],
+    queryKey: ["me", "employee"],
     queryFn: async () => {
-      const res = await fetch("/api/employees");
+      const res = await fetch("/api/me/employee");
       if (!res.ok) return null;
-      const all = (await res.json()) as { id: string }[];
-      return all.find((e) => e.id === employeeId) ?? null;
+      return (await res.json()) as { id: string } | null;
     },
-    enabled: !!employeeId,
+    enabled: !!userId,
   });
+  const employeeId = selfEmployee?.id ?? null;
 
   // Fetch transactions (only when we have a real employee link)
   const { data: txData, isLoading: txLoading } = useQuery({

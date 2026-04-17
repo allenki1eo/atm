@@ -16,6 +16,16 @@ export async function GET(request: NextRequest) {
   const statusFilter = searchParams.get("status");
   const employeeFilter = searchParams.get("employee_id");
 
+  let employeeId: string | null = null;
+  if (role === "employee") {
+    const userRes = await db.execute({
+      sql: "SELECT employee_id FROM users WHERE id = ?",
+      args: [userId],
+    });
+    const row = userRes.rows[0] as unknown as { employee_id: string | null } | undefined;
+    employeeId = row?.employee_id ?? null;
+  }
+
   // Base query joins employee for display + section for supervisor scoping
   let sql = `
     SELECT
@@ -30,8 +40,9 @@ export async function GET(request: NextRequest) {
   const args: (string | number)[] = [];
 
   if (role === "employee") {
+    if (!employeeId) return NextResponse.json([]);
     where.push("ac.employee_id = ?");
-    args.push(userId);
+    args.push(employeeId);
   } else if (role === "supervisor") {
     // Supervisor sees corrections for employees in sections they manage.
     where.push(`(
@@ -64,6 +75,21 @@ export async function POST(request: NextRequest) {
   await ensureDatabase();
 
   const userId = session.user.id!;
+  // Always resolve employee_id from the DB — the JWT is untrustworthy
+  // because older sessions used `employee_id ?? user.id`.
+  const userRes = await db.execute({
+    sql: "SELECT employee_id FROM users WHERE id = ?",
+    args: [userId],
+  });
+  const userRow = userRes.rows[0] as unknown as { employee_id: string | null } | undefined;
+  const employeeId = userRow?.employee_id ?? null;
+  if (!employeeId) {
+    return NextResponse.json(
+      { error: "Akaunti yako haijaunganishwa na mfanyakazi" },
+      { status: 400 }
+    );
+  }
+
   const body = await request.json();
   const { date, requested_status, reason } = body as {
     date?: string;
@@ -87,22 +113,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Resolve the employee record for this user (id == employee_id in this app)
-  const empRes = await db.execute({
-    sql: "SELECT id FROM employees WHERE id = ?",
-    args: [userId],
-  });
-  if (empRes.rows.length === 0) {
-    return NextResponse.json(
-      { error: "Akaunti yako haijaunganishwa na mfanyakazi" },
-      { status: 400 }
-    );
-  }
-
   // Don't allow corrections on dates whose attendance row is already locked
   const attRes = await db.execute({
     sql: "SELECT id, status, is_locked FROM attendance WHERE employee_id = ? AND date = ?",
-    args: [userId, date],
+    args: [employeeId, date],
   });
   const existingAtt = attRes.rows[0] as unknown as
     | { id: string; status: string; is_locked: number }
@@ -118,7 +132,7 @@ export async function POST(request: NextRequest) {
   const dupRes = await db.execute({
     sql: `SELECT id FROM attendance_corrections
           WHERE employee_id = ? AND date = ? AND status = 'pending'`,
-    args: [userId, date],
+    args: [employeeId, date],
   });
   if (dupRes.rows.length > 0) {
     return NextResponse.json(
@@ -143,7 +157,7 @@ export async function POST(request: NextRequest) {
           VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
     args: [
       id,
-      userId,
+      employeeId,
       date,
       existingAtt?.id ?? null,
       existingAtt?.status ?? null,

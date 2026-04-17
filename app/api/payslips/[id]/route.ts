@@ -36,14 +36,17 @@ export async function GET(
     generated_at: string;
   };
 
-  const sessionEmployeeId =
-    (session.user as { employeeId?: string | null }).employeeId ?? null;
-  if (
-    role !== "hr" &&
-    role !== "admin" &&
-    payslip.employee_id !== sessionEmployeeId
-  ) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (role !== "hr" && role !== "admin") {
+    const userRes = await db.execute({
+      sql: "SELECT employee_id FROM users WHERE id = ?",
+      args: [session.user.id!],
+    });
+    const linkedEmployeeId =
+      (userRes.rows[0] as unknown as { employee_id: string | null } | undefined)
+        ?.employee_id ?? null;
+    if (payslip.employee_id !== linkedEmployeeId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
 
   const empRes = await db.execute({

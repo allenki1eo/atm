@@ -7,9 +7,16 @@ export async function GET(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
-  const sessionEmployeeId =
-    (session.user as { employeeId?: string | null }).employeeId ?? null;
-  const employeeId = searchParams.get("employee_id") ?? sessionEmployeeId;
+  let employeeId: string | null = searchParams.get("employee_id");
+  if (!employeeId) {
+    const userRes = await db.execute({
+      sql: "SELECT employee_id FROM users WHERE id = ?",
+      args: [session.user.id!],
+    });
+    employeeId =
+      (userRes.rows[0] as unknown as { employee_id: string | null } | undefined)
+        ?.employee_id ?? null;
+  }
   if (!employeeId) {
     return NextResponse.json({ error: "Employee not found" }, { status: 404 });
   }
