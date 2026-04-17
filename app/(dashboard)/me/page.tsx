@@ -40,27 +40,30 @@ export default function MePage() {
   const [advanceOpen, setAdvanceOpen] = useState(false);
 
   const userId = session?.user?.id;
+  const employeeId =
+    (session?.user as { employeeId?: string | null } | undefined)?.employeeId ?? null;
 
-  // Fetch employee profile (if user is also an employee)
-  const { data: employees } = useQuery({
-    queryKey: ["employees"],
+  // Fetch the current user's own employee record (null for admin/HR with no link).
+  const { data: selfEmployee } = useQuery({
+    queryKey: ["me", "employee", employeeId],
     queryFn: async () => {
       const res = await fetch("/api/employees");
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
+      if (!res.ok) return null;
+      const all = (await res.json()) as { id: string }[];
+      return all.find((e) => e.id === employeeId) ?? null;
     },
-    enabled: !!userId,
+    enabled: !!employeeId,
   });
 
-  // Fetch transactions
+  // Fetch transactions (only when we have a real employee link)
   const { data: txData, isLoading: txLoading } = useQuery({
-    queryKey: ["transactions", userId],
+    queryKey: ["transactions", employeeId],
     queryFn: async () => {
-      const res = await fetch(`/api/transactions/advance?employee_id=${userId}`);
+      const res = await fetch(`/api/transactions/advance?employee_id=${employeeId}`);
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
-    enabled: !!userId,
+    enabled: !!employeeId,
   });
 
   const {
@@ -127,7 +130,7 @@ export default function MePage() {
         generated_at: string;
       }[];
     },
-    enabled: !!userId,
+    enabled: !!employeeId,
   });
 
   // Inbox: announcements + complaint responses
@@ -168,11 +171,6 @@ export default function MePage() {
   });
 
   const role = (session?.user as { role?: string })?.role;
-
-  // Find this user as an employee (for self-service view)
-  const selfEmployee = Array.isArray(employees)
-    ? employees.find((e: { id: string }) => e.id === userId) ?? employees[0]
-    : null;
 
   return (
     <div className="space-y-6">
