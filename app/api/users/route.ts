@@ -9,7 +9,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const result = await db.execute(
-    "SELECT id, name, role, email, phone, created_at FROM users ORDER BY name"
+    "SELECT id, name, role, email, phone, employee_id, created_at FROM users ORDER BY name"
   );
   return NextResponse.json(result.rows);
 }
