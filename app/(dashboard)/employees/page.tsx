@@ -9,6 +9,7 @@ import { z } from "zod";
 import {
   Plus, Search, Users, Pencil, Trash2, Upload, Download,
   FileText, CheckCircle2, XCircle, Loader2, KeyRound, MessageSquare,
+  ShieldCheck, ShieldOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +57,7 @@ interface SupervisorUser {
   id: string;
   name: string;
   role: string;
+  employee_id: string | null;
 }
 
 interface ImportResult {
@@ -154,6 +156,7 @@ export default function EmployeesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
+  const [roleTarget, setRoleTarget] = useState<{ emp: Employee; action: "promote" | "demote" } | null>(null);
   const [newCredentials, setNewCredentials] = useState<{ name: string; phone: string; pin: string } | null>(null);
 
   // CSV import state
@@ -281,6 +284,39 @@ export default function EmployeesPage() {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
+
+  const roleMutation = useMutation({
+    mutationFn: async ({ employeeId, action }: { employeeId: string; action: "promote" | "demote" }) => {
+      const res = await fetch(`/api/employees/${employeeId}/role`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? "Failed");
+      return json;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      setRoleTarget(null);
+      toast({
+        title: variables.action === "promote" ? "Amepandishwa cheo" : "Amerejeshwa",
+        description:
+          variables.action === "promote"
+            ? "Mfanyakazi sasa ni supervisor."
+            : "Wadhifa umerudishwa kuwa mfanyakazi.",
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Hitilafu", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const roleByEmployeeId = new Map<string, string>();
+  for (const u of allUsers ?? []) {
+    if (u.employee_id) roleByEmployeeId.set(u.employee_id, u.role);
+  }
 
   const openEdit = (emp: Employee) => {
     setEditingEmployee(emp);
@@ -503,6 +539,28 @@ export default function EmployeesPage() {
                         <Button variant="ghost" size="icon" onClick={() => openEdit(emp)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
+                        {isAdmin && roleByEmployeeId.get(emp.id) === "employee" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Pandisha kuwa supervisor"
+                            className="text-emerald-700 hover:text-emerald-700"
+                            onClick={() => setRoleTarget({ emp, action: "promote" })}
+                          >
+                            <ShieldCheck className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {isAdmin && roleByEmployeeId.get(emp.id) === "supervisor" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Rudisha kuwa mfanyakazi"
+                            className="text-amber-700 hover:text-amber-700"
+                            onClick={() => setRoleTarget({ emp, action: "demote" })}
+                          >
+                            <ShieldOff className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -718,6 +776,51 @@ export default function EmployeesPage() {
               {deleteMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Inafuta...</>
               ) : "Ndio, Futa"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Promote/Demote confirmation dialog */}
+      <Dialog open={!!roleTarget} onOpenChange={(open) => { if (!open) setRoleTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {roleTarget?.action === "promote" ? (
+                <><ShieldCheck className="h-5 w-5 text-emerald-600" />Pandisha kuwa Supervisor</>
+              ) : (
+                <><ShieldOff className="h-5 w-5 text-amber-600" />Rudisha kuwa Mfanyakazi</>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {roleTarget?.action === "promote" ? (
+                <>
+                  <strong>{roleTarget?.emp.name}</strong> atapata ufikiaji wa dashibodi ya supervisor pamoja na dashibodi yake ya mfanyakazi. Utaweza kumpangia wafanyakazi wa kusimamia.
+                </>
+              ) : (
+                <>
+                  <strong>{roleTarget?.emp.name}</strong> hatakuwa tena supervisor. Wafanyakazi aliokuwa akisimamia wataachwa bila supervisor (unaweza kuwapangia mwingine baadaye).
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRoleTarget(null)}>Ghairi</Button>
+            <Button
+              disabled={roleMutation.isPending}
+              onClick={() =>
+                roleTarget &&
+                roleMutation.mutate({ employeeId: roleTarget.emp.id, action: roleTarget.action })
+              }
+              className={
+                roleTarget?.action === "promote"
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                  : "bg-amber-600 hover:bg-amber-700 text-white"
+              }
+            >
+              {roleMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Inafanya...</>
+              ) : roleTarget?.action === "promote" ? "Ndio, Pandisha" : "Ndio, Rudisha"}
             </Button>
           </DialogFooter>
         </DialogContent>
