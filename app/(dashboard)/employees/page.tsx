@@ -767,37 +767,36 @@ export default function EmployeesPage() {
                 )}
               </div>
             ) : (
-              <>
-                <div className="space-y-2">
-                  <Label>Mshahara wa Mwezi (TZS)</Label>
-                  <Input
-                    type="number"
-                    step="1"
-                    placeholder="800000"
-                    {...register("monthly_salary", { valueAsNumber: true })}
-                  />
-                  {errors.monthly_salary && (
-                    <p className="text-xs text-destructive">{errors.monthly_salary.message}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Sheria ya Overtime</Label>
-                  <Select
-                    value={watch("overtime_rule") ?? "none"}
-                    onValueChange={(v) =>
-                      setValue("overtime_rule", v as "all_days" | "holidays_only" | "none")
-                    }
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Hakuna Overtime</SelectItem>
-                      <SelectItem value="all_days">Siku Zote</SelectItem>
-                      <SelectItem value="holidays_only">Likizo tu</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
+              <div className="space-y-2">
+                <Label>Mshahara wa Mwezi (TZS)</Label>
+                <Input
+                  type="number"
+                  step="1"
+                  placeholder="800000"
+                  {...register("monthly_salary", { valueAsNumber: true })}
+                />
+                {errors.monthly_salary && (
+                  <p className="text-xs text-destructive">{errors.monthly_salary.message}</p>
+                )}
+              </div>
             )}
+
+            <div className="space-y-2">
+              <Label>Sheria ya Overtime</Label>
+              <Select
+                value={watch("overtime_rule") ?? "none"}
+                onValueChange={(v) =>
+                  setValue("overtime_rule", v as "all_days" | "holidays_only" | "none")
+                }
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Hakuna Overtime</SelectItem>
+                  <SelectItem value="all_days">Siku Zote</SelectItem>
+                  <SelectItem value="holidays_only">Likizo tu</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* Deductions section */}
             <div className="space-y-2 rounded-lg border p-3 bg-muted/30">
