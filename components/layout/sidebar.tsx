@@ -22,6 +22,7 @@ import {
   UserCog,
   Megaphone,
   MessageSquareWarning,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -49,6 +50,7 @@ const navItems: NavItem[] = [
   { href: "/holidays", label: "Sikukuu", icon: CalendarDays, roles: ["hr", "admin"] },
   { href: "/users", label: "Watumiaji wa Mfumo", icon: UserCog, roles: ["admin"] },
   { href: "/leave", label: "Likizo", icon: Palmtree, roles: ["supervisor", "hr", "admin", "employee"] },
+  { href: "/overtime", label: "Overtime / Ziada", icon: Clock, roles: ["hr", "admin"] },
   { href: "/advances", label: "Salary Advance", icon: DollarSign, roles: ["hr", "admin"] },
   { href: "/payroll/periods", label: "Vipindi vya Mshahara", icon: DollarSign, roles: ["hr", "admin"] },
   { href: "/payroll/casual", label: "Mshahara wa Mkataba", icon: DollarSign, roles: ["hr", "admin"] },

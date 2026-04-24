@@ -78,10 +78,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Mfanyakazi huyu hana ruhusa ya overtime" }, { status: 400 });
   }
 
-  // Casual: each 9 hours = 1 daily_rate; Fulltime: (monthly_salary / 28 / 9) * hours
+  // Casual: proportional of daily_rate (4.5h = half day, 9h = full day)
+  // Fulltime: (monthly_salary / 28 / 9) * hours
   let amount: number;
   if (emp.type === "casual") {
-    amount = Math.round(Math.floor(hours / 9) * emp.daily_rate);
+    amount = Math.round((hours / 9) * emp.daily_rate);
   } else {
     amount = Math.round((emp.monthly_salary / 28 / 9) * hours);
   }
