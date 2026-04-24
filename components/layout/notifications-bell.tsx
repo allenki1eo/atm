@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, Megaphone, MessageSquareWarning, Palmtree, DollarSign, ClipboardEdit } from "lucide-react";
 import {
   DropdownMenu,
@@ -45,6 +45,24 @@ const WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function NotificationsBell({ role }: BellProps) {
   const isHrAdmin = role === "hr" || role === "admin";
+  const queryClient = useQueryClient();
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+
+  const dismiss = useCallback(
+    (notifId: string) => {
+      setDismissed((prev) => new Set(prev).add(notifId));
+      // For announcements, mark as read on the server immediately
+      if (notifId.startsWith("a-")) {
+        const realId = notifId.slice(2);
+        fetch(`/api/announcements/${realId}/read`, { method: "POST" }).then(() => {
+          queryClient.invalidateQueries({ queryKey: ["bell", "announcements"] });
+          queryClient.invalidateQueries({ queryKey: ["sidebar", "announcements-unread"] });
+          queryClient.invalidateQueries({ queryKey: ["announcements"] });
+        });
+      }
+    },
+    [queryClient]
+  );
 
   const { data: announcements } = useQuery({
     queryKey: ["bell", "announcements"],
@@ -262,17 +280,19 @@ export function NotificationsBell({ role }: BellProps) {
     return list.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
   }, [announcements, complaints, leaveData, advanceRequests, corrections, isHrAdmin, canReviewCorrections]);
 
+  const visibleItems = items.filter((n) => !dismissed.has(n.id));
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
-          {items.length > 0 && (
+          {visibleItems.length > 0 && (
             <Badge
               variant="destructive"
               className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] leading-none flex items-center justify-center"
             >
-              {items.length > 9 ? "9+" : items.length}
+              {visibleItems.length > 9 ? "9+" : visibleItems.length}
             </Badge>
           )}
         </Button>
@@ -281,21 +301,22 @@ export function NotificationsBell({ role }: BellProps) {
         <div className="px-3 py-2 border-b bg-muted/30">
           <p className="text-sm font-semibold">Arifa</p>
           <p className="text-xs text-muted-foreground">
-            {items.length === 0 ? "Hakuna arifa mpya" : `${items.length} arifa`}
+            {visibleItems.length === 0 ? "Hakuna arifa mpya" : `${visibleItems.length} arifa`}
           </p>
         </div>
-        {items.length === 0 ? (
+        {visibleItems.length === 0 ? (
           <div className="p-6 text-center text-sm text-muted-foreground">
             Hakuna arifa kwa sasa.
           </div>
         ) : (
           <ul>
-            {items.slice(0, 20).map((n) => {
+            {visibleItems.slice(0, 20).map((n) => {
               const Icon = iconFor[n.kind];
               return (
                 <li key={n.id}>
                   <Link
                     href={n.href}
+                    onClick={() => dismiss(n.id)}
                     className="flex gap-3 px-3 py-2.5 hover:bg-accent border-b last:border-0"
                   >
                     <div className="rounded-md bg-primary/10 h-8 w-8 flex items-center justify-center shrink-0">

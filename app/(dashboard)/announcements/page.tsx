@@ -85,6 +85,7 @@ export default function AnnouncementsPage() {
   const canCompose = role === "hr" || role === "admin";
 
   const [composeOpen, setComposeOpen] = useState(false);
+  const [showRead, setShowRead] = useState(false);
 
   const { data: announcements, isLoading } = useQuery({
     queryKey: ["announcements"],
@@ -155,10 +156,16 @@ export default function AnnouncementsPage() {
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["announcements"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["announcements"] });
+      queryClient.invalidateQueries({ queryKey: ["bell", "announcements"] });
+      queryClient.invalidateQueries({ queryKey: ["sidebar", "announcements-unread"] });
+    },
   });
 
-  const rows = announcements ?? [];
+  const allRows = announcements ?? [];
+  const unreadCount = allRows.filter((a) => !a.is_read).length;
+  const rows = showRead ? allRows : allRows.filter((a) => !a.is_read);
 
   return (
     <div className="space-y-6">
@@ -174,12 +181,26 @@ export default function AnnouncementsPage() {
               : "Matangazo kutoka HR na Admin"}
           </p>
         </div>
-        {canCompose && (
-          <Button onClick={() => setComposeOpen(true)} className="w-full sm:w-auto">
-            <Plus className="h-4 w-4 mr-2" />
-            Tangazo Jipya
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {allRows.length > unreadCount && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowRead((v) => !v)}
+              className="text-muted-foreground"
+            >
+              {showRead
+                ? "Ficha zilizosomwa"
+                : `Onyesha zilizosomwa (${allRows.length - unreadCount})`}
+            </Button>
+          )}
+          {canCompose && (
+            <Button onClick={() => setComposeOpen(true)} className="w-full sm:w-auto">
+              <Plus className="h-4 w-4 mr-2" />
+              Tangazo Jipya
+            </Button>
+          )}
+        </div>
       </div>
 
       {isLoading ? (
@@ -187,7 +208,19 @@ export default function AnnouncementsPage() {
       ) : rows.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            Hakuna matangazo bado
+            {allRows.length > 0 ? (
+              <>
+                Matangazo yote umeyasoma.{" "}
+                <button
+                  className="underline hover:text-foreground transition-colors"
+                  onClick={() => setShowRead(true)}
+                >
+                  Onyesha yote ({allRows.length})
+                </button>
+              </>
+            ) : (
+              "Hakuna matangazo bado"
+            )}
           </CardContent>
         </Card>
       ) : (
