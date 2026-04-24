@@ -1,13 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getTodayDate } from "@/lib/utils";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const today = getTodayDate();
+  const { searchParams } = new URL(request.url);
+  const dateParam = searchParams.get("date");
+  const date = dateParam ?? getTodayDate();
+
   const userId = session.user.id!;
   const role = (session.user as { role: string }).role;
 
@@ -34,7 +37,7 @@ export async function GET() {
       WHERE e.supervisor_id = ? AND e.active = 1
       ORDER BY e.name
     `;
-    args = [today, userId];
+    args = [date, userId];
   } else {
     sql = `
       SELECT
@@ -55,7 +58,7 @@ export async function GET() {
       WHERE e.active = 1
       ORDER BY e.department, e.name
     `;
-    args = [today];
+    args = [date];
   }
 
   const result = await db.execute({ sql, args });

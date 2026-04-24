@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { UserCog, Plus, Pencil, Trash2, Eye, EyeOff, Copy, Check, Loader2 } from "lucide-react";
+import { UserCog, Plus, Pencil, Trash2, Eye, EyeOff, Copy, Check, Loader2, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -89,6 +89,9 @@ export default function UsersPage() {
   const [newCredentials, setNewCredentials] = useState<{ name: string; phone: string | null; email: string | null; password: string } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [resetTarget, setResetTarget] = useState<SystemUser | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [showResetPw, setShowResetPw] = useState(false);
 
   const { data: users, isLoading } = useQuery({
     queryKey: ["users"],
@@ -181,6 +184,29 @@ export default function UsersPage() {
     },
   });
 
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ id, password }: { id: string; password: string }) => {
+      const res = await fetch("/api/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, password }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? "Imeshindwa");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setResetTarget(null);
+      setResetPassword("");
+      toast({ title: "Nywila imebadilishwa", description: "Nywila mpya imehifadhiwa." });
+    },
+    onError: (err) => {
+      toast({ title: "Hitilafu", description: err.message, variant: "destructive" });
+    },
+  });
+
   const openEdit = (user: SystemUser) => {
     setEditUser(user);
     editForm.reset({ name: user.name, phone: user.phone ?? "", email: user.email ?? "", role: user.role, password: "" });
@@ -252,8 +278,12 @@ export default function UsersPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(user)}>
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(user)} title="Hariri">
                           <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8" title="Badilisha Nywila"
+                          onClick={() => { setResetTarget(user); setResetPassword(""); setShowResetPw(false); }}>
+                          <KeyRound className="h-3.5 w-3.5" />
                         </Button>
                         <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteUser(user)}>
                           <Trash2 className="h-3.5 w-3.5" />
@@ -447,6 +477,49 @@ export default function UsersPage() {
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? "Inafuta..." : "Futa"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset password dialog */}
+      <Dialog open={!!resetTarget} onOpenChange={(o) => { if (!o) { setResetTarget(null); setResetPassword(""); } }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-amber-600" />
+              Badilisha Nywila
+            </DialogTitle>
+            <DialogDescription>
+              Weka nywila mpya kwa <strong>{resetTarget?.name}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Nywila mpya</Label>
+            <div className="relative">
+              <Input
+                type={showResetPw ? "text" : "password"}
+                placeholder="Herufi 6+"
+                value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+                className="pr-10"
+              />
+              <Button type="button" variant="ghost" size="icon"
+                className="absolute right-0 top-0 h-full w-10"
+                onClick={() => setShowResetPw(!showResetPw)}>
+                {showResetPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetTarget(null)}>Ghairi</Button>
+            <Button
+              disabled={resetPassword.length < 6 || resetPasswordMutation.isPending}
+              onClick={() => resetTarget && resetPasswordMutation.mutate({ id: resetTarget.id, password: resetPassword })}
+            >
+              {resetPasswordMutation.isPending
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Inahifadhi...</>
+                : "Hifadhi Nywila"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -8,7 +8,9 @@ import {
   LayoutDashboard,
   Users,
   Calendar,
+  CalendarDays,
   ClipboardList,
+  ClipboardEdit,
   DollarSign,
   UserCircle,
   LogOut,
@@ -20,8 +22,6 @@ import {
   UserCog,
   Megaphone,
   MessageSquareWarning,
-  CalendarDays,
-  ClipboardEdit,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -43,6 +43,7 @@ const navItems: NavItem[] = [
   { href: "/attendance/history", label: "Historia ya Mahudhurio", icon: Calendar, roles: ["supervisor", "hr", "admin"] },
   { href: "/attendance/import", label: "Ingiza Mahudhurio", icon: Upload, roles: ["admin"] },
   { href: "/attendance/corrections", label: "Marekebisho", icon: ClipboardEdit, roles: ["supervisor", "hr", "admin"], badgeKey: "corrections" },
+  { href: "/attendance/edit", label: "Hariri Mahudhurio", icon: CalendarDays, roles: ["admin"] },
   { href: "/employees", label: "Wafanyakazi", icon: Users, roles: ["hr", "admin"] },
   { href: "/companies", label: "Makampuni & Sehemu", icon: Building2, roles: ["admin"] },
   { href: "/holidays", label: "Sikukuu", icon: CalendarDays, roles: ["hr", "admin"] },

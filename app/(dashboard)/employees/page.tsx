@@ -158,6 +158,9 @@ export default function EmployeesPage() {
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
   const [roleTarget, setRoleTarget] = useState<{ emp: Employee; action: "promote" | "demote" } | null>(null);
   const [newCredentials, setNewCredentials] = useState<{ name: string; phone: string; pin: string } | null>(null);
+  const [resetTarget, setResetTarget] = useState<Employee | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [showResetPw, setShowResetPw] = useState(false);
 
   // CSV import state
   const [importOpen, setImportOpen] = useState(false);
@@ -313,10 +316,34 @@ export default function EmployeesPage() {
     },
   });
 
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ employee_id, password }: { employee_id: string; password: string }) => {
+      const res = await fetch("/api/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employee_id, password }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? "Imeshindwa");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setResetTarget(null);
+      setResetPassword("");
+      toast({ title: "Nywila imebadilishwa", description: "Nywila mpya imehifadhiwa." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Hitilafu", description: err.message, variant: "destructive" });
+    },
+  });
+
   const roleByEmployeeId = new Map<string, string>();
   for (const u of allUsers ?? []) {
     if (u.employee_id) roleByEmployeeId.set(u.employee_id, u.role);
   }
+
 
   const openEdit = (emp: Employee) => {
     setEditingEmployee(emp);
@@ -536,7 +563,7 @@ export default function EmployeesPage() {
                   {canManage && (
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(emp)}>
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(emp)} title="Hariri">
                           <Pencil className="h-4 w-4" />
                         </Button>
                         {isAdmin && roleByEmployeeId.get(emp.id) === "employee" && (
@@ -564,8 +591,17 @@ export default function EmployeesPage() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          title="Badilisha Nywila"
+                          onClick={() => { setResetTarget(emp); setResetPassword(""); setShowResetPw(false); }}
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="text-destructive hover:text-destructive"
                           onClick={() => setDeleteTarget(emp)}
+                          title="Futa"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -821,6 +857,54 @@ export default function EmployeesPage() {
               {roleMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Inafanya...</>
               ) : roleTarget?.action === "promote" ? "Ndio, Pandisha" : "Ndio, Rudisha"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset password dialog */}
+      <Dialog open={!!resetTarget} onOpenChange={(open) => { if (!open) { setResetTarget(null); setResetPassword(""); } }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-amber-600" />
+              Badilisha Nywila
+            </DialogTitle>
+            <DialogDescription>
+              Weka nywila mpya kwa <strong>{resetTarget?.name}</strong>.
+              Mfanyakazi ataweza kutumia nywila hii kuingia.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label>Nywila / PIN mpya</Label>
+            <div className="relative">
+              <Input
+                type={showResetPw ? "text" : "password"}
+                placeholder="Herufi 4+ au nambari"
+                value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+                className="pr-10"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 h-full w-10"
+                onClick={() => setShowResetPw(!showResetPw)}
+              >
+                {showResetPw ? "🙈" : "👁"}
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetTarget(null)}>Ghairi</Button>
+            <Button
+              disabled={resetPassword.length < 4 || resetPasswordMutation.isPending}
+              onClick={() => resetTarget && resetPasswordMutation.mutate({ employee_id: resetTarget.id, password: resetPassword })}
+            >
+              {resetPasswordMutation.isPending
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Inahifadhi...</>
+                : "Hifadhi Nywila"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { employee_id, date, status, notes } = body;
+  const { employee_id, date, status, notes, force } = body;
 
   if (!employee_id || !date || !status) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -26,6 +26,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
 
+  const adminOverride = force === true && role === "admin";
+
   // Check if locked
   const existing = await db.execute({
     sql: "SELECT id, is_locked FROM attendance WHERE employee_id = ? AND date = ?",
@@ -34,7 +36,7 @@ export async function POST(request: NextRequest) {
 
   if (existing.rows.length > 0) {
     const row = existing.rows[0] as unknown as { id: string; is_locked: number };
-    if (row.is_locked) {
+    if (row.is_locked && !adminOverride) {
       return NextResponse.json({ error: "Attendance is locked for this date" }, { status: 403 });
     }
 

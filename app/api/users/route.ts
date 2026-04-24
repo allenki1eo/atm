@@ -71,8 +71,23 @@ export async function PUT(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { id, name, role, phone, email, password } = body;
-  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+  // id = user id (staff), OR employee_id = look up user by employee record
+  const { id, employee_id, name, role, phone, email, password } = body;
+
+  let resolvedId = id as string | undefined;
+
+  if (!resolvedId && employee_id) {
+    const found = await db.execute({
+      sql: "SELECT id FROM users WHERE employee_id = ?",
+      args: [employee_id],
+    });
+    if (!found.rows.length) {
+      return NextResponse.json({ error: "Mfanyakazi hana akaunti ya kuingia" }, { status: 404 });
+    }
+    resolvedId = (found.rows[0] as unknown as { id: string }).id;
+  }
+
+  if (!resolvedId) return NextResponse.json({ error: "id au employee_id inahitajika" }, { status: 400 });
 
   const updates: string[] = [];
   const args: (string | null)[] = [];
@@ -89,7 +104,7 @@ export async function PUT(request: NextRequest) {
 
   if (updates.length === 0) return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
 
-  args.push(id);
+  args.push(resolvedId);
   try {
     await db.execute({ sql: `UPDATE users SET ${updates.join(", ")} WHERE id = ?`, args });
   } catch (err) {
@@ -102,7 +117,7 @@ export async function PUT(request: NextRequest) {
 
   const result = await db.execute({
     sql: "SELECT id, name, role, phone, email FROM users WHERE id = ?",
-    args: [id],
+    args: [resolvedId],
   });
   return NextResponse.json(result.rows[0]);
 }
