@@ -17,6 +17,47 @@ export async function ensureDatabase() {
   await initializeDatabase();
   // Schema migrations — safe to run repeatedly (errors mean column already exists)
   try { await db.execute("ALTER TABLE companies ADD COLUMN logo TEXT"); } catch (_) {}
+  // Migrate announcements to support 'employee' audience_type if needed
+  try {
+    const schemaRes = await db.execute(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='announcements'"
+    );
+    const ddl = (schemaRes.rows[0] as unknown as { sql: string } | undefined)?.sql ?? "";
+    if (ddl && !ddl.includes("'employee'")) {
+      // Drop the temp table if it survived a prior failed migration
+      try { await db.execute("DROP TABLE IF EXISTS announcements_new"); } catch (_) {}
+      await db.execute(`
+        CREATE TABLE announcements_new (
+          id TEXT PRIMARY KEY,
+          subject TEXT NOT NULL,
+          message TEXT NOT NULL,
+          audience_type TEXT CHECK(audience_type IN ('all','company','section','role','employee')) NOT NULL,
+          audience_id TEXT,
+          send_sms INTEGER DEFAULT 0,
+          created_by TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (created_by) REFERENCES users(id)
+        )
+      `);
+      await db.execute("INSERT INTO announcements_new SELECT * FROM announcements");
+      await db.execute("DROP TABLE announcements");
+      await db.execute("ALTER TABLE announcements_new RENAME TO announcements");
+    }
+  } catch (_) {}
+  // Ensure overtime_entries table exists (added after initial deploy)
+  try {
+    await db.execute(`CREATE TABLE IF NOT EXISTS overtime_entries (
+      id TEXT PRIMARY KEY,
+      employee_id TEXT NOT NULL,
+      date DATE NOT NULL,
+      hours REAL NOT NULL DEFAULT 9,
+      amount INTEGER NOT NULL,
+      notes TEXT,
+      created_by TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (employee_id) REFERENCES employees(id)
+    )`);
+  } catch (_) {}
   _initialized = true;
 }
 
@@ -176,6 +217,18 @@ export async function initializeDatabase() {
       FOREIGN KEY (employee_id) REFERENCES employees(id)
     );
 
+    CREATE TABLE IF NOT EXISTS overtime_entries (
+      id TEXT PRIMARY KEY,
+      employee_id TEXT NOT NULL,
+      date DATE NOT NULL,
+      hours REAL NOT NULL DEFAULT 9,
+      amount INTEGER NOT NULL,
+      notes TEXT,
+      created_by TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (employee_id) REFERENCES employees(id)
+    );
+
     CREATE TABLE IF NOT EXISTS complaints (
       id TEXT PRIMARY KEY,
       employee_id TEXT NOT NULL,
@@ -193,7 +246,7 @@ export async function initializeDatabase() {
       id TEXT PRIMARY KEY,
       subject TEXT NOT NULL,
       message TEXT NOT NULL,
-      audience_type TEXT CHECK(audience_type IN ('all','company','section','role')) NOT NULL,
+      audience_type TEXT CHECK(audience_type IN ('all','company','section','role','employee')) NOT NULL,
       audience_id TEXT,
       send_sms INTEGER DEFAULT 0,
       created_by TEXT NOT NULL,

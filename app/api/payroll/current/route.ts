@@ -60,13 +60,21 @@ export async function GET(request: NextRequest) {
   const halfDays = records.filter((r) => r.status === "half_day").length;
   const effectiveDays = presentDays + halfDays * 0.5;
 
-  // Calculate gross
-  let grossAmount = 0;
+  // Calculate base gross
+  let baseGross = 0;
   if (emp.type === "casual") {
-    grossAmount = Math.round(effectiveDays * emp.daily_rate);
+    baseGross = Math.round(effectiveDays * emp.daily_rate);
   } else {
-    grossAmount = emp.monthly_salary;
+    baseGross = emp.monthly_salary;
   }
+
+  // Add overtime
+  const overtimeRes = await db.execute({
+    sql: `SELECT COALESCE(SUM(amount), 0) as total FROM overtime_entries WHERE employee_id = ? AND date >= ? AND date <= ?`,
+    args: [employeeId!, startDate, endDate],
+  });
+  const totalOvertime = Math.round((overtimeRes.rows[0] as unknown as { total: number }).total);
+  const grossAmount = baseGross + totalOvertime;
 
   // Get advances
   const advanceResult = await db.execute({
@@ -100,6 +108,8 @@ export async function GET(request: NextRequest) {
     financial: {
       daily_rate: emp.daily_rate,
       monthly_salary: emp.monthly_salary,
+      base_gross: baseGross,
+      total_overtime: totalOvertime,
       gross_amount: grossAmount,
       total_advances: totalAdvances,
       net_amount: netAmount,

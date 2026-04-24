@@ -66,8 +66,8 @@ export async function PUT(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const callerRole = (session.user as { role: string }).role;
-  if (callerRole !== "admin") {
-    return NextResponse.json({ error: "Forbidden: admin only" }, { status: 403 });
+  if (callerRole !== "admin" && callerRole !== "hr") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const body = await request.json();
@@ -75,16 +75,32 @@ export async function PUT(request: NextRequest) {
   const { id, employee_id, name, role, phone, email, password } = body;
 
   let resolvedId = id as string | undefined;
+  let targetRole: string | null = null;
 
   if (!resolvedId && employee_id) {
     const found = await db.execute({
-      sql: "SELECT id FROM users WHERE employee_id = ?",
+      sql: "SELECT id, role FROM users WHERE employee_id = ?",
       args: [employee_id],
     });
     if (!found.rows.length) {
       return NextResponse.json({ error: "Mfanyakazi hana akaunti ya kuingia" }, { status: 404 });
     }
-    resolvedId = (found.rows[0] as unknown as { id: string }).id;
+    const foundUser = found.rows[0] as unknown as { id: string; role: string };
+    resolvedId = foundUser.id;
+    targetRole = foundUser.role;
+  } else if (resolvedId) {
+    const found = await db.execute({
+      sql: "SELECT role FROM users WHERE id = ?",
+      args: [resolvedId],
+    });
+    if (found.rows.length) {
+      targetRole = (found.rows[0] as unknown as { role: string }).role;
+    }
+  }
+
+  // HR can only update employee-role users; admin can update anyone
+  if (callerRole === "hr" && targetRole !== "employee") {
+    return NextResponse.json({ error: "HR can only reset passwords for employees" }, { status: 403 });
   }
 
   if (!resolvedId) return NextResponse.json({ error: "id au employee_id inahitajika" }, { status: 400 });

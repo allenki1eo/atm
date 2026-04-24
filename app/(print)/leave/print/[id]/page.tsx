@@ -26,6 +26,7 @@ interface Employee {
   phone: string;
   department: string | null;
   section_id: string | null;
+  company_id: string | null;
 }
 
 interface Section {
@@ -36,6 +37,13 @@ interface Section {
 interface User {
   id: string;
   name: string;
+}
+
+interface Company {
+  id: string;
+  name: string;
+  logo: string | null;
+  address: string | null;
 }
 
 const LEAVE_TYPE_LABELS: Record<string, string> = {
@@ -246,6 +254,15 @@ export default async function LeavePrintPage({
     section = (sectionResult.rows[0] as unknown as Section) ?? null;
   }
 
+  let company: Company | null = null;
+  if (employee?.company_id) {
+    const companyResult = await db.execute({
+      sql: "SELECT id, name, logo, address FROM companies WHERE id = ?",
+      args: [employee.company_id],
+    });
+    company = (companyResult.rows[0] as unknown as Company) ?? null;
+  }
+
   let reviewer: User | null = null;
   if (leave.reviewed_by) {
     const reviewerResult = await db.execute({
@@ -281,9 +298,15 @@ export default async function LeavePrintPage({
 
       {/* Letterhead */}
       <div className="letterhead">
-        <div className="logo-placeholder">LOGO</div>
-        <h1>TrustTrack</h1>
-        <p>Mfumo wa Mahudhurio na Mishahara</p>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {company?.logo
+          ? <img src={company.logo} alt="Logo" style={{ width: 70, height: 70, objectFit: "contain", borderRadius: 8, flexShrink: 0 }} />
+          : <div className="logo-placeholder">LOGO</div>
+        }
+        <div>
+          <h1>{company?.name ?? "TrustTrack"}</h1>
+          {company?.address ? <p>{company.address}</p> : !company && <p>Mfumo wa Mahudhurio na Mishahara</p>}
+        </div>
       </div>
 
       {/* Document title */}

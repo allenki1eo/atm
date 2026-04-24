@@ -103,10 +103,17 @@ export async function POST(request: NextRequest) {
     const halfDays = records.filter((r) => r.status === "half_day").length;
     const effectiveDays = presentDays + halfDays * 0.5;
 
-    const grossAmount =
+    const baseGross =
       emp.type === "casual"
         ? Math.round(effectiveDays * emp.daily_rate)
         : emp.monthly_salary;
+
+    const overtimeResult = await db.execute({
+      sql: `SELECT COALESCE(SUM(amount), 0) as total FROM overtime_entries WHERE employee_id = ? AND date >= ? AND date <= ?`,
+      args: [emp.id, startDate, endDate],
+    });
+    const totalOvertime = Math.round((overtimeResult.rows[0] as unknown as { total: number }).total);
+    const grossAmount = baseGross + totalOvertime;
 
     const advResult = await db.execute({
       sql: `SELECT SUM(amount) as total FROM transactions
@@ -168,4 +175,48 @@ export async function POST(request: NextRequest) {
     sms_sent: smsSent,
     employees_processed: employees.rows.length,
   });
+}
+
+export async function PUT(request: NextRequest) {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const role = (session.user as { role: string }).role;
+  if (role !== "hr" && role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const body = await request.json();
+  const { period_id } = body as { period_id?: string };
+  if (!period_id) return NextResponse.json({ error: "period_id required" }, { status: 400 });
+
+  const periodRes = await db.execute({
+    sql: "SELECT * FROM payroll_periods WHERE id = ?",
+    args: [period_id],
+  });
+  if (!periodRes.rows.length) return NextResponse.json({ error: "Period not found" }, { status: 404 });
+
+  const p = periodRes.rows[0] as unknown as {
+    id: string; start_date: string; end_date: string; company_id: string | null;
+  };
+
+  if (p.company_id) {
+    await db.execute({
+      sql: `UPDATE attendance SET is_locked = 0 WHERE date >= ? AND date <= ?
+            AND employee_id IN (SELECT id FROM employees WHERE company_id = ?)`,
+      args: [p.start_date, p.end_date, p.company_id],
+    });
+  } else {
+    await db.execute({
+      sql: "UPDATE attendance SET is_locked = 0 WHERE date >= ? AND date <= ?",
+      args: [p.start_date, p.end_date],
+    });
+  }
+
+  await db.execute({
+    sql: "UPDATE payroll_periods SET status = 'open', locked_at = NULL, locked_by = NULL WHERE id = ?",
+    args: [p.id],
+  });
+
+  return NextResponse.json({ success: true });
 }
