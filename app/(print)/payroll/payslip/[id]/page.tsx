@@ -13,7 +13,7 @@ interface Payslip {
   id: string; employee_id: string; period_id: string;
   days_worked: number; gross_amount: number; total_advances: number; net_amount: number;
   nssf_amount: number; cotwu_amount: number; fadhila_amount: number;
-  heslb_amount: number; total_deductions: number; generated_at: string;
+  heslb_amount: number; wcf_amount: number; total_deductions: number; generated_at: string;
 }
 interface Employee {
   id: string; name: string; phone: string; type: "casual" | "fulltime";
@@ -119,11 +119,12 @@ export default async function PayslipPrintPage({ params }: { params: Promise<{ i
   const cotwuAmt = payslip.cotwu_amount ?? 0;
   const fadhilaAmt = payslip.fadhila_amount ?? (employee?.deduct_fadhila ? 10000 : 0);
   const heslbAmt = payslip.heslb_amount ?? 0;
+  const wcfAmt = payslip.wcf_amount ?? 0;
   const totalAdvances = payslip.total_advances ?? 0;
   const computedTotalDeductions =
     payslip.total_deductions && payslip.total_deductions > 0
       ? payslip.total_deductions
-      : nssfAmt + cotwuAmt + fadhilaAmt + heslbAmt + totalAdvances;
+      : nssfAmt + cotwuAmt + fadhilaAmt + heslbAmt + wcfAmt + totalAdvances;
   const baseGross = payslip.gross_amount - totalOvertime;
   const periodLabel = period ? `${MONTHS[period.month - 1]} ${period.year}` : "—";
 
@@ -198,6 +199,7 @@ export default async function PayslipPrintPage({ params }: { params: Promise<{ i
               {cotwuAmt > 0 && <tr><td>COTWU</td><td>{formatCurrency(cotwuAmt)}</td></tr>}
               {fadhilaAmt > 0 && <tr><td>Fadhila</td><td>{formatCurrency(fadhilaAmt)}</td></tr>}
               {heslbAmt > 0 && <tr><td>HESLB</td><td>{formatCurrency(heslbAmt)}</td></tr>}
+              {wcfAmt > 0 && <tr><td>WCF</td><td>{formatCurrency(wcfAmt)}</td></tr>}
               {totalAdvances > 0 && <tr><td>Salary Advance</td><td>{formatCurrency(totalAdvances)}</td></tr>}
               <tr className="subtotal"><td>Jumla ya Makato</td><td>{formatCurrency(computedTotalDeductions)}</td></tr>
             </tbody>

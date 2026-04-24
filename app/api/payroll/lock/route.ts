@@ -5,6 +5,9 @@ import { nanoid } from "nanoid";
 import { sendSMS, smsTemplates } from "@/lib/at";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
+const FADHILA_AMOUNT = 10000;
+const NSSF_RATE = 0.10;
+
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -35,7 +38,7 @@ export async function POST(request: NextRequest) {
     year: "numeric",
   });
 
-  // Create or update payroll period scoped by company_id
+  // Create or update payroll period
   const existing = await db.execute({
     sql: scopedCompanyId
       ? "SELECT id FROM payroll_periods WHERE month = ? AND year = ? AND company_id = ?"
@@ -59,7 +62,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Lock attendance for employees in the selected company (or all if global)
+  // Lock attendance
   if (scopedCompanyId) {
     await db.execute({
       sql: `UPDATE attendance SET is_locked = 1
@@ -74,40 +77,42 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Generate payslips for employees in the selected company (or all if global)
+  // Fetch employees with deduction fields and their company's cotwu_rate
   const employees = await db.execute({
     sql: scopedCompanyId
-      ? "SELECT * FROM employees WHERE active = 1 AND company_id = ?"
-      : "SELECT * FROM employees WHERE active = 1",
+      ? `SELECT e.*, COALESCE(c.cotwu_rate, 0) AS company_cotwu_rate
+         FROM employees e LEFT JOIN companies c ON c.id = e.company_id
+         WHERE e.active = 1 AND e.company_id = ?`
+      : `SELECT e.*, COALESCE(c.cotwu_rate, 0) AS company_cotwu_rate
+         FROM employees e LEFT JOIN companies c ON c.id = e.company_id
+         WHERE e.active = 1`,
     args: scopedCompanyId ? [scopedCompanyId] : [],
   });
 
   let smsSent = 0;
 
   for (const emp of employees.rows as unknown as {
-    id: string;
-    name: string;
-    phone: string;
-    type: string;
-    daily_rate: number;
-    monthly_salary: number;
+    id: string; name: string; phone: string; type: string;
+    daily_rate: number; monthly_salary: number;
+    deduct_nssf: number; deduct_cotwu: number; deduct_fadhila: number;
+    heslb_amount: number; wcf_amount: number;
+    company_cotwu_rate: number;
   }[]) {
+    // Attendance
     const attendResult = await db.execute({
-      sql: `SELECT status FROM attendance
-            WHERE employee_id = ? AND date >= ? AND date <= ?`,
+      sql: `SELECT status FROM attendance WHERE employee_id = ? AND date >= ? AND date <= ?`,
       args: [emp.id, startDate, endDate],
     });
-
     const records = attendResult.rows as unknown as { status: string }[];
     const presentDays = records.filter((r) => ["present", "late"].includes(r.status)).length;
     const halfDays = records.filter((r) => r.status === "half_day").length;
     const effectiveDays = presentDays + halfDays * 0.5;
 
-    const baseGross =
-      emp.type === "casual"
-        ? Math.round(effectiveDays * emp.daily_rate)
-        : emp.monthly_salary;
+    const baseGross = emp.type === "casual"
+      ? Math.round(effectiveDays * emp.daily_rate)
+      : emp.monthly_salary;
 
+    // Overtime
     const overtimeResult = await db.execute({
       sql: `SELECT COALESCE(SUM(amount), 0) as total FROM overtime_entries WHERE employee_id = ? AND date >= ? AND date <= ?`,
       args: [emp.id, startDate, endDate],
@@ -115,6 +120,7 @@ export async function POST(request: NextRequest) {
     const totalOvertime = Math.round((overtimeResult.rows[0] as unknown as { total: number }).total);
     const grossAmount = baseGross + totalOvertime;
 
+    // Advances
     const advResult = await db.execute({
       sql: `SELECT SUM(amount) as total FROM transactions
             WHERE employee_id = ? AND type = 'advance_given'
@@ -122,19 +128,41 @@ export async function POST(request: NextRequest) {
       args: [emp.id, startDate + " 00:00:00", endDate + " 23:59:59"],
     });
     const totalAdvances = Math.abs((advResult.rows[0] as unknown as { total: number }).total ?? 0);
-    const netAmount = grossAmount - totalAdvances;
 
-    // Upsert payslip
+    // Statutory & other deductions
+    const nssfAmount    = emp.deduct_nssf    ? Math.round(grossAmount * NSSF_RATE) : 0;
+    const cotwuAmount   = emp.deduct_cotwu   ? (emp.company_cotwu_rate ?? 0)       : 0;
+    const fadhilaAmount = emp.deduct_fadhila ? FADHILA_AMOUNT                       : 0;
+    const heslbAmount   = emp.heslb_amount   ?? 0;
+    const wcfAmount     = emp.wcf_amount     ?? 0;
+
+    const totalDeductions = nssfAmount + cotwuAmount + fadhilaAmount + heslbAmount + wcfAmount + totalAdvances;
+    const netAmount = grossAmount - totalDeductions;
+
+    // Upsert payslip with all deduction columns
     await db.execute({
-      sql: `INSERT INTO payslips (id, employee_id, period_id, days_worked, gross_amount, total_advances, net_amount)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+      sql: `INSERT INTO payslips
+              (id, employee_id, period_id, days_worked, gross_amount, total_advances,
+               net_amount, nssf_amount, cotwu_amount, fadhila_amount,
+               heslb_amount, wcf_amount, total_deductions)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(employee_id, period_id) DO UPDATE SET
-            days_worked = excluded.days_worked,
-            gross_amount = excluded.gross_amount,
-            total_advances = excluded.total_advances,
-            net_amount = excluded.net_amount,
-            generated_at = CURRENT_TIMESTAMP`,
-      args: [nanoid(), emp.id, periodId, Math.round(effectiveDays), grossAmount, totalAdvances, netAmount],
+              days_worked      = excluded.days_worked,
+              gross_amount     = excluded.gross_amount,
+              total_advances   = excluded.total_advances,
+              net_amount       = excluded.net_amount,
+              nssf_amount      = excluded.nssf_amount,
+              cotwu_amount     = excluded.cotwu_amount,
+              fadhila_amount   = excluded.fadhila_amount,
+              heslb_amount     = excluded.heslb_amount,
+              wcf_amount       = excluded.wcf_amount,
+              total_deductions = excluded.total_deductions,
+              generated_at     = CURRENT_TIMESTAMP`,
+      args: [
+        nanoid(), emp.id, periodId, Math.round(effectiveDays), grossAmount,
+        totalAdvances, netAmount, nssfAmount, cotwuAmount, fadhilaAmount,
+        heslbAmount, wcfAmount, totalDeductions,
+      ],
     });
 
     // Send SMS
@@ -144,11 +172,8 @@ export async function POST(request: NextRequest) {
 
       if (emp.type === "casual") {
         message = smsTemplates.payrollReady(
-          monthName,
-          Math.round(effectiveDays),
-          formatCurrency(emp.daily_rate),
-          formatCurrency(grossAmount),
-          formatDate(deadline)
+          monthName, Math.round(effectiveDays),
+          formatCurrency(emp.daily_rate), formatCurrency(grossAmount), formatDate(deadline)
         );
       } else {
         message = smsTemplates.periodLocked(monthName);

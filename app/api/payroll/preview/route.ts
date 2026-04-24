@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 
+const FADHILA_AMOUNT = 10000;
+const NSSF_RATE = 0.10;
+
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -23,8 +26,12 @@ export async function GET(request: NextRequest) {
 
   const employees = await db.execute({
     sql: companyId
-      ? "SELECT * FROM employees WHERE active = 1 AND company_id = ? ORDER BY name"
-      : "SELECT * FROM employees WHERE active = 1 ORDER BY name",
+      ? `SELECT e.*, COALESCE(c.cotwu_rate, 0) AS company_cotwu_rate
+         FROM employees e LEFT JOIN companies c ON c.id = e.company_id
+         WHERE e.active = 1 AND e.company_id = ? ORDER BY e.name`
+      : `SELECT e.*, COALESCE(c.cotwu_rate, 0) AS company_cotwu_rate
+         FROM employees e LEFT JOIN companies c ON c.id = e.company_id
+         WHERE e.active = 1 ORDER BY e.name`,
     args: companyId ? [companyId] : [],
   });
 
@@ -32,6 +39,9 @@ export async function GET(request: NextRequest) {
   for (const emp of employees.rows as unknown as {
     id: string; name: string; phone: string; type: string;
     daily_rate: number; monthly_salary: number;
+    deduct_nssf: number; deduct_cotwu: number; deduct_fadhila: number;
+    heslb_amount: number; wcf_amount: number;
+    company_cotwu_rate: number;
   }[]) {
     const attendResult = await db.execute({
       sql: `SELECT status FROM attendance WHERE employee_id = ? AND date >= ? AND date <= ?`,
@@ -60,7 +70,15 @@ export async function GET(request: NextRequest) {
     const totalAdvances = Math.round((advRes.rows[0] as unknown as { total: number }).total);
 
     const grossAmount = baseGross + totalOvertime;
-    const netAmount = grossAmount - totalAdvances;
+
+    const nssfAmount    = emp.deduct_nssf    ? Math.round(grossAmount * NSSF_RATE) : 0;
+    const cotwuAmount   = emp.deduct_cotwu   ? (emp.company_cotwu_rate ?? 0)       : 0;
+    const fadhilaAmount = emp.deduct_fadhila ? FADHILA_AMOUNT                       : 0;
+    const heslbAmount   = emp.heslb_amount   ?? 0;
+    const wcfAmount     = emp.wcf_amount     ?? 0;
+
+    const totalDeductions = nssfAmount + cotwuAmount + fadhilaAmount + heslbAmount + wcfAmount + totalAdvances;
+    const netAmount = grossAmount - totalDeductions;
 
     rows.push({
       employee_id: emp.id,
@@ -70,6 +88,12 @@ export async function GET(request: NextRequest) {
       base_gross: baseGross,
       total_overtime: totalOvertime,
       gross_amount: grossAmount,
+      nssf_amount: nssfAmount,
+      cotwu_amount: cotwuAmount,
+      fadhila_amount: fadhilaAmount,
+      heslb_amount: heslbAmount,
+      wcf_amount: wcfAmount,
+      total_deductions: totalDeductions,
       total_advances: totalAdvances,
       net_amount: netAmount,
     });

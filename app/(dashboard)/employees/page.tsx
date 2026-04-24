@@ -40,6 +40,11 @@ interface Employee {
   monthly_salary: number;
   overtime_rule: string;
   active: number;
+  deduct_nssf: number;
+  deduct_cotwu: number;
+  deduct_fadhila: number;
+  heslb_amount: number;
+  wcf_amount: number;
 }
 
 interface Company {
@@ -90,6 +95,11 @@ const employeeSchema = z
     daily_rate: z.preprocess(nanToZero, z.number().min(0).optional()),
     monthly_salary: z.preprocess(nanToZero, z.number().min(0).optional()),
     overtime_rule: z.enum(["all_days", "holidays_only", "none"]).optional(),
+    deduct_nssf: z.boolean().optional(),
+    deduct_cotwu: z.boolean().optional(),
+    deduct_fadhila: z.boolean().optional(),
+    heslb_amount: z.preprocess(nanToZero, z.number().min(0).optional()),
+    wcf_amount: z.preprocess(nanToZero, z.number().min(0).optional()),
   })
   .superRefine((data, ctx) => {
     if (data.type === "casual" && !(data.daily_rate && data.daily_rate > 0)) {
@@ -119,6 +129,11 @@ type EmployeeForm = {
   daily_rate?: number;
   monthly_salary?: number;
   overtime_rule?: "all_days" | "holidays_only" | "none";
+  deduct_nssf?: boolean;
+  deduct_cotwu?: boolean;
+  deduct_fadhila?: boolean;
+  heslb_amount?: number;
+  wcf_amount?: number;
 };
 
 const CSV_TEMPLATE =
@@ -358,6 +373,11 @@ export default function EmployeesPage() {
       daily_rate: emp.daily_rate,
       monthly_salary: emp.monthly_salary,
       overtime_rule: emp.overtime_rule as "all_days" | "holidays_only" | "none",
+      deduct_nssf: !!emp.deduct_nssf,
+      deduct_cotwu: !!emp.deduct_cotwu,
+      deduct_fadhila: !!emp.deduct_fadhila,
+      heslb_amount: emp.heslb_amount ?? 0,
+      wcf_amount: emp.wcf_amount ?? 0,
     });
     setDialogOpen(true);
   };
@@ -778,6 +798,47 @@ export default function EmployeesPage() {
                 </div>
               </>
             )}
+
+            {/* Deductions section */}
+            <div className="space-y-2 rounded-lg border p-3 bg-muted/30">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Makato ya Mishahara</p>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" {...register("deduct_nssf")} className="accent-primary" />
+                  <span>NSSF (10% ya mshahara)</span>
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" {...register("deduct_cotwu")} className="accent-primary" />
+                  <span>COTWU (kiwango cha kampuni)</span>
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" {...register("deduct_fadhila")} className="accent-primary" />
+                  <span>Fadhila (TZS 10,000/mwezi)</span>
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <div className="space-y-1">
+                  <Label className="text-xs">HESLB (TZS/mwezi)</Label>
+                  <Input
+                    type="number"
+                    step="1"
+                    min="0"
+                    placeholder="0"
+                    {...register("heslb_amount", { valueAsNumber: true })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">WCF (TZS/mwezi)</Label>
+                  <Input
+                    type="number"
+                    step="1"
+                    min="0"
+                    placeholder="0"
+                    {...register("wcf_amount", { valueAsNumber: true })}
+                  />
+                </div>
+              </div>
+            </div>
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>

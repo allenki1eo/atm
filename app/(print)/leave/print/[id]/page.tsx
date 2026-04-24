@@ -68,54 +68,56 @@ const css = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: 'Segoe UI', Arial, sans-serif !important;
-    font-size: 11pt;
+    font-size: 9.5pt;
     color: #111;
     background: #fff !important;
     min-height: unset !important;
-    padding: 15mm 20mm;
+    padding: 8mm 12mm;
   }
   .letterhead {
-    text-align: center;
+    display: flex;
+    align-items: center;
+    gap: 12px;
     border-bottom: 2px solid #111;
-    padding-bottom: 14px;
-    margin-bottom: 20px;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
   }
   .letterhead .logo-placeholder {
-    width: 70px; height: 70px;
+    width: 50px; height: 50px;
     border: 2px dashed #ccc;
-    border-radius: 8px;
+    border-radius: 6px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     color: #aaa;
-    font-size: 9pt;
-    margin-bottom: 6px;
+    font-size: 8pt;
+    flex-shrink: 0;
   }
-  .letterhead h1 { font-size: 17pt; font-weight: bold; letter-spacing: 1px; }
-  .letterhead p { font-size: 9pt; color: #555; }
+  .letterhead h1 { font-size: 14pt; font-weight: bold; letter-spacing: 0.5px; }
+  .letterhead p { font-size: 8pt; color: #555; }
   .doc-title {
     text-align: center;
-    font-size: 14pt;
+    font-size: 11pt;
     font-weight: bold;
     text-transform: uppercase;
-    letter-spacing: 2px;
-    margin-bottom: 18px;
-    padding: 9px;
+    letter-spacing: 1.5px;
+    margin-bottom: 8px;
+    padding: 5px;
     border: 1.5px solid #333;
   }
   .section-title {
-    font-size: 10pt;
+    font-size: 8.5pt;
     font-weight: bold;
-    margin: 16px 0 6px;
+    margin: 8px 0 3px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     border-bottom: 1px solid #999;
-    padding-bottom: 3px;
+    padding-bottom: 2px;
   }
-  .info-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+  .info-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
   .info-table th, .info-table td {
     border: 1px solid #ccc;
-    padding: 7px 11px;
+    padding: 3px 7px;
     text-align: left;
     vertical-align: top;
   }
@@ -123,24 +125,24 @@ const css = `
     background: #f3f4f6;
     font-weight: 600;
     width: 30%;
-    font-size: 9.5pt;
+    font-size: 8.5pt;
     color: #444;
   }
-  .info-table td { font-size: 10.5pt; }
+  .info-table td { font-size: 9pt; }
   .leave-types {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px 20px;
-    margin: 6px 0 14px;
+    gap: 4px 16px;
+    margin: 3px 0 6px;
   }
   .leave-type-item {
     display: flex;
     align-items: center;
-    gap: 5px;
-    font-size: 10pt;
+    gap: 4px;
+    font-size: 8.5pt;
   }
   .checkbox {
-    width: 14px; height: 14px;
+    width: 12px; height: 12px;
     border: 1.5px solid #333;
     border-radius: 2px;
     display: inline-block;
@@ -151,61 +153,61 @@ const css = `
   .checkbox.checked::after {
     content: '✓';
     position: absolute;
-    top: -2px; left: 1px;
-    font-size: 12pt;
+    top: -3px; left: 0px;
+    font-size: 11pt;
     color: #1d4ed8;
     font-weight: bold;
   }
   .status-badge {
     display: inline-block;
-    padding: 3px 11px;
+    padding: 2px 8px;
     border-radius: 9999px;
-    font-size: 10.5pt;
+    font-size: 9pt;
     font-weight: bold;
     color: #fff;
   }
   .notes-box {
     border: 1px solid #ccc;
     border-radius: 4px;
-    padding: 9px 11px;
-    min-height: 44px;
-    font-size: 10.5pt;
+    padding: 5px 8px;
+    min-height: 28px;
+    font-size: 9pt;
     color: #333;
     background: #fafafa;
   }
-  .sig-section { margin-top: 28px; }
+  .sig-section { margin-top: 10px; }
   .sig-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    margin-bottom: 20px;
+    gap: 10px;
+    margin-bottom: 8px;
   }
   .sig-box {
     border: 1px solid #ccc;
     border-radius: 4px;
-    padding: 10px 12px;
+    padding: 6px 8px;
   }
   .sig-box .sig-role {
-    font-size: 9.5pt;
+    font-size: 8pt;
     font-weight: bold;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: #333;
-    margin-bottom: 6px;
+    margin-bottom: 3px;
     border-bottom: 1px solid #eee;
-    padding-bottom: 4px;
+    padding-bottom: 2px;
   }
   .sig-agree-row {
     display: flex;
-    gap: 16px;
-    margin: 8px 0;
-    font-size: 10pt;
+    gap: 12px;
+    margin: 4px 0;
+    font-size: 8.5pt;
   }
   .sig-agree-item { display: flex; align-items: center; gap: 4px; }
-  .sig-line-label { font-size: 9pt; color: #666; margin-top: 4px; }
-  .sig-line { border-bottom: 1px solid #999; min-height: 32px; margin: 6px 0 2px; }
-  .sig-name { font-size: 10pt; font-weight: 600; }
-  .sig-date { font-size: 9pt; color: #666; }
+  .sig-line-label { font-size: 8pt; color: #666; margin-top: 2px; }
+  .sig-line { border-bottom: 1px solid #999; min-height: 22px; margin: 4px 0 2px; }
+  .sig-name { font-size: 9pt; font-weight: 600; }
+  .sig-date { font-size: 8pt; color: #666; }
   .print-btn {
     position: fixed; bottom: 24px; right: 24px;
     background: #1d4ed8; color: #fff;
@@ -216,7 +218,7 @@ const css = `
   .print-btn:hover { background: #1e40af; }
   @media print {
     .no-print { display: none !important; }
-    body { padding: 10mm 15mm; }
+    body { padding: 6mm 10mm; }
   }
 `;
 

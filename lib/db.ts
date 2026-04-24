@@ -325,6 +325,7 @@ export async function migrateDatabase() {
     "ALTER TABLE employees ADD COLUMN deduct_cotwu INTEGER DEFAULT 0",
     "ALTER TABLE employees ADD COLUMN deduct_fadhila INTEGER DEFAULT 0",
     "ALTER TABLE employees ADD COLUMN heslb_amount INTEGER DEFAULT 0",
+    "ALTER TABLE employees ADD COLUMN wcf_amount INTEGER DEFAULT 0",
   ];
 
   const leaveColumns = [
@@ -339,6 +340,7 @@ export async function migrateDatabase() {
     "ALTER TABLE payslips ADD COLUMN heslb_amount INTEGER DEFAULT 0",
     "ALTER TABLE payslips ADD COLUMN total_deductions INTEGER DEFAULT 0",
     "ALTER TABLE payslips ADD COLUMN leave_days INTEGER DEFAULT 0",
+    "ALTER TABLE payslips ADD COLUMN wcf_amount INTEGER DEFAULT 0",
   ];
 
   const payrollPeriodColumns = [
