@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   Building2, Plus, Pencil, Trash2, ChevronDown, ChevronRight,
-  Users, Loader2, Layers,
+  Users, Loader2, Layers, ImagePlus, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,7 @@ interface Company {
   name: string;
   address: string | null;
   cotwu_rate: number;
+  logo: string | null;
 }
 
 interface Section {
@@ -75,6 +76,9 @@ export default function CompaniesPage() {
 
   // Expanded company cards
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
+
+  // Logo state (base64 preview for dialog)
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   // Company dialog state
   const [companyDialogOpen, setCompanyDialogOpen] = useState(false);
@@ -175,10 +179,13 @@ export default function CompaniesPage() {
 
   const createCompanyMutation = useMutation({
     mutationFn: async (data: CompanyForm) => {
+      const payload = editingCompany
+        ? { ...data, id: editingCompany.id, logo: logoPreview ?? editingCompany.logo }
+        : { ...data, logo: logoPreview };
       const res = await fetch("/api/companies", {
         method: editingCompany ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editingCompany ? { ...data, id: editingCompany.id } : data),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Failed");
@@ -188,6 +195,7 @@ export default function CompaniesPage() {
       queryClient.invalidateQueries({ queryKey: ["companies"] });
       setCompanyDialogOpen(false);
       setEditingCompany(null);
+      setLogoPreview(null);
       resetCompany({ cotwu_rate: 2 });
       toast({ title: editingCompany ? "Kampuni imesasishwa" : "Kampuni imeongezwa" });
     },
@@ -298,18 +306,32 @@ export default function CompaniesPage() {
 
   const openCreateCompany = () => {
     setEditingCompany(null);
+    setLogoPreview(null);
     resetCompany({ cotwu_rate: 2 });
     setCompanyDialogOpen(true);
   };
 
   const openEditCompany = (company: Company) => {
     setEditingCompany(company);
+    setLogoPreview(null);
     resetCompany({
       name: company.name,
       address: company.address ?? "",
       cotwu_rate: company.cotwu_rate,
     });
     setCompanyDialogOpen(true);
+  };
+
+  const handleLogoFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 512 * 1024) {
+      toast({ title: "Faili kubwa sana", description: "Picha lazima iwe chini ya 512 KB", variant: "destructive" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => setLogoPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
   };
 
   const openCreateSection = (companyId: string) => {
@@ -425,6 +447,17 @@ export default function CompaniesPage() {
                         <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
                       ) : (
                         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      )}
+                      {company.logo ? (
+                        <img
+                          src={company.logo}
+                          alt={company.name}
+                          className="h-9 w-9 rounded object-contain border bg-white shrink-0"
+                        />
+                      ) : (
+                        <div className="h-9 w-9 rounded border bg-muted flex items-center justify-center shrink-0">
+                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                        </div>
                       )}
                       <div className="min-w-0">
                         <p className="font-semibold truncate">{company.name}</p>
@@ -584,6 +617,40 @@ export default function CompaniesPage() {
               <p className="text-xs text-muted-foreground">
                 Kiwango cha makato ya COTWU: {cotwuRate ?? 2}%
               </p>
+            </div>
+
+            {/* Logo upload */}
+            <div className="space-y-2">
+              <Label>Logo ya Kampuni (hiari)</Label>
+              <div className="flex items-center gap-3">
+                {(logoPreview ?? (editingCompany?.logo ?? null)) ? (
+                  <div className="relative">
+                    <img
+                      src={logoPreview ?? editingCompany!.logo!}
+                      alt="Logo preview"
+                      className="h-14 w-14 rounded border object-contain bg-white"
+                    />
+                    <button
+                      type="button"
+                      className="absolute -top-1.5 -right-1.5 rounded-full bg-destructive text-white h-4 w-4 flex items-center justify-center"
+                      onClick={() => setLogoPreview(editingCompany ? "" : null)}
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </div>
+                ) : null}
+                <label className="cursor-pointer flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground hover:bg-muted/50 transition-colors">
+                  <ImagePlus className="h-4 w-4" />
+                  {logoPreview || editingCompany?.logo ? "Badilisha Logo" : "Pakia Logo"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={handleLogoFile}
+                  />
+                </label>
+              </div>
+              <p className="text-xs text-muted-foreground">PNG, JPG, SVG — hadi 512 KB</p>
             </div>
 
             <DialogFooter>

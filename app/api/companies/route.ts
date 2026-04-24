@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { name, address, cotwu_rate } = body;
+  const { name, address, cotwu_rate, logo } = body;
 
   if (!name) {
     return NextResponse.json({ error: "Company name is required" }, { status: 400 });
@@ -36,8 +36,8 @@ export async function POST(request: NextRequest) {
     await ensureDatabase();
     const id = nanoid();
     await db.execute({
-      sql: "INSERT INTO companies (id, name, address, cotwu_rate) VALUES (?, ?, ?, ?)",
-      args: [id, name, address ?? null, cotwu_rate ?? 2],
+      sql: "INSERT INTO companies (id, name, address, cotwu_rate, logo) VALUES (?, ?, ?, ?, ?)",
+      args: [id, name, address ?? null, cotwu_rate ?? 2, logo ?? null],
     });
     const result = await db.execute({ sql: "SELECT * FROM companies WHERE id = ?", args: [id] });
     return NextResponse.json(result.rows[0], { status: 201 });
@@ -54,14 +54,14 @@ export async function PUT(request: NextRequest) {
   if (role !== "admin") return NextResponse.json({ error: "Forbidden: admin only" }, { status: 403 });
 
   const body = await request.json();
-  const { id, name, address, cotwu_rate } = body;
+  const { id, name, address, cotwu_rate, logo } = body;
   if (!id || !name) return NextResponse.json({ error: "id and name required" }, { status: 400 });
 
   try {
     await ensureDatabase();
     await db.execute({
-      sql: "UPDATE companies SET name = ?, address = ?, cotwu_rate = ? WHERE id = ?",
-      args: [name, address ?? null, cotwu_rate ?? 2, id],
+      sql: "UPDATE companies SET name = ?, address = ?, cotwu_rate = ?, logo = ? WHERE id = ?",
+      args: [name, address ?? null, cotwu_rate ?? 2, logo ?? null, id],
     });
     const result = await db.execute({ sql: "SELECT * FROM companies WHERE id = ?", args: [id] });
     if (!result.rows[0]) return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Megaphone, Plus, Loader2, Send, Users, Building2, Briefcase, Globe } from "lucide-react";
+import { Megaphone, Plus, Loader2, Send, Users, Building2, Briefcase, Globe, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +25,7 @@ interface Announcement {
   id: string;
   subject: string;
   message: string;
-  audience_type: "all" | "company" | "section" | "role";
+  audience_type: "all" | "company" | "section" | "role" | "employee";
   audience_id: string | null;
   send_sms: number;
   created_by: string;
@@ -36,11 +36,12 @@ interface Announcement {
 
 interface Company { id: string; name: string }
 interface Section { id: string; name: string; company_id: string }
+interface Employee { id: string; name: string; phone: string; department: string | null }
 
 const composeSchema = z.object({
   subject: z.string().min(3, "Kichwa kinahitajika"),
   message: z.string().min(5, "Ujumbe unahitajika"),
-  audience_type: z.enum(["all", "company", "section", "role"]),
+  audience_type: z.enum(["all", "company", "section", "role", "employee"]),
   audience_id: z.string().optional(),
   send_sms: z.boolean().optional(),
 }).superRefine((val, ctx) => {
@@ -57,7 +58,7 @@ const ROLE_OPTIONS = [
   { value: "admin", label: "Admins" },
 ];
 
-function audienceLabel(a: Announcement, companies: Company[], sections: Section[]): string {
+function audienceLabel(a: Announcement, companies: Company[], sections: Section[], employees: Employee[]): string {
   if (a.audience_type === "all") return "Wote";
   if (a.audience_type === "role") {
     return ROLE_OPTIONS.find((r) => r.value === a.audience_id)?.label ?? a.audience_id ?? "—";
@@ -68,6 +69,9 @@ function audienceLabel(a: Announcement, companies: Company[], sections: Section[
   if (a.audience_type === "section") {
     return sections.find((s) => s.id === a.audience_id)?.name ?? "Sehemu";
   }
+  if (a.audience_type === "employee") {
+    return employees.find((e) => e.id === a.audience_id)?.name ?? "Mfanyakazi";
+  }
   return "—";
 }
 
@@ -75,6 +79,7 @@ function audienceIcon(type: Announcement["audience_type"]) {
   if (type === "all") return Globe;
   if (type === "company") return Building2;
   if (type === "section") return Briefcase;
+  if (type === "employee") return UserCircle;
   return Users;
 }
 
@@ -113,6 +118,16 @@ export default function AnnouncementsPage() {
       if (!res.ok) return [];
       return res.json() as Promise<Section[]>;
     },
+  });
+
+  const { data: employees } = useQuery({
+    queryKey: ["employees"],
+    queryFn: async () => {
+      const res = await fetch("/api/employees");
+      if (!res.ok) return [];
+      return res.json() as Promise<Employee[]>;
+    },
+    enabled: canCompose,
   });
 
   const form = useForm<ComposeForm>({
@@ -246,7 +261,7 @@ export default function AnnouncementsPage() {
                     </div>
                     <Badge variant="secondary" className="flex items-center gap-1 shrink-0">
                       <Icon className="h-3 w-3" />
-                      {audienceLabel(a, companies ?? [], sections ?? [])}
+                      {audienceLabel(a, companies ?? [], sections ?? [], employees ?? [])}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -295,6 +310,7 @@ export default function AnnouncementsPage() {
                   <SelectItem value="company">Kampuni Maalum</SelectItem>
                   <SelectItem value="section">Sehemu Maalum</SelectItem>
                   <SelectItem value="role">Kwa Jukumu</SelectItem>
+                  <SelectItem value="employee">Mfanyakazi Mmoja</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -350,6 +366,28 @@ export default function AnnouncementsPage() {
                   <SelectContent>
                     {ROLE_OPTIONS.map((r) => (
                       <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {form.formState.errors.audience_id && (
+                  <p className="text-xs text-destructive">{form.formState.errors.audience_id.message}</p>
+                )}
+              </div>
+            )}
+
+            {audienceType === "employee" && (
+              <div className="space-y-2">
+                <Label>Chagua Mfanyakazi</Label>
+                <Select
+                  value={form.watch("audience_id") ?? ""}
+                  onValueChange={(v) => form.setValue("audience_id", v)}
+                >
+                  <SelectTrigger><SelectValue placeholder="Chagua mfanyakazi..." /></SelectTrigger>
+                  <SelectContent>
+                    {(employees ?? []).map((e) => (
+                      <SelectItem key={e.id} value={e.id}>
+                        {e.name}{e.department ? ` — ${e.department}` : ""}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

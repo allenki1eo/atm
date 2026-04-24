@@ -15,6 +15,8 @@ let _initialized = false;
 export async function ensureDatabase() {
   if (_initialized) return;
   await initializeDatabase();
+  // Schema migrations — safe to run repeatedly (errors mean column already exists)
+  try { await db.execute("ALTER TABLE companies ADD COLUMN logo TEXT"); } catch (_) {}
   _initialized = true;
 }
 

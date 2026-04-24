@@ -59,8 +59,9 @@ export async function GET(request: NextRequest) {
               OR (a.audience_type = 'role' AND a.audience_id = ?)
               OR (a.audience_type = 'company' AND a.audience_id = ?)
               OR (a.audience_type = 'section' AND a.audience_id = ?)
+              OR (a.audience_type = 'employee' AND a.audience_id = ?)
            ORDER BY a.created_at DESC`;
-    args = [userId, role, companyId, sectionId];
+    args = [userId, role, companyId, sectionId, employeeId];
   }
 
   const result = await db.execute({ sql, args });
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
   if (!subject?.trim() || !message?.trim()) {
     return NextResponse.json({ error: "Subject and message required" }, { status: 400 });
   }
-  if (!["all", "company", "section", "role"].includes(audience_type)) {
+  if (!["all", "company", "section", "role", "employee"].includes(audience_type)) {
     return NextResponse.json({ error: "Invalid audience_type" }, { status: 400 });
   }
   if (audience_type !== "all" && !audience_id) {
@@ -119,9 +120,10 @@ export async function POST(request: NextRequest) {
       empSql += " AND section_id = ?";
       empArgs.push(audience_id);
     } else if (audience_type === "role") {
-      // role-scoped SMS: send to users in that role via users table instead
       empSql = "SELECT phone FROM users WHERE role = ? AND phone IS NOT NULL AND phone != ''";
-      empArgs.length = 0;
+      empArgs.push(audience_id);
+    } else if (audience_type === "employee") {
+      empSql += " AND id = ?";
       empArgs.push(audience_id);
     }
 

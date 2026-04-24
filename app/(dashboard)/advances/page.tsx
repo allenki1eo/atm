@@ -311,10 +311,10 @@ export default function AdvancesPage() {
         <div>
           <div className="flex items-center gap-2">
             <DollarSign className="h-5 w-5 text-muted-foreground" />
-            <h1 className="text-2xl font-bold">Usimamizi wa Mikopo</h1>
+            <h1 className="text-2xl font-bold">Salary Advance</h1>
           </div>
           <p className="text-muted-foreground mt-1">
-            Fuatilia mikopo na malipo ya wafanyakazi
+            Fuatilia mapato ya mapema na makato ya kila mwezi
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -370,7 +370,7 @@ export default function AdvancesPage() {
         </Card>
       </div>
 
-      <Tabs defaultValue={(advanceRequests?.length ?? 0) > 0 ? "requests" : "balances"}>
+      <Tabs defaultValue={(advanceRequests?.length ?? 0) > 0 ? "requests" : "schedules"}>
         <TabsList>
           <TabsTrigger value="requests" className="relative">
             <Inbox className="h-3.5 w-3.5 mr-1" />
@@ -545,128 +545,134 @@ export default function AdvancesPage() {
 
         {/* Schedules tab */}
         <TabsContent value="schedules" className="mt-4 space-y-4">
-          <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Mfanyakazi</TableHead>
-                  <TableHead>Deni la Jumla</TableHead>
-                  <TableHead>Iliyobaki</TableHead>
-                  <TableHead>Kila Mwezi</TableHead>
-                  <TableHead>Miezi Iliyobaki</TableHead>
-                  <TableHead>Hali</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {schedLoading ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <TableRow key={i}>
-                      {[1,2,3,4,5,6,7].map((j) => (
-                        <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : (schedules ?? []).length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      Hakuna ratiba za mikopo. Bonyeza &ldquo;Ratiba ya Mkopo&rdquo; kuongeza.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  (schedules ?? []).map((s) => {
-                    const monthsLeft = s.remaining_debt > 0
-                      ? Math.ceil(s.remaining_debt / s.monthly_deduction)
-                      : 0;
-                    return (
-                      <TableRow key={s.id} className={s.status === "cleared" ? "opacity-50" : ""}>
-                        <TableCell className="font-medium">{s.employee_name}</TableCell>
-                        <TableCell>{formatCurrency(s.total_debt)}</TableCell>
-                        <TableCell className={s.remaining_debt > 0 ? "text-red-700 font-semibold" : "text-green-700"}>
-                          {formatCurrency(s.remaining_debt)}
-                        </TableCell>
-                        <TableCell>{formatCurrency(s.monthly_deduction)}</TableCell>
-                        <TableCell>
-                          {s.status === "cleared" ? (
-                            <Badge variant="success">Imelipwa</Badge>
-                          ) : (
-                            <Badge variant={monthsLeft <= 2 ? "warning" : "secondary"}>
-                              {monthsLeft} mwezi{monthsLeft !== 1 ? "" : ""}
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={s.status === "active" ? "destructive" : "success"}>
-                            {s.status === "active" ? "Inaendelea" : "Imelipwa"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {s.status === "active" && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 text-xs text-green-700 hover:text-green-700 hover:bg-green-50"
-                              disabled={clearScheduleMutation.isPending}
-                              onClick={() => clearScheduleMutation.mutate(s.id)}
-                            >
-                              <CheckCircle2 className="h-3 w-3 mr-1" />
-                              Lipa
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-            </div>
-          </Card>
-
-          {/* Summary per employee */}
-          {(schedules ?? []).filter((s) => s.status === "active").length > 0 && (
+          {schedLoading ? (
+            <Card><CardContent className="py-8 text-center text-muted-foreground">Inapakia...</CardContent></Card>
+          ) : (schedules ?? []).length === 0 ? (
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                  Muhtasari wa Madeni Yanayoendelea
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                {Object.entries(
-                  (schedules ?? [])
-                    .filter((s) => s.status === "active")
-                    .reduce<Record<string, { name: string; total: number; monthly: number; count: number }>>(
-                      (acc, s) => {
-                        if (!acc[s.employee_id]) {
-                          acc[s.employee_id] = { name: s.employee_name, total: 0, monthly: 0, count: 0 };
-                        }
-                        acc[s.employee_id].total += s.remaining_debt;
-                        acc[s.employee_id].monthly += s.monthly_deduction;
-                        acc[s.employee_id].count += 1;
-                        return acc;
-                      },
-                      {}
-                    )
-                ).map(([empId, info]) => (
-                  <div key={empId} className="flex items-center justify-between py-2 border-b last:border-0 text-sm">
-                    <div>
-                      <span className="font-medium">{info.name}</span>
-                      {info.count > 1 && (
-                        <Badge variant="warning" className="ml-2 text-xs">{info.count} madeni</Badge>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-red-700 font-semibold">{formatCurrency(info.total)} iliyobaki</p>
-                      <p className="text-muted-foreground text-xs">
-                        {formatCurrency(info.monthly)}/mwezi · Inaisha baada ya miezi {Math.ceil(info.total / info.monthly)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+              <CardContent className="py-12 text-center text-muted-foreground">
+                Hakuna ratiba za mapato ya mapema. Bonyeza &ldquo;Ratiba ya Mkopo&rdquo; kuongeza.
               </CardContent>
             </Card>
+          ) : (
+            <div className="space-y-3">
+              {Object.entries(
+                (schedules ?? []).reduce<Record<string, { name: string; phone: string; schedules: AdvanceSchedule[] }>>(
+                  (acc, s) => {
+                    if (!acc[s.employee_id]) acc[s.employee_id] = { name: s.employee_name, phone: s.employee_phone, schedules: [] };
+                    acc[s.employee_id].schedules.push(s);
+                    return acc;
+                  },
+                  {}
+                )
+              ).map(([empId, empData]) => {
+                const active = empData.schedules.filter((s) => s.status === "active");
+                const cleared = empData.schedules.filter((s) => s.status === "cleared");
+                const totalRemaining = active.reduce((s, sc) => s + sc.remaining_debt, 0);
+                const totalMonthly = active.reduce((s, sc) => s + sc.monthly_deduction, 0);
+                const totalOriginal = empData.schedules.reduce((s, sc) => s + sc.total_debt, 0);
+                const totalPaid = totalOriginal - totalRemaining;
+                const pctPaid = totalOriginal > 0 ? Math.round((totalPaid / totalOriginal) * 100) : 100;
+                const monthsLeft = totalMonthly > 0 ? Math.ceil(totalRemaining / totalMonthly) : 0;
+                const completionDate = monthsLeft > 0
+                  ? new Date(Date.now() + monthsLeft * 30 * 24 * 60 * 60 * 1000).toLocaleDateString("sw-TZ", { month: "long", year: "numeric" })
+                  : null;
+
+                return (
+                  <Card key={empId} className={active.length === 0 ? "opacity-60" : ""}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <CardTitle className="text-base">{empData.name}</CardTitle>
+                          <p className="text-xs text-muted-foreground mt-0.5">{empData.phone}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          {active.length === 0 ? (
+                            <Badge variant="success">Imelipwa</Badge>
+                          ) : (
+                            <>
+                              <p className="text-sm font-bold text-red-700">{formatCurrency(totalRemaining)} iliyobaki</p>
+                              <p className="text-xs text-muted-foreground">{formatCurrency(totalMonthly)}/mwezi</p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div className="mt-3">
+                        <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                          <span>{pctPaid}% imelipwa</span>
+                          {completionDate && <span>Inaisha: {completionDate} ({monthsLeft} mwezi)</span>}
+                        </div>
+                        <div className="h-2 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${pctPaid}%`,
+                              background: pctPaid >= 100 ? "#16a34a" : pctPaid >= 60 ? "#d97706" : "#dc2626",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </CardHeader>
+
+                    {empData.schedules.length > 0 && (
+                      <CardContent className="pt-0">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="text-xs text-muted-foreground border-b">
+                                <th className="text-left pb-1 font-medium">Deni la Asili</th>
+                                <th className="text-left pb-1 font-medium">Iliyobaki</th>
+                                <th className="text-left pb-1 font-medium">Kila Mwezi</th>
+                                <th className="text-left pb-1 font-medium">Hali</th>
+                                <th className="pb-1"></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {empData.schedules.map((s) => {
+                                const ml = s.remaining_debt > 0 ? Math.ceil(s.remaining_debt / s.monthly_deduction) : 0;
+                                return (
+                                  <tr key={s.id} className={s.status === "cleared" ? "opacity-50" : ""}>
+                                    <td className="py-1">{formatCurrency(s.total_debt)}</td>
+                                    <td className={`py-1 font-semibold ${s.remaining_debt > 0 ? "text-red-700" : "text-green-700"}`}>
+                                      {formatCurrency(s.remaining_debt)}
+                                    </td>
+                                    <td className="py-1">{formatCurrency(s.monthly_deduction)}</td>
+                                    <td className="py-1">
+                                      {s.status === "cleared" ? (
+                                        <Badge variant="success" className="text-xs">Imelipwa</Badge>
+                                      ) : (
+                                        <Badge variant={ml <= 2 ? "warning" : "secondary"} className="text-xs">
+                                          {ml} mwezi
+                                        </Badge>
+                                      )}
+                                    </td>
+                                    <td className="py-1 text-right">
+                                      {s.status === "active" && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-6 text-xs text-green-700 hover:bg-green-50"
+                                          disabled={clearScheduleMutation.isPending}
+                                          onClick={() => clearScheduleMutation.mutate(s.id)}
+                                        >
+                                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                                          Lipa
+                                        </Button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
           )}
         </TabsContent>
 
