@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { UserCircle, DollarSign, Calendar as CalendarIcon, Loader2, FileText, Inbox, Megaphone, MessageSquareWarning, Receipt } from "lucide-react";
+import { UserCircle, DollarSign, Calendar as CalendarIcon, Loader2, FileText, Inbox, Megaphone, MessageSquareWarning, Receipt, CheckCircle, Clock, AlertCircle, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,7 @@ export default function MePage() {
   const [advanceOpen, setAdvanceOpen] = useState(false);
 
   const userId = session?.user?.id;
+  const now = new Date();
 
   // Resolve the current user's employee record server-side — returns
   // null for admin/HR without a linked profile.
@@ -53,6 +54,24 @@ export default function MePage() {
     enabled: !!userId,
   });
   const employeeId = selfEmployee?.id ?? null;
+
+  // Summary: current-month attendance + earnings (same cache key as FinancialCard)
+  const { data: summaryData } = useQuery({
+    queryKey: ["payroll", "current", employeeId, now.getFullYear(), now.getMonth() + 1],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/payroll/current?employee_id=${employeeId}&year=${now.getFullYear()}&month=${now.getMonth() + 1}`
+      );
+      if (!res.ok) return null;
+      return res.json() as Promise<{
+        attendance: { present: number; late: number; absent: number; effective_days: number };
+        financial: { gross_amount: number; net_amount: number; total_advances: number };
+        employee: { type: string };
+      }>;
+    },
+    enabled: !!employeeId,
+    staleTime: 60000,
+  });
 
   // Fetch transactions (only when we have a real employee link)
   const { data: txData, isLoading: txLoading } = useQuery({
@@ -184,6 +203,67 @@ export default function MePage() {
         </div>
       </div>
 
+      {/* ── This-month summary strip ──────────────────────────────────────── */}
+      {summaryData && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Card>
+            <CardContent className="p-3 flex items-center gap-2">
+              <div className="rounded-lg p-1.5 bg-green-50">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Present</p>
+                <p className="text-xl font-bold text-green-700">
+                  {summaryData.attendance.present}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-3 flex items-center gap-2">
+              <div className="rounded-lg p-1.5 bg-amber-50">
+                <Clock className="h-4 w-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Late</p>
+                <p className="text-xl font-bold text-amber-600">
+                  {summaryData.attendance.late}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-3 flex items-center gap-2">
+              <div className="rounded-lg p-1.5 bg-red-50">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Absent</p>
+                <p className="text-xl font-bold text-red-600">
+                  {summaryData.attendance.absent}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-3 flex items-center gap-2">
+              <div className="rounded-lg p-1.5 bg-blue-50">
+                <TrendingUp className="h-4 w-4 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Net earnings</p>
+                <p className="text-base font-bold text-blue-700 leading-tight">
+                  {formatCurrency(summaryData.financial.net_amount)}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <Tabs defaultValue={unreadCount > 0 ? "inbox" : "financial"}>
         <TabsList className="grid w-full grid-cols-5 max-w-2xl">
           <TabsTrigger value="financial">Financial</TabsTrigger>
@@ -267,7 +347,62 @@ export default function MePage() {
                   Hakuna mshahara uliofungwa bado.
                 </p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-4">
+                  {/* Mini earnings trend chart */}
+                  {myPayslips.length > 1 && (
+                    <div className="rounded-lg border bg-muted/20 p-3">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
+                        <TrendingUp className="h-3.5 w-3.5" />
+                        Earnings Trend
+                      </p>
+                      {(() => {
+                        const recent = [...myPayslips].slice(-6);
+                        const maxNet = Math.max(...recent.map((p) => p.net_amount), 1);
+                        const W = 400, H = 90;
+                        const PAD = { top: 12, right: 8, bottom: 28, left: 8 };
+                        const chartW = W - PAD.left - PAD.right;
+                        const chartH = H - PAD.top - PAD.bottom;
+                        const slotW = chartW / recent.length;
+                        const barW = Math.min(slotW * 0.6, 36);
+                        const shortMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+                        return (
+                          <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+                            {recent.map((ps, i) => {
+                              const cx = PAD.left + i * slotW + slotW / 2;
+                              const x = cx - barW / 2;
+                              const bH = Math.max((ps.net_amount / maxNet) * chartH, 2);
+                              const base = PAD.top + chartH;
+                              return (
+                                <g key={ps.id}>
+                                  <rect
+                                    x={x}
+                                    y={base - bH}
+                                    width={barW}
+                                    height={bH}
+                                    fill={ps.net_amount >= 0 ? "#86efac" : "#fca5a5"}
+                                    rx={3}
+                                  />
+                                  <text x={cx} y={base - bH - 3} textAnchor="middle" fontSize={7} fill="#374151" fontWeight="600">
+                                    {ps.net_amount >= 1000
+                                      ? `${Math.round(ps.net_amount / 1000)}K`
+                                      : ps.net_amount}
+                                  </text>
+                                  <text x={cx} y={H - PAD.bottom + 12} textAnchor="middle" fontSize={8} fill="#6b7280">
+                                    {shortMonths[ps.month - 1]}
+                                  </text>
+                                  <text x={cx} y={H - PAD.bottom + 22} textAnchor="middle" fontSize={7} fill="#9ca3af">
+                                    {"'" + String(ps.year).slice(2)}
+                                  </text>
+                                </g>
+                              );
+                            })}
+                          </svg>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
                   {myPayslips.map((ps) => {
                     const monthNames = [
                       "Januari", "Februari", "Machi", "Aprili", "Mei", "Juni",
@@ -298,6 +433,7 @@ export default function MePage() {
                       </div>
                     );
                   })}
+                  </div>
                 </div>
               )}
             </CardContent>
