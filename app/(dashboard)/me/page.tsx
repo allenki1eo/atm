@@ -104,7 +104,7 @@ interface AccountData {
 
 interface LeaveRequest {
   id: string;
-  status: "pending" | "approved" | "denied";
+  status: "pending_supervisor" | "pending_hr" | "approved" | "denied" | "pending";
   days: number;
   submitted_at: string;
   reviewed_at: string | null;
@@ -430,6 +430,8 @@ export default function MePage() {
                 ? "Likizo imeidhinishwa"
                 : latestLeave.status === "denied"
                 ? "Likizo imekataliwa"
+                : latestLeave.status === "pending_hr"
+                ? "Likizo inasubiri HR"
                 : "Ombi la likizo linashughulikiwa",
             description: `${latestLeave.days} siku`,
             date: latestLeave.reviewed_at ?? latestLeave.submitted_at,
@@ -719,6 +721,8 @@ export default function MePage() {
                       ? "success"
                       : latestLeave.status === "denied"
                       ? "destructive"
+                      : latestLeave.status === "pending_hr"
+                      ? "info"
                       : "warning"
                   }
                 >

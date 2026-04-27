@@ -97,6 +97,51 @@ export async function ensureDatabase() {
       await db.execute("ALTER TABLE complaints_new RENAME TO complaints");
     }
   } catch {}
+  try {
+    const schemaRes = await db.execute(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='leave_requests'"
+    );
+    const ddl = (schemaRes.rows[0] as unknown as { sql: string } | undefined)?.sql ?? "";
+    if (ddl && !ddl.includes("'pending_supervisor'")) {
+      try { await db.execute("DROP TABLE IF EXISTS leave_requests_new"); } catch {}
+      await db.execute(`
+        CREATE TABLE leave_requests_new (
+          id TEXT PRIMARY KEY,
+          employee_id TEXT NOT NULL,
+          start_date DATE NOT NULL,
+          end_date DATE NOT NULL,
+          days INTEGER NOT NULL,
+          reason TEXT,
+          status TEXT CHECK(status IN ('pending_supervisor','pending_hr','approved','denied','pending')) DEFAULT 'pending_supervisor',
+          submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          reviewed_by TEXT,
+          reviewed_at DATETIME,
+          review_note TEXT,
+          leave_type TEXT,
+          employee_phone TEXT,
+          supervisor_reviewed_by TEXT,
+          supervisor_reviewed_at DATETIME,
+          supervisor_note TEXT,
+          FOREIGN KEY (employee_id) REFERENCES employees(id)
+        )
+      `);
+      await db.execute(`
+        INSERT INTO leave_requests_new
+          (id, employee_id, start_date, end_date, days, reason, status, submitted_at,
+           reviewed_by, reviewed_at, review_note, leave_type, employee_phone)
+        SELECT
+          id, employee_id, start_date, end_date, days, reason,
+          CASE status WHEN 'pending' THEN 'pending_supervisor' ELSE status END,
+          submitted_at, reviewed_by, reviewed_at, review_note, leave_type, employee_phone
+        FROM leave_requests
+      `);
+      await db.execute("DROP TABLE leave_requests");
+      await db.execute("ALTER TABLE leave_requests_new RENAME TO leave_requests");
+    }
+  } catch {}
+  try { await db.execute("ALTER TABLE leave_requests ADD COLUMN supervisor_reviewed_by TEXT"); } catch {}
+  try { await db.execute("ALTER TABLE leave_requests ADD COLUMN supervisor_reviewed_at DATETIME"); } catch {}
+  try { await db.execute("ALTER TABLE leave_requests ADD COLUMN supervisor_note TEXT"); } catch {}
   _initialized = true;
 }
 
@@ -227,11 +272,14 @@ export async function initializeDatabase() {
       end_date DATE NOT NULL,
       days INTEGER NOT NULL,
       reason TEXT,
-      status TEXT CHECK(status IN ('pending','approved','denied')) DEFAULT 'pending',
+      status TEXT CHECK(status IN ('pending_supervisor','pending_hr','approved','denied','pending')) DEFAULT 'pending_supervisor',
       submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       reviewed_by TEXT,
       reviewed_at DATETIME,
       review_note TEXT,
+      supervisor_reviewed_by TEXT,
+      supervisor_reviewed_at DATETIME,
+      supervisor_note TEXT,
       FOREIGN KEY (employee_id) REFERENCES employees(id)
     );
 
@@ -372,6 +420,9 @@ export async function migrateDatabase() {
   const leaveColumns = [
     "ALTER TABLE leave_requests ADD COLUMN leave_type TEXT",
     "ALTER TABLE leave_requests ADD COLUMN employee_phone TEXT",
+    "ALTER TABLE leave_requests ADD COLUMN supervisor_reviewed_by TEXT",
+    "ALTER TABLE leave_requests ADD COLUMN supervisor_reviewed_at DATETIME",
+    "ALTER TABLE leave_requests ADD COLUMN supervisor_note TEXT",
   ];
 
   const payslipColumns = [

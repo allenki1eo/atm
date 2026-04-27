@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
 import { nanoid } from "nanoid";
 import { calcWorkingDays } from "@/lib/utils";
+import { sendSMS } from "@/lib/at";
 
 export async function GET() {
   const session = await auth();
@@ -75,28 +76,17 @@ export async function GET() {
       },
     });
   } else if (role === "supervisor") {
-    // Get sections this supervisor manages
-    const sectionsResult = await db.execute({
-      sql: "SELECT section_id FROM supervisor_sections WHERE supervisor_id = ?",
-      args: [userId],
-    });
-    const sectionIds = (sectionsResult.rows as unknown as { section_id: string }[]).map(
-      (r) => r.section_id
-    );
-
-    if (sectionIds.length === 0) {
-      return NextResponse.json({ requests: [], balance: null });
-    }
-
-    const placeholders = sectionIds.map(() => "?").join(", ");
     requestsSql = `
       SELECT lr.*, e.name as employee_name
       FROM leave_requests lr
       JOIN employees e ON lr.employee_id = e.id
-      WHERE e.section_id IN (${placeholders})
+      WHERE e.supervisor_id = ?
+        OR e.section_id IN (
+          SELECT section_id FROM supervisor_sections WHERE supervisor_id = ?
+        )
       ORDER BY lr.submitted_at DESC
     `;
-    const result = await db.execute({ sql: requestsSql, args: sectionIds });
+    const result = await db.execute({ sql: requestsSql, args: [userId, userId] });
     return NextResponse.json({ requests: result.rows, balance: null });
   } else {
     // hr or admin: all requests
@@ -267,9 +257,42 @@ export async function POST(request: NextRequest) {
 
   await db.execute({
     sql: `INSERT INTO leave_requests (id, employee_id, start_date, end_date, days, reason, leave_type, employee_phone, status)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending_supervisor')`,
     args: [requestId, employee_id, start_date, end_date, days, reason ?? null, leave_type ?? null, employee_phone ?? null],
   });
+
+  const supervisorRows = await db.execute({
+    sql: `SELECT DISTINCT u.phone, u.id, e.name as employee_name
+          FROM employees e
+          JOIN users u ON (
+            u.id = e.supervisor_id
+            OR u.id IN (
+              SELECT ss.supervisor_id
+              FROM supervisor_sections ss
+              WHERE ss.section_id = e.section_id
+            )
+          )
+          WHERE e.id = ?
+            AND u.phone IS NOT NULL
+            AND u.phone != ''`,
+    args: [employee_id],
+  });
+  await Promise.all(
+    (supervisorRows.rows as unknown as {
+      phone: string;
+      id: string;
+      employee_name: string;
+    }[]).map((row) =>
+      sendSMS(
+        row.phone,
+        `TrustTrack: ${row.employee_name} ameomba likizo ya siku ${days} (${start_date} - ${end_date}). Tafadhali pitia kwenye mfumo.`,
+        {
+          sentBy: userId,
+          source: "leave_supervisor_review",
+        }
+      ).catch(console.error)
+    )
+  );
 
   // Upsert leave_balances for the year with per-employee allowance + carryover
   if (!balance) {

@@ -194,10 +194,25 @@ export function NotificationsBell({ role }: BellProps) {
     }
 
     for (const lr of leaveData?.requests ?? []) {
-      if (
-        (lr.status === "approved" || lr.status === "denied") &&
-        lr.reviewed_at
-      ) {
+      if (role === "supervisor" && (lr.status === "pending_supervisor" || lr.status === "pending")) {
+        list.push({
+          id: `l-${lr.id}`,
+          kind: "leave",
+          title: "Likizo inasubiri msimamizi",
+          detail: `${lr.days} siku (${formatDate(lr.start_date)})`,
+          time: lr.start_date,
+          href: "/leave",
+        });
+      } else if (isHrAdmin && lr.status === "pending_hr") {
+        list.push({
+          id: `l-${lr.id}`,
+          kind: "leave",
+          title: "Likizo imepitishwa na msimamizi",
+          detail: `${lr.days} siku (${formatDate(lr.start_date)})`,
+          time: lr.start_date,
+          href: "/leave",
+        });
+      } else if ((lr.status === "approved" || lr.status === "denied") && lr.reviewed_at) {
         list.push({
           id: `l-${lr.id}`,
           kind: "leave",
@@ -271,7 +286,7 @@ export function NotificationsBell({ role }: BellProps) {
     }
 
     return list.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
-  }, [announcements, complaints, leaveData, advanceRequests, corrections, isHrAdmin, canReviewCorrections]);
+  }, [announcements, complaints, leaveData, advanceRequests, corrections, role, isHrAdmin, canReviewCorrections]);
 
   const visibleItems = items.filter((n) => !dismissed.has(n.id));
 

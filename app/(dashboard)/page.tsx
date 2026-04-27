@@ -151,6 +151,23 @@ export default async function DashboardPage() {
       pendingCorrections = (
         corrResult.rows[0] as unknown as { count: number }
       ).count;
+
+      const leaveResult = await db.execute({
+        sql: `SELECT COUNT(*) as count
+              FROM leave_requests lr
+              JOIN employees e ON e.id = lr.employee_id
+              WHERE lr.status IN ('pending_supervisor','pending')
+                AND (
+                  e.supervisor_id = ?
+                  OR e.section_id IN (
+                    SELECT section_id FROM supervisor_sections WHERE supervisor_id = ?
+                  )
+                )`,
+        args: [userId, userId],
+      });
+      pendingLeaves = (
+        leaveResult.rows[0] as unknown as { count: number }
+      ).count;
     } else if (role === "admin" || role === "hr") {
       // ── Admin / HR: company-wide ─────────────────────────────────────────
       const empResult = await db.execute(
@@ -262,7 +279,7 @@ export default async function DashboardPage() {
           "SELECT COUNT(*) as count FROM attendance_corrections WHERE status = 'pending'"
         ),
         db.execute(
-          "SELECT COUNT(*) as count FROM leave_requests WHERE status = 'pending'"
+          "SELECT COUNT(*) as count FROM leave_requests WHERE status = 'pending_hr'"
         ),
         db.execute(
           "SELECT COUNT(*) as count FROM advance_requests WHERE status = 'pending'"
@@ -421,7 +438,7 @@ export default async function DashboardPage() {
                   </Card>
                 </Link>
               )}
-              {pendingLeaves > 0 && role !== "supervisor" && (
+              {pendingLeaves > 0 && (
                 <Link href="/leave" className="block">
                   <Card className="border-blue-200 bg-blue-50 hover:shadow-md transition-shadow cursor-pointer">
                     <CardContent className="p-4 flex items-center gap-3">

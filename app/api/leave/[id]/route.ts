@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, ensureDatabase } from "@/lib/db";
 import { supervisorCanAccessEmployee } from "@/lib/authorization";
 import { nanoid } from "nanoid";
 import { sendSMS } from "@/lib/at";
@@ -12,6 +12,7 @@ export async function PUT(
 ) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await ensureDatabase();
 
   const role = (session.user as { role: string }).role;
   if (role !== "hr" && role !== "admin" && role !== "supervisor") {
@@ -48,14 +49,13 @@ export async function PUT(
     end_date: string;
   };
 
-  if (leaveRequest.status !== "pending") {
-    return NextResponse.json(
-      { error: `Cannot review a request that is already '${leaveRequest.status}'` },
-      { status: 400 }
-    );
-  }
-
   if (role === "supervisor") {
+    if (leaveRequest.status !== "pending_supervisor" && leaveRequest.status !== "pending") {
+      return NextResponse.json(
+        { error: "Ombi hili halisubiri uamuzi wa msimamizi" },
+        { status: 400 }
+      );
+    }
     const canAccess = await supervisorCanAccessEmployee(
       session.user.id!,
       leaveRequest.employee_id
@@ -66,17 +66,41 @@ export async function PUT(
         { status: 403 }
       );
     }
+  } else if (role === "hr" || role === "admin") {
+    if (leaveRequest.status !== "pending_hr") {
+      return NextResponse.json(
+        { error: "Ombi lazima lipitie kwa msimamizi kabla ya HR/Admin" },
+        { status: 400 }
+      );
+    }
   }
 
-  await db.execute({
-    sql: `UPDATE leave_requests
-          SET status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP, review_note = ?
-          WHERE id = ?`,
-    args: [status, session.user.id!, review_note ?? null, id],
-  });
+  if (role === "supervisor") {
+    await db.execute({
+      sql: `UPDATE leave_requests
+            SET status = ?,
+                supervisor_reviewed_by = ?,
+                supervisor_reviewed_at = CURRENT_TIMESTAMP,
+                supervisor_note = ?
+            WHERE id = ?`,
+      args: [
+        status === "approved" ? "pending_hr" : "denied",
+        session.user.id!,
+        review_note ?? null,
+        id,
+      ],
+    });
+  } else {
+    await db.execute({
+      sql: `UPDATE leave_requests
+            SET status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP, review_note = ?
+            WHERE id = ?`,
+      args: [status, session.user.id!, review_note ?? null, id],
+    });
+  }
 
   // If approved, increment used_days in leave_balances
-  if (status === "approved") {
+  if ((role === "hr" || role === "admin") && status === "approved") {
     const year = new Date(leaveRequest.start_date).getFullYear();
 
     // Check if balance row exists
@@ -118,9 +142,10 @@ export async function PUT(
   } | undefined;
   if (row?.employee_phone) {
     const dates = `${formatDate(row.start_date)} - ${formatDate(row.end_date)}`;
-    const msg =
-      status === "approved"
-        ? `TrustTrack: Likizo yako (${row.days} siku, ${dates}) IMEIDHINISHWA.${review_note ? ` ${review_note}` : ""}`
+    const msg = role === "supervisor" && status === "approved"
+      ? `TrustTrack: Ombi lako la likizo (${row.days} siku, ${dates}) limeidhinishwa na msimamizi na linasubiri HR.`
+      : status === "approved"
+        ? `TrustTrack: Likizo yako (${row.days} siku, ${dates}) IMEIDHINISHWA na HR.${review_note ? ` ${review_note}` : ""}`
         : `TrustTrack: Likizo yako (${dates}) IMEKATALIWA.${review_note ? ` Sababu: ${review_note}` : ""}`;
     await sendSMS(row.employee_phone, msg, {
       sentBy: session.user.id ?? null,

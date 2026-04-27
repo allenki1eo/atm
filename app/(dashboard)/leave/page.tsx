@@ -36,7 +36,7 @@ interface LeaveRequest {
   leave_type: string | null;
   employee_phone: string | null;
   reason: string | null;
-  status: "pending" | "approved" | "denied";
+  status: "pending_supervisor" | "pending_hr" | "approved" | "denied" | "pending";
   submitted_at: string;
   reviewed_by: string | null;
   reviewed_at: string | null;
@@ -96,9 +96,11 @@ const reviewSchema = z.object({
 type ReviewForm = z.infer<typeof reviewSchema>;
 
 const statusConfig = {
-  pending:  { label: "Inasubiri",      variant: "warning"     as const, icon: Clock },
-  approved: { label: "Imeidhinishwa",  variant: "success"     as const, icon: CheckCircle2 },
-  denied:   { label: "Imekataliwa",    variant: "destructive" as const, icon: XCircle },
+  pending:            { label: "Kwa Msimamizi", icon: Clock,        variant: "warning"     as const },
+  pending_supervisor: { label: "Kwa Msimamizi", icon: Clock,        variant: "warning"     as const },
+  pending_hr:         { label: "Kwa HR",        icon: Clock,        variant: "info"        as const },
+  approved:           { label: "Imeidhinishwa", icon: CheckCircle2, variant: "success"     as const },
+  denied:             { label: "Imekataliwa",   icon: XCircle,      variant: "destructive" as const },
 };
 
 function StatusBadge({ status }: { status: LeaveRequest["status"] }) {
@@ -307,7 +309,8 @@ export default function LeavePage() {
                 {canReview && (
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      {req.status === "pending" && (
+                      {((role === "supervisor" && (req.status === "pending_supervisor" || req.status === "pending")) ||
+                        (isHROrAdmin && req.status === "pending_hr")) && (
                         <>
                           <Button size="sm" variant="ghost"
                             className="h-7 text-xs text-green-700 hover:text-green-700 hover:bg-green-50"
@@ -482,20 +485,22 @@ export default function LeavePage() {
       <div className="grid grid-cols-3 gap-2">
         <Card>
           <CardContent className="p-3">
-            <p className="text-xl font-bold text-amber-600">{requests.filter((r) => r.status === "pending").length}</p>
-            <p className="text-xs text-muted-foreground">Inasubiri</p>
+            <p className="text-xl font-bold text-amber-600">
+              {requests.filter((r) => r.status === "pending_supervisor" || r.status === "pending").length}
+            </p>
+            <p className="text-xs text-muted-foreground">Kwa Msimamizi</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3">
+            <p className="text-xl font-bold text-blue-600">{requests.filter((r) => r.status === "pending_hr").length}</p>
+            <p className="text-xs text-muted-foreground">Kwa HR</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3">
             <p className="text-xl font-bold text-green-600">{requests.filter((r) => r.status === "approved").length}</p>
             <p className="text-xs text-muted-foreground">Imeidhinishwa</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-3">
-            <p className="text-xl font-bold text-red-600">{requests.filter((r) => r.status === "denied").length}</p>
-            <p className="text-xs text-muted-foreground">Imekataliwa</p>
           </CardContent>
         </Card>
       </div>
