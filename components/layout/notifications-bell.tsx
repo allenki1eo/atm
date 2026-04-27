@@ -41,8 +41,6 @@ const STATUS_SW: Record<string, string> = {
   half_day: "Nusu siku",
 };
 
-const WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-
 export function NotificationsBell({ role }: BellProps) {
   const isHrAdmin = role === "hr" || role === "admin";
   const queryClient = useQueryClient();
@@ -152,7 +150,6 @@ export function NotificationsBell({ role }: BellProps) {
   });
 
   const items = useMemo<NotifItem[]>(() => {
-    const now = Date.now();
     const list: NotifItem[] = [];
 
     for (const a of announcements ?? []) {
@@ -168,7 +165,7 @@ export function NotificationsBell({ role }: BellProps) {
 
     for (const c of complaints ?? []) {
       if (isHrAdmin) {
-        if (c.status === "open" && now - new Date(c.created_at).getTime() < WINDOW_MS) {
+        if (["received", "in_review", "awaiting_employee", "open"].includes(c.status)) {
           list.push({
             id: `c-${c.id}`,
             kind: "complaint",
@@ -180,10 +177,9 @@ export function NotificationsBell({ role }: BellProps) {
         }
       } else {
         if (
-          c.status === "resolved" &&
+          ["closed", "resolved"].includes(c.status) &&
           c.response &&
-          c.responded_at &&
-          now - new Date(c.responded_at).getTime() < WINDOW_MS
+          c.responded_at
         ) {
           list.push({
             id: `c-${c.id}`,
@@ -200,8 +196,7 @@ export function NotificationsBell({ role }: BellProps) {
     for (const lr of leaveData?.requests ?? []) {
       if (
         (lr.status === "approved" || lr.status === "denied") &&
-        lr.reviewed_at &&
-        now - new Date(lr.reviewed_at).getTime() < WINDOW_MS
+        lr.reviewed_at
       ) {
         list.push({
           id: `l-${lr.id}`,
@@ -229,8 +224,7 @@ export function NotificationsBell({ role }: BellProps) {
       } else {
         if (
           (ar.status === "approved" || ar.status === "denied") &&
-          ar.reviewed_at &&
-          now - new Date(ar.reviewed_at).getTime() < WINDOW_MS
+          ar.reviewed_at
         ) {
           list.push({
             id: `ar-${ar.id}`,
@@ -259,8 +253,7 @@ export function NotificationsBell({ role }: BellProps) {
       } else {
         if (
           (cr.status === "approved" || cr.status === "denied") &&
-          cr.reviewed_at &&
-          now - new Date(cr.reviewed_at).getTime() < WINDOW_MS
+          cr.reviewed_at
         ) {
           list.push({
             id: `cr-${cr.id}`,

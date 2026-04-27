@@ -8,7 +8,8 @@ export default auth((req: NextRequest & { auth: { user?: { role?: string } } | n
 
   const isAuthPage = nextUrl.pathname.startsWith("/login");
   const isApiRoute = nextUrl.pathname.startsWith("/api/");
-  const isPublicFile = nextUrl.pathname.startsWith("/_next") ||
+  const isPublicFile =
+    nextUrl.pathname.startsWith("/_next") ||
     nextUrl.pathname.startsWith("/icons") ||
     nextUrl.pathname === "/manifest.json" ||
     nextUrl.pathname === "/sw.js" ||
@@ -22,10 +23,11 @@ export default auth((req: NextRequest & { auth: { user?: { role?: string } } | n
   }
 
   if (!isLoggedIn) {
-    return NextResponse.redirect(new URL(`/login?callbackUrl=${encodeURIComponent(nextUrl.pathname)}`, nextUrl));
+    return NextResponse.redirect(
+      new URL(`/login?callbackUrl=${encodeURIComponent(nextUrl.pathname)}`, nextUrl)
+    );
   }
 
-  // Employees can access /me, /leave, /announcements, /complaints
   const role = session?.user?.role;
   if (
     role === "employee" &&

@@ -1,8 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { Menu, X, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -19,12 +17,6 @@ interface MobileNavProps {
 
 export function MobileNav({ user }: MobileNavProps) {
   const [open, setOpen] = useState(false);
-  const pathname = usePathname();
-
-  // Close drawer whenever the route changes
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
 
   return (
     <>
@@ -62,6 +54,11 @@ export function MobileNav({ user }: MobileNavProps) {
           "fixed inset-y-0 left-0 z-50 w-[85vw] max-w-72 transform transition-transform duration-300 ease-in-out lg:hidden",
           open ? "translate-x-0" : "-translate-x-full"
         )}
+        onClick={(event) => {
+          if ((event.target as HTMLElement).closest("a")) {
+            setOpen(false);
+          }
+        }}
       >
         <div className="absolute right-2 top-2">
           <Button

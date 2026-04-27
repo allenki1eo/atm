@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, MessageSquareWarning } from "lucide-react";
 import {
@@ -42,12 +42,13 @@ export function CorrectionRequestDialog({ open, onOpenChange, date, currentStatu
   const [requestedStatus, setRequestedStatus] = useState("");
   const [reason, setReason] = useState("");
 
-  useEffect(() => {
-    if (open) {
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) {
       setRequestedStatus("");
       setReason("");
     }
-  }, [open]);
+    onOpenChange(nextOpen);
+  };
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -100,7 +101,7 @@ export function CorrectionRequestDialog({ open, onOpenChange, date, currentStatu
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
