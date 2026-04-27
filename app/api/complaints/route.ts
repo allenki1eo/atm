@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
+import { getLinkedEmployeeId, isAdminOrHr } from "@/lib/authorization";
 import { nanoid } from "nanoid";
 
 export async function GET() {
@@ -12,12 +13,7 @@ export async function GET() {
   const userId = session.user.id!;
 
   if (role === "employee") {
-    const userResult = await db.execute({
-      sql: "SELECT employee_id FROM users WHERE id = ?",
-      args: [userId],
-    });
-    const row = userResult.rows[0] as unknown as { employee_id: string | null } | undefined;
-    const employeeId = row?.employee_id;
+    const employeeId = await getLinkedEmployeeId(userId);
     if (!employeeId) return NextResponse.json([]);
 
     const result = await db.execute({
@@ -31,7 +27,15 @@ export async function GET() {
     return NextResponse.json(result.rows);
   }
 
-  // HR/Admin/Supervisor see all complaints
+  if (!isAdminOrHr(role)) {
+    return NextResponse.json(
+      { error: "Forbidden: complaints are visible to HR/Admin only" },
+      { status: 403 }
+    );
+  }
+
+  // HR/Admin see all complaints. Supervisors are intentionally excluded from
+  // complaint visibility to match the navigation and employee privacy promise.
   const result = await db.execute({
     sql: `SELECT c.*, e.name as employee_name, e.phone as employee_phone
           FROM complaints c
@@ -60,12 +64,7 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = session.user.id!;
-  const userResult = await db.execute({
-    sql: "SELECT employee_id FROM users WHERE id = ?",
-    args: [userId],
-  });
-  const row = userResult.rows[0] as unknown as { employee_id: string | null } | undefined;
-  const employeeId = row?.employee_id;
+  const employeeId = await getLinkedEmployeeId(userId);
 
   if (!employeeId) {
     return NextResponse.json(

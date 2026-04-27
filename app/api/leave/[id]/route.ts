@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { supervisorCanAccessEmployee } from "@/lib/authorization";
 import { nanoid } from "nanoid";
 import { sendSMS } from "@/lib/at";
 import { formatDate } from "@/lib/utils";
@@ -52,6 +53,19 @@ export async function PUT(
       { error: `Cannot review a request that is already '${leaveRequest.status}'` },
       { status: 400 }
     );
+  }
+
+  if (role === "supervisor") {
+    const canAccess = await supervisorCanAccessEmployee(
+      session.user.id!,
+      leaveRequest.employee_id
+    );
+    if (!canAccess) {
+      return NextResponse.json(
+        { error: "Huwezi kupitia ombi la mfanyakazi huyu" },
+        { status: 403 }
+      );
+    }
   }
 
   await db.execute({

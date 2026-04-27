@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   MessageSquareWarning, Plus, Loader2, CheckCircle2, Clock, Send,
+  ShieldCheck, Timer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +48,20 @@ const respondSchema = z.object({
   resolve: z.boolean().optional(),
 });
 type RespondForm = z.infer<typeof respondSchema>;
+
+function daysSince(value: string) {
+  const created = new Date(value).getTime();
+  if (Number.isNaN(created)) return 0;
+  return Math.max(0, Math.floor((Date.now() - created) / 86_400_000));
+}
+
+function complaintStage(complaint: Complaint) {
+  if (complaint.status === "resolved") return "Imefungwa";
+  if (complaint.response) return "Inasubiri jibu lako";
+  const age = daysSince(complaint.created_at);
+  if (age >= 3) return "Inakaguliwa";
+  return "Imepokelewa";
+}
 
 export default function ComplaintsPage() {
   const { data: session } = useSession();
@@ -144,6 +159,23 @@ export default function ComplaintsPage() {
         )}
       </div>
 
+      {isEmployee && (
+        <Card className="border-green-200 bg-green-50/60">
+          <CardContent className="p-4 flex items-start gap-3">
+            <ShieldCheck className="h-5 w-5 text-green-700 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-green-950">
+                Visible to HR/Admin only
+              </p>
+              <p className="text-xs text-green-800">
+                Supervisors cannot view complaint cases from the API or the menu.
+                New cases should be acknowledged within 3 working days.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-2 gap-2 max-w-md">
         <Card>
@@ -189,6 +221,19 @@ export default function ComplaintsPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    <Timer className="h-3 w-3" />
+                    {complaintStage(c)}
+                  </Badge>
+                  {c.status === "open" && (
+                    <span>
+                      SLA: {Math.max(0, 3 - daysSince(c.created_at))} working day
+                      {Math.max(0, 3 - daysSince(c.created_at)) === 1 ? "" : "s"} before follow-up
+                    </span>
+                  )}
+                  {isEmployee && <span>Visible to HR/Admin only</span>}
+                </div>
                 <div className="text-sm whitespace-pre-wrap rounded-lg border bg-muted/30 p-3">
                   {c.message}
                 </div>
@@ -220,7 +265,8 @@ export default function ComplaintsPage() {
           <DialogHeader>
             <DialogTitle>Wasilisha Malalamiko</DialogTitle>
             <DialogDescription>
-              Ujumbe wako utapelekwa kwa HR kwa jibu.
+              Ujumbe wako utaonekana kwa HR/Admin tu. Tutathibitisha kupokea
+              na kuanza ukaguzi ndani ya siku 3 za kazi.
             </DialogDescription>
           </DialogHeader>
           <form

@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   CalendarDays, Plus, CheckCircle2, XCircle, Clock, Loader2,
-  Printer, FileText, Scissors, AlertTriangle,
+  Printer, FileText, Scissors, AlertTriangle, Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -167,7 +167,7 @@ export default function LeavePage() {
   // ── Forms ──────────────────────────────────────────────────────────────────
 
   const {
-    register, handleSubmit, watch, reset, setValue,
+    register, handleSubmit, watch, reset,
     formState: { errors },
   } = useForm<LeaveRequestForm>({
     resolver: zodResolver(leaveRequestSchema),
@@ -431,6 +431,24 @@ export default function LeavePage() {
           </CardContent>
         </Card>
 
+        <Card className="border-amber-200 bg-amber-50/60">
+          <CardContent className="p-4 flex items-start gap-3">
+            <Info className="h-5 w-5 text-amber-700 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-amber-950">
+                How leave days are counted
+              </p>
+              <p className="text-xs text-amber-800">
+                The system counts working days only. Weekends and registered
+                public holidays are excluded after submission, so the final
+                approved days can be lower than the calendar-day estimate.
+                Requests may be rejected if your balance is too low or the
+                dates are invalid.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         <div>
           <h2 className="text-base font-semibold mb-3 flex items-center gap-2">
             <FileText className="h-4 w-4" />Maombi Yangu
@@ -646,7 +664,10 @@ export default function LeavePage() {
             <DialogTitle className="flex items-center gap-2">
               <CalendarDays className="h-5 w-5" />Omba Likizo
             </DialogTitle>
-            <DialogDescription>Jaza taarifa za ombi lako la likizo</DialogDescription>
+            <DialogDescription>
+              Jaza taarifa za ombi lako la likizo. Weekends and registered
+              holidays are excluded by the server before the request is saved.
+            </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit((d) => requestMutation.mutate({ ...d, employee_id: userId ?? "" }))} className="space-y-4">
@@ -685,7 +706,7 @@ export default function LeavePage() {
             {daysRequested > 0 && (
               <div className="rounded-lg border bg-blue-50/50 p-3 text-sm">
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Siku zitakazochukuliwa:</span>
+                  <span className="text-muted-foreground">Makadirio ya siku:</span>
                   <Badge variant="info">{daysRequested} siku</Badge>
                 </div>
                 <div className="flex justify-between items-center mt-1">
@@ -699,6 +720,11 @@ export default function LeavePage() {
                     Siku zilizoomba zinazidi bakaa yako ({remaining} siku zilizobaki)
                   </p>
                 )}
+                <p className="text-xs text-muted-foreground mt-2">
+                  This is a calendar-day estimate. The submitted request is
+                  recalculated as working days only, excluding weekends and
+                  registered holidays.
+                </p>
               </div>
             )}
 

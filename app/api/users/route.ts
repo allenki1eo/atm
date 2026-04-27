@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
+import { isAdminOrHr } from "@/lib/authorization";
 import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
 
 export async function GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const callerRole = (session.user as { role: string }).role;
+  if (!isAdminOrHr(callerRole)) {
+    return NextResponse.json({ error: "Forbidden: HR or admin only" }, { status: 403 });
+  }
+
+  await ensureDatabase();
 
   const result = await db.execute(
     "SELECT id, name, role, email, phone, employee_id, created_at FROM users ORDER BY name"
