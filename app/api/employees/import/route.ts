@@ -5,15 +5,11 @@ import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
 import { sendSMS } from "@/lib/at";
 
-interface ImportRow {
-  name: string;
-  phone: string;
-  type: "casual" | "fulltime";
-  department?: string;
-  daily_rate?: number;
-  monthly_salary?: number;
-  overtime_rule?: "all_days" | "holidays_only" | "none";
-  supervisor_id?: string;
+const FOOD_ADVANCE_AMOUNTS = new Set([0, 20000, 25000, 30000, 35000]);
+
+function normalizeFoodAdvance(value: unknown) {
+  const amount = Math.round(Number(value ?? 0));
+  return FOOD_ADVANCE_AMOUNTS.has(amount) ? amount : 0;
 }
 
 interface ImportResult {
@@ -117,6 +113,7 @@ export async function POST(request: NextRequest) {
 
     const dailyRate = type === "casual" ? Math.round(Number(raw["daily_rate"]) || 0) : 0;
     const monthlySalary = type === "fulltime" ? Math.round(Number(raw["monthly_salary"]) || 0) : 0;
+    const foodAdvanceAmount = normalizeFoodAdvance(raw["food_advance_amount"]);
     const overtimeRule = (["all_days", "holidays_only", "none"].includes(raw["overtime_rule"] ?? "")
       ? raw["overtime_rule"]
       : "none") as "all_days" | "holidays_only" | "none";
@@ -155,9 +152,9 @@ export async function POST(request: NextRequest) {
     try {
       // Insert employee record
       await db.execute({
-        sql: `INSERT INTO employees (id, name, phone, type, department, supervisor_id, daily_rate, monthly_salary, overtime_rule)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [employeeId, name, phone, type, department ?? null, supervisorId ?? null, dailyRate, monthlySalary, overtimeRule],
+        sql: `INSERT INTO employees (id, name, phone, type, department, supervisor_id, daily_rate, monthly_salary, food_advance_amount, overtime_rule)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [employeeId, name, phone, type, department ?? null, supervisorId ?? null, dailyRate, monthlySalary, foodAdvanceAmount, overtimeRule],
       });
 
       // Insert user record with employee role

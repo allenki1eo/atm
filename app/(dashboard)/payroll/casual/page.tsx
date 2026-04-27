@@ -23,6 +23,8 @@ interface EmployeeRow {
   section_name: string;
   days_worked: number;
   gross_amount: number;
+  salary_advances?: number;
+  food_advance_amount: number;
   advances: number;
   net_amount: number;
 }
@@ -100,6 +102,7 @@ export default function CasualPayrollPage() {
   const totalGross = filtered.reduce((s, r) => s + r.gross_amount, 0);
   const totalNet = filtered.reduce((s, r) => s + r.net_amount, 0);
   const totalAdvances = filtered.reduce((s, r) => s + r.advances, 0);
+  const totalFoodAdvances = filtered.reduce((s, r) => s + (r.food_advance_amount ?? 0), 0);
 
   const toggleCompany = (key: string) => {
     setCollapsedCompanies((prev) => {
@@ -111,9 +114,9 @@ export default function CasualPayrollPage() {
   };
 
   const exportCSV = () => {
-    const header = "Kampuni,Sehemu,Jina,Siku,Kiwango,Jumla,Mikopo,Malipo\n";
+    const header = "Kampuni,Sehemu,Jina,Siku,Kiwango,Jumla,Salary Advance,Food Advance,Jumla Makato,Malipo\n";
     const rows_csv = filtered.map((r) =>
-      `"${r.company_name}","${r.section_name}","${r.employee_name}",${r.days_worked},${r.daily_rate},${r.gross_amount},${r.advances},${r.net_amount}`
+      `"${r.company_name}","${r.section_name}","${r.employee_name}",${r.days_worked},${r.daily_rate},${r.gross_amount},${r.salary_advances ?? 0},${r.food_advance_amount ?? 0},${r.advances},${r.net_amount}`
     ).join("\n");
     const blob = new Blob([header + rows_csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -212,6 +215,9 @@ export default function CasualPayrollPage() {
           <CardContent className="p-3">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Mikopo</p>
             <p className="text-lg font-bold text-red-600">-{formatCurrency(totalAdvances)}</p>
+            {totalFoodAdvances > 0 && (
+              <p className="text-xs text-muted-foreground">Food: {formatCurrency(totalFoodAdvances)}</p>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -296,7 +302,7 @@ export default function CasualPayrollPage() {
                                 <TableHead className="text-center">Siku</TableHead>
                                 <TableHead className="hidden sm:table-cell text-right">Kiwango</TableHead>
                                 <TableHead className="hidden sm:table-cell text-right">Gross</TableHead>
-                                <TableHead className="hidden sm:table-cell text-right">Mikopo</TableHead>
+                                <TableHead className="hidden sm:table-cell text-right">Makato</TableHead>
                                 <TableHead className="text-right">Malipo</TableHead>
                               </TableRow>
                             </TableHeader>

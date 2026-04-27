@@ -167,6 +167,7 @@ export async function initializeDatabase() {
       supervisor_id TEXT,
       daily_rate INTEGER DEFAULT 0,
       monthly_salary INTEGER DEFAULT 0,
+      food_advance_amount INTEGER DEFAULT 0,
       overtime_rule TEXT CHECK(overtime_rule IN ('all_days', 'holidays_only', 'none')) DEFAULT 'none',
       emergency_contact_name TEXT,
       emergency_contact_phone TEXT,
@@ -415,6 +416,7 @@ export async function migrateDatabase() {
     "ALTER TABLE employees ADD COLUMN deduct_fadhila INTEGER DEFAULT 0",
     "ALTER TABLE employees ADD COLUMN heslb_amount INTEGER DEFAULT 0",
     "ALTER TABLE employees ADD COLUMN wcf_amount INTEGER DEFAULT 0",
+    "ALTER TABLE employees ADD COLUMN food_advance_amount INTEGER DEFAULT 0",
   ];
 
   const leaveColumns = [

@@ -51,6 +51,8 @@ export function FinancialCard({ employeeId, onRequestAdvance }: FinancialCardPro
   const isPositive = financial.net_amount >= 0;
   const totalOvertime = financial.total_overtime ?? 0;
   const baseGross = financial.base_gross ?? financial.gross_amount - totalOvertime;
+  const salaryAdvances = financial.salary_advances ?? Math.max(0, financial.total_advances - (financial.food_advance_amount ?? 0));
+  const foodAdvanceAmount = financial.food_advance_amount ?? 0;
   const monthName = new Date(period.year, period.month - 1, 1).toLocaleString("default", {
     month: "long",
     year: "numeric",
@@ -123,12 +125,22 @@ export function FinancialCard({ employeeId, onRequestAdvance }: FinancialCardPro
             </span>
           </div>
 
-          {financial.total_advances > 0 && (
+          {salaryAdvances > 0 && (
             <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">Mikopo iliyochukuliwa</span>
+              <span className="text-muted-foreground">Salary advance</span>
               <span className="font-medium text-red-600">
                 <ArrowDownRight className="h-3 w-3 inline" />
-                -{formatCurrency(financial.total_advances)}
+                -{formatCurrency(salaryAdvances)}
+              </span>
+            </div>
+          )}
+
+          {foodAdvanceAmount > 0 && (
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">Food advance</span>
+              <span className="font-medium text-red-600">
+                <ArrowDownRight className="h-3 w-3 inline" />
+                -{formatCurrency(foodAdvanceAmount)}
               </span>
             </div>
           )}

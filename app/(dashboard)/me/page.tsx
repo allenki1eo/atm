@@ -255,6 +255,8 @@ export default function MePage() {
           total_overtime: number;
           gross_amount: number;
           net_amount: number;
+          salary_advances?: number;
+          food_advance_amount: number;
           total_advances: number;
         };
       }>;
@@ -464,6 +466,7 @@ export default function MePage() {
   const latestAdvanceRequest = advanceRequests?.[0];
   const monthlyCash = summaryData?.financial.net_amount ?? latestPayslip?.net_amount ?? 0;
   const overtimeCash = summaryData?.financial.total_overtime ?? 0;
+  const foodAdvanceCash = summaryData?.financial.food_advance_amount ?? 0;
   const activeAdvanceSchedules =
     advanceSchedules?.filter((schedule) => schedule.status === "active") ?? [];
   const advanceRemaining = activeAdvanceSchedules.reduce(
@@ -576,6 +579,9 @@ export default function MePage() {
           </Badge>
           <Badge variant={overtimeCash > 0 ? "success" : "secondary"} className="whitespace-nowrap">
             Overtime: {summaryData ? formatCurrency(overtimeCash) : "-"}
+          </Badge>
+          <Badge variant={foodAdvanceCash > 0 ? "warning" : "secondary"} className="whitespace-nowrap">
+            Food: {summaryData ? formatCurrency(foodAdvanceCash) : "-"}
           </Badge>
         </div>
       </div>

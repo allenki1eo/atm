@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
     type: string;
     daily_rate: number;
     monthly_salary: number;
+    food_advance_amount: number;
     overtime_rule: string;
   };
 
@@ -85,9 +86,11 @@ export async function GET(request: NextRequest) {
     args: [employeeId!, startDate + " 00:00:00", endDate + " 23:59:59"],
   });
   const totalAdvances = Math.abs((advanceResult.rows[0] as unknown as { total: number }).total ?? 0);
+  const foodAdvanceAmount = emp.food_advance_amount ?? 0;
+  const totalAdvanceDeductions = totalAdvances + foodAdvanceAmount;
 
   // Net amount
-  const netAmount = grossAmount - totalAdvances;
+  const netAmount = grossAmount - totalAdvanceDeductions;
 
   // Get period info
   const periodResult = await db.execute({
@@ -113,7 +116,9 @@ export async function GET(request: NextRequest) {
       base_gross: baseGross,
       total_overtime: totalOvertime,
       gross_amount: grossAmount,
-      total_advances: totalAdvances,
+      salary_advances: totalAdvances,
+      food_advance_amount: foodAdvanceAmount,
+      total_advances: totalAdvanceDeductions,
       net_amount: netAmount,
     },
   });

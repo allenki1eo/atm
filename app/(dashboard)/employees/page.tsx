@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   Plus, Search, Users, Pencil, Trash2, Upload, Download,
-  FileText, CheckCircle2, XCircle, Loader2, KeyRound, MessageSquare,
+  FileText, CheckCircle2, XCircle, Loader2, KeyRound,
   ShieldCheck, ShieldOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,7 @@ interface Employee {
   section_id: string | null;
   daily_rate: number;
   monthly_salary: number;
+  food_advance_amount: number;
   overtime_rule: string;
   active: number;
   deduct_nssf: number;
@@ -94,6 +95,7 @@ const employeeSchema = z
     section_id: z.string().optional(),
     daily_rate: z.preprocess(nanToZero, z.number().min(0).optional()),
     monthly_salary: z.preprocess(nanToZero, z.number().min(0).optional()),
+    food_advance_amount: z.preprocess(nanToZero, z.number().optional()),
     overtime_rule: z.enum(["all_days", "holidays_only", "none"]).optional(),
     deduct_nssf: z.boolean().optional(),
     deduct_cotwu: z.boolean().optional(),
@@ -128,6 +130,7 @@ type EmployeeForm = {
   section_id?: string;
   daily_rate?: number;
   monthly_salary?: number;
+  food_advance_amount?: number;
   overtime_rule?: "all_days" | "holidays_only" | "none";
   deduct_nssf?: boolean;
   deduct_cotwu?: boolean;
@@ -137,10 +140,10 @@ type EmployeeForm = {
 };
 
 const CSV_TEMPLATE =
-  "name,phone,type,department,daily_rate,monthly_salary,overtime_rule\n" +
-  "Juma Salim,+255712345001,casual,Uendeshaji,15000,,none\n" +
-  "Fatuma Hassan,+255712345002,casual,Uendeshaji,15000,,none\n" +
-  "Robert Mwangi,+255712345003,fulltime,Fedha,,800000,all_days\n";
+  "name,phone,type,department,daily_rate,monthly_salary,food_advance_amount,overtime_rule\n" +
+  "Juma Salim,+255712345001,casual,Uendeshaji,15000,,20000,none\n" +
+  "Fatuma Hassan,+255712345002,casual,Uendeshaji,15000,,0,none\n" +
+  "Robert Mwangi,+255712345003,fulltime,Fedha,,800000,30000,all_days\n";
 
 function downloadTemplate() {
   const blob = new Blob([CSV_TEMPLATE], { type: "text/csv" });
@@ -372,6 +375,7 @@ export default function EmployeesPage() {
       section_id: emp.section_id ?? "",
       daily_rate: emp.daily_rate,
       monthly_salary: emp.monthly_salary,
+      food_advance_amount: emp.food_advance_amount ?? 0,
       overtime_rule: emp.overtime_rule as "all_days" | "holidays_only" | "none",
       deduct_nssf: !!emp.deduct_nssf,
       deduct_cotwu: !!emp.deduct_cotwu,
@@ -384,7 +388,7 @@ export default function EmployeesPage() {
 
   const openCreate = () => {
     setEditingEmployee(null);
-    reset({ type: "casual", overtime_rule: "none" });
+    reset({ type: "casual", overtime_rule: "none", food_advance_amount: 0 });
     setDialogOpen(true);
   };
 
@@ -403,6 +407,7 @@ export default function EmployeesPage() {
       section_id: data.section_id || undefined,
       daily_rate: data.type === "casual" ? Math.round(data.daily_rate ?? 0) : 0,
       monthly_salary: data.type === "fulltime" ? Math.round(data.monthly_salary ?? 0) : 0,
+      food_advance_amount: Math.round(data.food_advance_amount ?? 0),
     };
     createMutation.mutate(payload);
   };
@@ -801,6 +806,22 @@ export default function EmployeesPage() {
             {/* Deductions section */}
             <div className="space-y-2 rounded-lg border p-3 bg-muted/30">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Makato ya Mishahara</p>
+              <div className="space-y-1">
+                <Label className="text-xs">Food advance ya mwezi</Label>
+                <Select
+                  value={String(watch("food_advance_amount") ?? 0)}
+                  onValueChange={(v) => setValue("food_advance_amount", Number(v))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">Hakuna</SelectItem>
+                    <SelectItem value="20000">TZS 20,000</SelectItem>
+                    <SelectItem value="25000">TZS 25,000</SelectItem>
+                    <SelectItem value="30000">TZS 30,000</SelectItem>
+                    <SelectItem value="35000">TZS 35,000</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input type="checkbox" {...register("deduct_nssf")} className="accent-primary" />
@@ -1086,7 +1107,7 @@ export default function EmployeesPage() {
                     <div>
                       <p className="text-sm font-medium">Pakua kiolezo cha CSV</p>
                       <p className="text-xs text-muted-foreground">
-                        Safu: name, phone, type, department, daily_rate, monthly_salary, overtime_rule
+                        Safu: name, phone, type, department, daily_rate, monthly_salary, food_advance_amount, overtime_rule
                       </p>
                     </div>
                   </div>

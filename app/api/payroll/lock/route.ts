@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
     daily_rate: number; monthly_salary: number;
     deduct_nssf: number; deduct_cotwu: number; deduct_fadhila: number;
     heslb_amount: number; wcf_amount: number;
+    food_advance_amount: number;
     company_cotwu_rate: number;
   }[]) {
     // Attendance
@@ -128,6 +129,8 @@ export async function POST(request: NextRequest) {
       args: [emp.id, startDate + " 00:00:00", endDate + " 23:59:59"],
     });
     const totalAdvances = Math.abs((advResult.rows[0] as unknown as { total: number }).total ?? 0);
+    const foodAdvanceAmount = emp.food_advance_amount ?? 0;
+    const totalAdvanceDeductions = totalAdvances + foodAdvanceAmount;
 
     // Statutory & other deductions
     const nssfAmount    = emp.deduct_nssf    ? Math.round(grossAmount * NSSF_RATE) : 0;
@@ -136,7 +139,7 @@ export async function POST(request: NextRequest) {
     const heslbAmount   = emp.heslb_amount   ?? 0;
     const wcfAmount     = emp.wcf_amount     ?? 0;
 
-    const totalDeductions = nssfAmount + cotwuAmount + fadhilaAmount + heslbAmount + wcfAmount + totalAdvances;
+    const totalDeductions = nssfAmount + cotwuAmount + fadhilaAmount + heslbAmount + wcfAmount + totalAdvanceDeductions;
     const netAmount = grossAmount - totalDeductions;
 
     // Upsert payslip with all deduction columns
@@ -160,7 +163,7 @@ export async function POST(request: NextRequest) {
               generated_at     = CURRENT_TIMESTAMP`,
       args: [
         nanoid(), emp.id, periodId, Math.round(effectiveDays), grossAmount,
-        totalAdvances, netAmount, nssfAmount, cotwuAmount, fadhilaAmount,
+        totalAdvanceDeductions, netAmount, nssfAmount, cotwuAmount, fadhilaAmount,
         heslbAmount, wcfAmount, totalDeductions,
       ],
     });

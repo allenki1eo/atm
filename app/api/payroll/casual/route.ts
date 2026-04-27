@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
   }
 
   type EmpRow = {
-    id: string; name: string; daily_rate: number;
+    id: string; name: string; daily_rate: number; food_advance_amount: number;
     company_id: string | null; section_id: string | null;
     company_name: string | null; section_name: string | null;
   };
@@ -114,7 +114,9 @@ export async function GET(request: NextRequest) {
     const baseGross = Math.round(days_worked * (e.daily_rate ?? 0));
     const overtime = overtimeMap.get(e.id) ?? 0;
     const gross = baseGross + overtime;
-    const advances = advMap.get(e.id) ?? 0;
+    const salaryAdvances = advMap.get(e.id) ?? 0;
+    const foodAdvanceAmount = e.food_advance_amount ?? 0;
+    const advances = salaryAdvances + foodAdvanceAmount;
     const net = Math.max(0, gross - advances);
 
     return {
@@ -129,6 +131,8 @@ export async function GET(request: NextRequest) {
       base_gross: baseGross,
       total_overtime: overtime,
       gross_amount: gross,
+      salary_advances: salaryAdvances,
+      food_advance_amount: foodAdvanceAmount,
       advances,
       net_amount: net,
     };

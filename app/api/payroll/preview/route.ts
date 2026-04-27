@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
     daily_rate: number; monthly_salary: number;
     deduct_nssf: number; deduct_cotwu: number; deduct_fadhila: number;
     heslb_amount: number; wcf_amount: number;
+    food_advance_amount: number;
     company_cotwu_rate: number;
   }[]) {
     const attendResult = await db.execute({
@@ -68,6 +69,8 @@ export async function GET(request: NextRequest) {
       args: [emp.id, startDate + " 00:00:00", endDate + " 23:59:59"],
     });
     const totalAdvances = Math.round((advRes.rows[0] as unknown as { total: number }).total);
+    const foodAdvanceAmount = emp.food_advance_amount ?? 0;
+    const totalAdvanceDeductions = totalAdvances + foodAdvanceAmount;
 
     const grossAmount = baseGross + totalOvertime;
 
@@ -77,7 +80,7 @@ export async function GET(request: NextRequest) {
     const heslbAmount   = emp.heslb_amount   ?? 0;
     const wcfAmount     = emp.wcf_amount     ?? 0;
 
-    const totalDeductions = nssfAmount + cotwuAmount + fadhilaAmount + heslbAmount + wcfAmount + totalAdvances;
+    const totalDeductions = nssfAmount + cotwuAmount + fadhilaAmount + heslbAmount + wcfAmount + totalAdvanceDeductions;
     const netAmount = grossAmount - totalDeductions;
 
     rows.push({
@@ -94,7 +97,9 @@ export async function GET(request: NextRequest) {
       heslb_amount: heslbAmount,
       wcf_amount: wcfAmount,
       total_deductions: totalDeductions,
-      total_advances: totalAdvances,
+      salary_advances: totalAdvances,
+      food_advance_amount: foodAdvanceAmount,
+      total_advances: totalAdvanceDeductions,
       net_amount: netAmount,
     });
   }

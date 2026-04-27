@@ -9,6 +9,13 @@ function generatePIN(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
+const FOOD_ADVANCE_AMOUNTS = new Set([0, 20000, 25000, 30000, 35000]);
+
+function normalizeFoodAdvance(value: unknown) {
+  const amount = Math.round(Number(value ?? 0));
+  return FOOD_ADVANCE_AMOUNTS.has(amount) ? amount : 0;
+}
+
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -80,6 +87,7 @@ export async function POST(request: NextRequest) {
     section_id,
     daily_rate = 0,
     monthly_salary = 0,
+    food_advance_amount = 0,
     overtime_rule = "none",
   } = body;
 
@@ -88,12 +96,13 @@ export async function POST(request: NextRequest) {
   }
 
   const employeeId = nanoid();
+  const foodAdvanceAmount = normalizeFoodAdvance(food_advance_amount);
 
   // 1. Create employee record
   try {
     await db.execute({
-      sql: `INSERT INTO employees (id, name, phone, type, department, supervisor_id, company_id, section_id, daily_rate, monthly_salary, overtime_rule)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO employees (id, name, phone, type, department, supervisor_id, company_id, section_id, daily_rate, monthly_salary, food_advance_amount, overtime_rule)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         employeeId, name, phone, type,
         department ?? null,
@@ -102,6 +111,7 @@ export async function POST(request: NextRequest) {
         section_id ?? null,
         daily_rate ?? 0,
         monthly_salary ?? 0,
+        foodAdvanceAmount,
         overtime_rule ?? "none",
       ],
     });
@@ -172,22 +182,23 @@ export async function PUT(request: NextRequest) {
   const body = await request.json();
   const {
     id, name, phone, type, department, supervisor_id, company_id, section_id,
-    daily_rate, monthly_salary, overtime_rule, active,
+    daily_rate, monthly_salary, food_advance_amount, overtime_rule, active,
     deduct_nssf, deduct_cotwu, deduct_fadhila, heslb_amount, wcf_amount,
   } = body;
 
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  const foodAdvanceAmount = normalizeFoodAdvance(food_advance_amount);
 
   try {
     await db.execute({
       sql: `UPDATE employees
             SET name=?, phone=?, type=?, department=?, supervisor_id=?, company_id=?,
-                section_id=?, daily_rate=?, monthly_salary=?, overtime_rule=?, active=?,
+                section_id=?, daily_rate=?, monthly_salary=?, food_advance_amount=?, overtime_rule=?, active=?,
                 deduct_nssf=?, deduct_cotwu=?, deduct_fadhila=?, heslb_amount=?, wcf_amount=?
             WHERE id=?`,
       args: [
         name, phone, type, department ?? null, supervisor_id ?? null, company_id ?? null,
-        section_id ?? null, daily_rate ?? 0, monthly_salary ?? 0, overtime_rule ?? "none", active ?? 1,
+        section_id ?? null, daily_rate ?? 0, monthly_salary ?? 0, foodAdvanceAmount, overtime_rule ?? "none", active ?? 1,
         deduct_nssf ? 1 : 0, deduct_cotwu ? 1 : 0, deduct_fadhila ? 1 : 0,
         heslb_amount ?? 0, wcf_amount ?? 0, id,
       ],
