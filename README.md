@@ -1,36 +1,110 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TrustTrack Attendance System
+
+TrustTrack is a Next.js attendance, payroll, leave, announcements, complaints,
+and SMS notification system for teams that need role-based HR operations.
+
+The app supports four roles:
+
+- `admin`: full system access, company setup, users, attendance, payroll, and configuration
+- `hr`: HR operations, employees, leave, payroll, announcements, and complaints
+- `supervisor`: team attendance, attendance corrections, leave visibility, and announcements
+- `employee`: personal attendance, leave, advances, complaints, announcements, and payslips
+
+## Tech Stack
+
+- Next.js 16 App Router
+- React 19
+- NextAuth v5
+- Turso/libSQL, with `file:local.db` as the local fallback
+- Tailwind CSS 4
+- Radix UI primitives
+- Serwist PWA support
+- Africa's Talking SMS integration
 
 ## Getting Started
 
-First, run the development server:
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create your local environment file:
+
+```bash
+cp .env.example .env.local
+```
+
+For local development, you can leave `TURSO_DATABASE_URL` unset and the app will
+use `file:local.db`. Set `AUTH_SECRET` to a secure random string before running
+the app.
+
+Start the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Database Setup
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The schema is created from `lib/db.ts`. After the app starts, visit:
 
-## Learn More
+```text
+http://localhost:3000/api/setup
+```
 
-To learn more about Next.js, take a look at the following resources:
+This creates the database tables and seeds demo data if the users table is
+empty. The endpoint is idempotent for local setup.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Demo credentials seeded by the setup endpoint:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `admin@trusttrack.com` / `admin123`
+- `supervisor@trusttrack.com` / `supervisor123`
+- `hr@trusttrack.com` / `hr123`
 
-## Deploy on Vercel
+## Environment Variables
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+See `.env.example` for the full list.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Required for authentication:
+
+- `AUTH_SECRET`
+- `NEXTAUTH_URL` for local development
+
+Optional or deployment-specific:
+
+- `TURSO_DATABASE_URL`
+- `TURSO_AUTH_TOKEN`
+- `AT_API_KEY`
+- `AT_USERNAME`
+- `AT_SENDER_ID`
+- `NEXT_PUBLIC_APP_URL`
+- `ENABLE_PWA`
+
+## Useful Scripts
+
+```bash
+npm run dev
+npm run build
+npm run start
+npm run lint
+```
+
+## Project Structure
+
+- `app/`: routes, dashboards, print views, and API endpoints
+- `components/`: shared UI, layout, attendance, dashboard, and payroll components
+- `hooks/`: client-side hooks for attendance, offline state, sync, and toasts
+- `lib/`: auth, database, utilities, and SMS integration helpers
+- `types/`: TypeScript declaration extensions
+
+## Deployment Notes
+
+- Set a persistent Turso database in production with `TURSO_DATABASE_URL` and
+  `TURSO_AUTH_TOKEN`.
+- Set `AUTH_SECRET` in the deployment environment.
+- Enable PWA generation with `ENABLE_PWA=true` when you want service worker
+  output outside the default production behavior.
+- Configure Africa's Talking credentials before enabling live SMS workflows.
