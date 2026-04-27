@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
 
   // Sum advance transactions given this month
   const advResult = await db.execute({
-    sql: `SELECT employee_id, SUM(amount) as total
+    sql: `SELECT employee_id, SUM(ABS(amount)) as total
           FROM transactions
           WHERE type = 'advance_given' AND created_at LIKE ?
           GROUP BY employee_id`,
@@ -84,6 +84,20 @@ export async function GET(request: NextRequest) {
   const advMap = new Map<string, number>();
   for (const row of advResult.rows as unknown as AdvRow[]) {
     advMap.set(row.employee_id, row.total);
+  }
+
+  const overtimeResult = await db.execute({
+    sql: `SELECT employee_id, COALESCE(SUM(amount), 0) as total
+          FROM overtime_entries
+          WHERE date LIKE ?
+          GROUP BY employee_id`,
+    args: [`${datePrefix}%`],
+  });
+
+  type OvertimeRow = { employee_id: string; total: number };
+  const overtimeMap = new Map<string, number>();
+  for (const row of overtimeResult.rows as unknown as OvertimeRow[]) {
+    overtimeMap.set(row.employee_id, Math.round(row.total ?? 0));
   }
 
   type EmpRow = {
@@ -97,7 +111,9 @@ export async function GET(request: NextRequest) {
     const full = att?.full_days ?? 0;
     const half = att?.half_days ?? 0;
     const days_worked = full + half * 0.5;
-    const gross = Math.round(days_worked * (e.daily_rate ?? 0));
+    const baseGross = Math.round(days_worked * (e.daily_rate ?? 0));
+    const overtime = overtimeMap.get(e.id) ?? 0;
+    const gross = baseGross + overtime;
     const advances = advMap.get(e.id) ?? 0;
     const net = Math.max(0, gross - advances);
 
@@ -110,6 +126,8 @@ export async function GET(request: NextRequest) {
       section_id: e.section_id ?? null,
       section_name: e.section_name ?? "Sehemu Haijawekwa",
       days_worked,
+      base_gross: baseGross,
+      total_overtime: overtime,
       gross_amount: gross,
       advances,
       net_amount: net,

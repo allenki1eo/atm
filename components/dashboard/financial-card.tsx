@@ -49,6 +49,8 @@ export function FinancialCard({ employeeId, onRequestAdvance }: FinancialCardPro
 
   const { financial, attendance, employee, period } = data;
   const isPositive = financial.net_amount >= 0;
+  const totalOvertime = financial.total_overtime ?? 0;
+  const baseGross = financial.base_gross ?? financial.gross_amount - totalOvertime;
   const monthName = new Date(period.year, period.month - 1, 1).toLocaleString("default", {
     month: "long",
     year: "numeric",
@@ -102,6 +104,21 @@ export function FinancialCard({ employeeId, onRequestAdvance }: FinancialCardPro
             </span>
             <span className="font-medium text-green-700">
               <ArrowUpRight className="h-3 w-3 inline" />
+              {formatCurrency(baseGross)}
+            </span>
+          </div>
+
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-muted-foreground">Overtime cash</span>
+            <span className="font-medium text-green-700">
+              <ArrowUpRight className="h-3 w-3 inline" />
+              {formatCurrency(totalOvertime)}
+            </span>
+          </div>
+
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-muted-foreground">Jumla kabla ya makato</span>
+            <span className="font-medium text-green-700">
               {formatCurrency(financial.gross_amount)}
             </span>
           </div>

@@ -251,6 +251,8 @@ export default function MePage() {
           effective_days: number;
         };
         financial: {
+          base_gross: number;
+          total_overtime: number;
           gross_amount: number;
           net_amount: number;
           total_advances: number;
@@ -460,6 +462,8 @@ export default function MePage() {
   const latestLeave = leaveData?.requests?.[0];
   const latestTransaction = txData?.transactions?.[0];
   const latestAdvanceRequest = advanceRequests?.[0];
+  const monthlyCash = summaryData?.financial.net_amount ?? latestPayslip?.net_amount ?? 0;
+  const overtimeCash = summaryData?.financial.total_overtime ?? 0;
   const activeAdvanceSchedules =
     advanceSchedules?.filter((schedule) => schedule.status === "active") ?? [];
   const advanceRemaining = activeAdvanceSchedules.reduce(
@@ -568,7 +572,10 @@ export default function MePage() {
             Likizo: {leaveRemaining ?? "-"} siku
           </Badge>
           <Badge variant="info" className="whitespace-nowrap">
-            Net: {summaryData ? formatCurrency(summaryData.financial.net_amount) : "-"}
+            Net: {summaryData ? formatCurrency(monthlyCash) : "-"}
+          </Badge>
+          <Badge variant={overtimeCash > 0 ? "success" : "secondary"} className="whitespace-nowrap">
+            Overtime: {summaryData ? formatCurrency(overtimeCash) : "-"}
           </Badge>
         </div>
       </div>
@@ -584,10 +591,10 @@ export default function MePage() {
         />
         <ActionCard
           icon={Receipt}
-          title="Payslips Zangu"
-          metric={latestPayslip ? formatCurrency(latestPayslip.net_amount) : "0"}
-          updatedAt={latestPayslip ? formatDate(latestPayslip.generated_at) : "Hakuna mpya"}
-          action="Angalia ya karibuni"
+          title="Malipo ya Mwezi"
+          metric={formatCurrency(monthlyCash)}
+          updatedAt={`Overtime ${formatCurrency(overtimeCash)}`}
+          action="Payslips"
           onAction={() => scrollToSection("payslips")}
         />
         <ActionCard
@@ -662,7 +669,7 @@ export default function MePage() {
         <div>
           <h2 className="text-lg font-semibold">Fedha Zangu</h2>
           <p className="text-sm text-muted-foreground">
-            Muhtasari wa mapato, makato, na salary advance
+            Muhtasari wa mapato, overtime cash, makato, na salary advance
           </p>
         </div>
         {selfEmployee ? (

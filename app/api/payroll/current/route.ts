@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
   });
 
   const records = attendResult.rows as unknown as { status: string; date: string }[];
+  const lateDays = records.filter((r) => r.status === "late").length;
   const presentDays = records.filter((r) =>
     ["present", "late"].includes(r.status)
   ).length;
@@ -100,6 +101,7 @@ export async function GET(request: NextRequest) {
     period: { month, year, start_date: startDate, end_date: endDate, info: period },
     attendance: {
       present: presentDays,
+      late: lateDays,
       half_day: halfDays,
       absent: records.filter((r) => r.status === "absent").length,
       effective_days: effectiveDays,
