@@ -154,6 +154,8 @@ const monthNames = [
   "Desemba",
 ];
 
+type DashboardPanel = "financial" | "attendance" | "payslips" | "leave" | "salary" | "messages";
+
 function ActionCard({
   icon: Icon,
   title,
@@ -221,6 +223,7 @@ export default function MePage() {
   const queryClient = useQueryClient();
   const [advanceOpen, setAdvanceOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState<DashboardPanel>("financial");
 
   const userId = session?.user?.id;
   const now = new Date();
@@ -466,7 +469,6 @@ export default function MePage() {
   const latestAdvanceRequest = advanceRequests?.[0];
   const monthlyCash = summaryData?.financial.net_amount ?? latestPayslip?.net_amount ?? 0;
   const overtimeCash = summaryData?.financial.total_overtime ?? 0;
-  const foodAdvanceCash = summaryData?.financial.food_advance_amount ?? 0;
   const activeAdvanceSchedules =
     advanceSchedules?.filter((schedule) => schedule.status === "active") ?? [];
   const advanceRemaining = activeAdvanceSchedules.reduce(
@@ -541,10 +543,14 @@ export default function MePage() {
 
   const scrollToSection = (id: string) =>
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const openPanel = (panel: DashboardPanel) => {
+    setActivePanel(panel);
+    window.setTimeout(() => scrollToSection("detail-panel"), 0);
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="sticky top-0 z-10 -mx-4 border-b bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:static md:mx-0 md:border-0 md:bg-transparent md:px-0 md:py-0">
+    <div className="mx-auto max-w-6xl space-y-8">
+      <div className="sticky top-0 z-10 -mx-4 border-b bg-background/95 px-4 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:static md:mx-0 md:rounded-lg md:border md:bg-card md:px-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
@@ -559,12 +565,28 @@ export default function MePage() {
               </p>
             </div>
           </div>
-          <Button onClick={() => scrollToSection(presentToday ? "leave" : "attendance")}>
-            {presentToday ? "Omba Likizo" : "Omba Marekebisho"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => {
+              accountForm.reset({
+                email: accountData?.user?.email ?? "",
+                phone: accountData?.user?.phone ?? accountData?.employee?.phone ?? "",
+                emergency_contact_name: accountData?.employee?.emergency_contact_name ?? "",
+                emergency_contact_phone: accountData?.employee?.emergency_contact_phone ?? "",
+                current_password: "",
+                new_password: "",
+              });
+              setSettingsOpen(true);
+            }}>
+              <Settings className="h-4 w-4 mr-2" />
+              Akaunti
+            </Button>
+            <Button onClick={() => openPanel(presentToday ? "leave" : "attendance")}>
+              {presentToday ? "Omba Likizo" : "Omba Marekebisho"}
+            </Button>
+          </div>
         </div>
 
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Badge variant={presentToday ? "success" : "warning"} className="whitespace-nowrap">
             Leo: {presentToday ? "Umehudhuria" : "Haijathibitishwa"}
           </Badge>
@@ -577,39 +599,33 @@ export default function MePage() {
           <Badge variant="info" className="whitespace-nowrap">
             Net: {summaryData ? formatCurrency(monthlyCash) : "-"}
           </Badge>
-          <Badge variant={overtimeCash > 0 ? "success" : "secondary"} className="whitespace-nowrap">
-            Overtime: {summaryData ? formatCurrency(overtimeCash) : "-"}
-          </Badge>
-          <Badge variant={foodAdvanceCash > 0 ? "warning" : "secondary"} className="whitespace-nowrap">
-            Food: {summaryData ? formatCurrency(foodAdvanceCash) : "-"}
-          </Badge>
         </div>
       </div>
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <ActionCard
           icon={CalendarIcon}
           title="Mahudhurio Yangu"
           metric={`${summaryData?.attendance.effective_days ?? 0} siku`}
           updatedAt="Mwezi huu"
           action="Fungua"
-          onAction={() => scrollToSection("attendance")}
+          onAction={() => openPanel("attendance")}
         />
         <ActionCard
           icon={Receipt}
-          title="Malipo ya Mwezi"
+          title="Malipo"
           metric={formatCurrency(monthlyCash)}
           updatedAt={`Overtime ${formatCurrency(overtimeCash)}`}
-          action="Payslips"
-          onAction={() => scrollToSection("payslips")}
+          action="Angalia"
+          onAction={() => openPanel("financial")}
         />
         <ActionCard
           icon={Palmtree}
           title="Likizo na Maombi"
           metric={leaveRemaining !== null ? `${leaveRemaining} siku` : "-"}
           updatedAt={latestLeave ? formatDate(latestLeave.submitted_at) : "Hakuna ombi"}
-          action="Omba likizo"
-          onAction={() => (window.location.href = "/leave")}
+          action="Fungua"
+          onAction={() => openPanel("leave")}
         />
         <ActionCard
           icon={Inbox}
@@ -617,37 +633,11 @@ export default function MePage() {
           metric={`${unreadCount} mpya`}
           updatedAt={unreadCount > 0 ? "Unahitaji kusoma" : "Hakuna mpya"}
           action={unreadCount > 0 ? "Soma" : "Fungua"}
-          onAction={() => scrollToSection("messages")}
-        />
-        <ActionCard
-          icon={DollarSign}
-          title="Salary Advance"
-          metric={advanceRemaining > 0 ? formatCurrency(advanceRemaining) : `${advanceRequests?.length ?? 0} maombi`}
-          updatedAt={latestAdvanceRequest ? formatDate(latestAdvanceRequest.requested_at) : "Hakuna ombi"}
-          action="Angalia"
-          onAction={() => scrollToSection("salary-advance")}
-        />
-        <ActionCard
-          icon={Settings}
-          title="Akaunti"
-          metric="Binafsi"
-          updatedAt={accountData?.employee?.phone ?? accountData?.user?.phone ?? "Weka taarifa"}
-          action="Hariri"
-          onAction={() => {
-            accountForm.reset({
-              email: accountData?.user?.email ?? "",
-              phone: accountData?.user?.phone ?? accountData?.employee?.phone ?? "",
-              emergency_contact_name: accountData?.employee?.emergency_contact_name ?? "",
-              emergency_contact_phone: accountData?.employee?.emergency_contact_phone ?? "",
-              current_password: "",
-              new_password: "",
-            });
-            setSettingsOpen(true);
-          }}
+          onAction={() => openPanel("messages")}
         />
       </section>
 
-      <section>
+      <section className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Kilichotokea Karibuni</CardTitle>
@@ -669,9 +659,27 @@ export default function MePage() {
             )}
           </CardContent>
         </Card>
+        <Card className="bg-muted/25">
+          <CardHeader>
+            <CardTitle className="text-base">Zaidi</CardTitle>
+            <CardDescription>Fungua kipengele unachohitaji tu</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-2">
+            <Button variant={activePanel === "financial" ? "default" : "outline"} onClick={() => openPanel("financial")}>
+              Fedha
+            </Button>
+            <Button variant={activePanel === "payslips" ? "default" : "outline"} onClick={() => openPanel("payslips")}>
+              Payslips
+            </Button>
+            <Button variant={activePanel === "salary" ? "default" : "outline"} onClick={() => openPanel("salary")}>
+              Salary Advance
+            </Button>
+          </CardContent>
+        </Card>
       </section>
 
-      <section id="financial" className="scroll-mt-28 space-y-4">
+      {activePanel === "financial" && (
+      <section id="detail-panel" className="scroll-mt-28 space-y-4">
         <div>
           <h2 className="text-lg font-semibold">Fedha Zangu</h2>
           <p className="text-sm text-muted-foreground">
@@ -681,7 +689,7 @@ export default function MePage() {
         {selfEmployee ? (
           <FinancialCard
             employeeId={selfEmployee.id}
-            onRequestAdvance={() => scrollToSection("salary-advance")}
+            onRequestAdvance={() => openPanel("salary")}
           />
         ) : (
           <Card>
@@ -693,8 +701,10 @@ export default function MePage() {
           </Card>
         )}
       </section>
+      )}
 
-      <section id="salary-advance" className="scroll-mt-28">
+      {activePanel === "salary" && (
+      <section id="detail-panel" className="scroll-mt-28">
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -789,8 +799,10 @@ export default function MePage() {
           </CardContent>
         </Card>
       </section>
+      )}
 
-      <section id="attendance" className="scroll-mt-28">
+      {activePanel === "attendance" && (
+      <section id="detail-panel" className="scroll-mt-28">
         {selfEmployee ? (
           <Card>
             <CardHeader>
@@ -812,8 +824,10 @@ export default function MePage() {
           </Card>
         )}
       </section>
+      )}
 
-      <section id="payslips" className="scroll-mt-28">
+      {activePanel === "payslips" && (
+      <section id="detail-panel" className="scroll-mt-28">
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -865,8 +879,10 @@ export default function MePage() {
           </CardContent>
         </Card>
       </section>
+      )}
 
-      <section id="leave" className="scroll-mt-28">
+      {activePanel === "leave" && (
+      <section id="detail-panel" className="scroll-mt-28">
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -900,8 +916,10 @@ export default function MePage() {
           </CardContent>
         </Card>
       </section>
+      )}
 
-      <section id="history" className="scroll-mt-28">
+      {activePanel === "financial" && (
+      <section className="scroll-mt-28">
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -951,8 +969,10 @@ export default function MePage() {
           </CardContent>
         </Card>
       </section>
+      )}
 
-      <section id="messages" className="scroll-mt-28 space-y-4">
+      {activePanel === "messages" && (
+      <section id="detail-panel" className="scroll-mt-28 space-y-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -1028,6 +1048,7 @@ export default function MePage() {
           </CardContent>
         </Card>
       </section>
+      )}
 
       <Dialog open={advanceOpen} onOpenChange={setAdvanceOpen}>
         <DialogContent>
