@@ -1,17 +1,35 @@
 "use client";
 
+import type { ElementType } from "react";
 import { useState } from "react";
 import { useSession } from "next-auth/react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { UserCircle, DollarSign, Calendar as CalendarIcon, Loader2, FileText, Inbox, Megaphone, MessageSquareWarning, Receipt, CheckCircle, Clock, AlertCircle, TrendingUp } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  ArrowRight,
+  Calendar as CalendarIcon,
+  DollarSign,
+  FileText,
+  Inbox,
+  Loader2,
+  Megaphone,
+  MessageSquareWarning,
+  Palmtree,
+  Receipt,
+  UserCircle,
+} from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -34,6 +52,134 @@ const advanceSchema = z.object({
 });
 type AdvanceForm = z.infer<typeof advanceSchema>;
 
+interface Payslip {
+  id: string;
+  month: number;
+  year: number;
+  days_worked: number;
+  gross_amount: number;
+  net_amount: number;
+  total_deductions: number;
+  generated_at: string;
+}
+
+interface Transaction {
+  id: string;
+  type: string;
+  amount: number;
+  description: string;
+  created_at: string;
+}
+
+interface Announcement {
+  id: string;
+  subject: string;
+  message: string;
+  created_at: string;
+}
+
+interface Complaint {
+  id: string;
+  subject: string;
+  response: string | null;
+  status: string;
+  responded_at: string | null;
+}
+
+interface LeaveRequest {
+  id: string;
+  status: "pending" | "approved" | "denied";
+  days: number;
+  submitted_at: string;
+  reviewed_at: string | null;
+}
+
+interface ActivityItem {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  icon: ElementType;
+  tone: "green" | "amber" | "blue" | "red" | "slate";
+}
+
+const monthNames = [
+  "Januari",
+  "Februari",
+  "Machi",
+  "Aprili",
+  "Mei",
+  "Juni",
+  "Julai",
+  "Agosti",
+  "Septemba",
+  "Oktoba",
+  "Novemba",
+  "Desemba",
+];
+
+function ActionCard({
+  icon: Icon,
+  title,
+  metric,
+  updatedAt,
+  action,
+  onAction,
+}: {
+  icon: ElementType;
+  title: string;
+  metric: string;
+  updatedAt: string;
+  action: string;
+  onAction: () => void;
+}) {
+  return (
+    <Card className="hover:shadow-md transition-shadow">
+      <CardContent className="p-4 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="rounded-lg bg-primary/10 p-2">
+            <Icon className="h-5 w-5 text-primary" />
+          </div>
+          <Badge variant="secondary">{metric}</Badge>
+        </div>
+        <div>
+          <h3 className="font-semibold">{title}</h3>
+          <p className="text-xs text-muted-foreground mt-1">{updatedAt}</p>
+        </div>
+        <Button className="w-full justify-between" variant="outline" onClick={onAction}>
+          {action}
+          <ArrowRight className="h-4 w-4" />
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ActivityRow({ item }: { item: ActivityItem }) {
+  const toneClass = {
+    green: "bg-green-50 text-green-700",
+    amber: "bg-amber-50 text-amber-700",
+    blue: "bg-blue-50 text-blue-700",
+    red: "bg-red-50 text-red-700",
+    slate: "bg-slate-100 text-slate-700",
+  }[item.tone];
+
+  return (
+    <div className="flex gap-3 rounded-lg border p-3">
+      <div className={`mt-0.5 rounded-full p-1.5 ${toneClass}`}>
+        <item.icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-medium">{item.title}</p>
+          <span className="text-xs text-muted-foreground">{formatDate(item.date)}</span>
+        </div>
+        <p className="text-sm text-muted-foreground">{item.description}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function MePage() {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
@@ -42,8 +188,6 @@ export default function MePage() {
   const userId = session?.user?.id;
   const now = new Date();
 
-  // Resolve the current user's employee record server-side — returns
-  // null for admin/HR without a linked profile.
   const { data: selfEmployee } = useQuery({
     queryKey: ["me", "employee"],
     queryFn: async () => {
@@ -55,7 +199,6 @@ export default function MePage() {
   });
   const employeeId = selfEmployee?.id ?? null;
 
-  // Summary: current-month attendance + earnings (same cache key as FinancialCard)
   const { data: summaryData } = useQuery({
     queryKey: ["payroll", "current", employeeId, now.getFullYear(), now.getMonth() + 1],
     queryFn: async () => {
@@ -64,24 +207,72 @@ export default function MePage() {
       );
       if (!res.ok) return null;
       return res.json() as Promise<{
-        attendance: { present: number; late: number; absent: number; effective_days: number };
-        financial: { gross_amount: number; net_amount: number; total_advances: number };
-        employee: { type: string };
+        attendance: {
+          present: number;
+          late: number;
+          absent: number;
+          effective_days: number;
+        };
+        financial: {
+          gross_amount: number;
+          net_amount: number;
+          total_advances: number;
+        };
       }>;
     },
     enabled: !!employeeId,
     staleTime: 60000,
   });
 
-  // Fetch transactions (only when we have a real employee link)
   const { data: txData, isLoading: txLoading } = useQuery({
     queryKey: ["transactions", employeeId],
     queryFn: async () => {
       const res = await fetch(`/api/transactions/advance?employee_id=${employeeId}`);
       if (!res.ok) throw new Error("Failed");
-      return res.json();
+      return res.json() as Promise<{ transactions: Transaction[]; balance: number }>;
     },
     enabled: !!employeeId,
+  });
+
+  const { data: myPayslips, isLoading: payslipsLoading } = useQuery({
+    queryKey: ["my-payslips"],
+    queryFn: async () => {
+      const res = await fetch("/api/payslips/mine");
+      if (!res.ok) return [];
+      return (await res.json()) as Payslip[];
+    },
+    enabled: !!employeeId,
+  });
+
+  const { data: leaveData } = useQuery({
+    queryKey: ["leave"],
+    queryFn: async () => {
+      const res = await fetch("/api/leave");
+      if (!res.ok) return null;
+      return (await res.json()) as {
+        requests: LeaveRequest[];
+        balance: {
+          allowed_days: number;
+          used_days: number;
+          carryover_days?: number | null;
+        } | null;
+      };
+    },
+    enabled: !!employeeId,
+  });
+
+  const { data: inbox } = useQuery({
+    queryKey: ["me-inbox"],
+    queryFn: async () => {
+      const [annRes, compRes] = await Promise.all([
+        fetch("/api/announcements?unread=1"),
+        fetch("/api/complaints?mine=1"),
+      ]);
+      const announcements = annRes.ok ? ((await annRes.json()) as Announcement[]) : [];
+      const complaints = compRes.ok ? ((await compRes.json()) as Complaint[]) : [];
+      return { announcements, complaints };
+    },
+    enabled: !!userId,
   });
 
   const {
@@ -122,58 +313,12 @@ export default function MePage() {
     },
     onError: (e: Error) => {
       toast({
-        title: "Error",
-        description: e.message || "Failed to submit request",
+        title: "Hitilafu",
+        description: e.message || "Imeshindikana kutuma ombi",
         variant: "destructive",
       });
     },
   });
-
-  // My payslips
-  const { data: myPayslips, isLoading: payslipsLoading } = useQuery({
-    queryKey: ["my-payslips"],
-    queryFn: async () => {
-      const res = await fetch("/api/payslips/mine");
-      if (!res.ok) return [];
-      return (await res.json()) as {
-        id: string;
-        month: number;
-        year: number;
-        start_date: string;
-        end_date: string;
-        days_worked: number;
-        gross_amount: number;
-        net_amount: number;
-        total_deductions: number;
-        generated_at: string;
-      }[];
-    },
-    enabled: !!employeeId,
-  });
-
-  // Inbox: announcements + complaint responses
-  const { data: inbox } = useQuery({
-    queryKey: ["me-inbox"],
-    queryFn: async () => {
-      const [annRes, compRes] = await Promise.all([
-        fetch("/api/announcements?unread=1"),
-        fetch("/api/complaints?mine=1"),
-      ]);
-      const announcements = annRes.ok ? await annRes.json() : [];
-      const complaints = compRes.ok ? await compRes.json() : [];
-      return { announcements, complaints };
-    },
-    enabled: !!userId,
-  });
-
-  const unreadCount =
-    (inbox?.announcements?.length ?? 0) +
-    (Array.isArray(inbox?.complaints)
-      ? inbox.complaints.filter(
-          (c: { status: string; response: string | null }) =>
-            c.status === "resolved" && c.response
-        ).length
-      : 0);
 
   const markAnnouncementRead = useMutation({
     mutationFn: async (announcementId: string) => {
@@ -189,409 +334,443 @@ export default function MePage() {
   });
 
   const role = (session?.user as { role?: string })?.role;
+  const announcements = inbox?.announcements ?? [];
+  const complaintResponses =
+    inbox?.complaints.filter((c) => c.status === "resolved" && c.response) ?? [];
+  const unreadCount = announcements.length + complaintResponses.length;
+  const presentToday = (summaryData?.attendance.present ?? 0) > 0;
+  const leaveRemaining = leaveData?.balance
+    ? leaveData.balance.allowed_days +
+      (leaveData.balance.carryover_days ?? 0) -
+      leaveData.balance.used_days
+    : null;
+  const latestPayslip = myPayslips?.[0];
+  const latestLeave = leaveData?.requests?.[0];
+  const latestTransaction = txData?.transactions?.[0];
+
+  const recentActivities: ActivityItem[] = [
+    ...(latestLeave
+      ? [
+          {
+            id: `leave-${latestLeave.id}`,
+            title:
+              latestLeave.status === "approved"
+                ? "Likizo imeidhinishwa"
+                : latestLeave.status === "denied"
+                ? "Likizo imekataliwa"
+                : "Ombi la likizo linashughulikiwa",
+            description: `${latestLeave.days} siku`,
+            date: latestLeave.reviewed_at ?? latestLeave.submitted_at,
+            icon: Palmtree,
+            tone:
+              latestLeave.status === "approved"
+                ? "green"
+                : latestLeave.status === "denied"
+                ? "red"
+                : "amber",
+          } satisfies ActivityItem,
+        ]
+      : []),
+    ...(latestPayslip
+      ? [
+          {
+            id: `payslip-${latestPayslip.id}`,
+            title: "Payslip mpya ipo tayari",
+            description: `Net ${formatCurrency(latestPayslip.net_amount)}`,
+            date: latestPayslip.generated_at,
+            icon: Receipt,
+            tone: "green",
+          } satisfies ActivityItem,
+        ]
+      : []),
+    ...(announcements[0]
+      ? [
+          {
+            id: `announcement-${announcements[0].id}`,
+            title: "Tangazo jipya",
+            description: announcements[0].subject,
+            date: announcements[0].created_at,
+            icon: Megaphone,
+            tone: "blue",
+          } satisfies ActivityItem,
+        ]
+      : []),
+    ...(latestTransaction
+      ? [
+          {
+            id: `tx-${latestTransaction.id}`,
+            title: latestTransaction.type.replace(/_/g, " "),
+            description: formatCurrency(latestTransaction.amount),
+            date: latestTransaction.created_at,
+            icon: DollarSign,
+            tone: latestTransaction.amount >= 0 ? "green" : "red",
+          } satisfies ActivityItem,
+        ]
+      : []),
+  ]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 5);
+
+  const scrollToSection = (id: string) =>
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-          <UserCircle className="h-7 w-7 text-primary" />
+      <div className="sticky top-0 z-10 -mx-4 border-b bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:static md:mx-0 md:border-0 md:bg-transparent md:px-0 md:py-0">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+              <UserCircle className="h-7 w-7 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold sm:text-2xl">
+                Habari, {session?.user?.name}
+              </h1>
+              <p className="truncate text-sm text-muted-foreground capitalize">
+                {role} · {session?.user?.email}
+              </p>
+            </div>
+          </div>
+          <Button onClick={() => scrollToSection(presentToday ? "leave" : "attendance")}>
+            {presentToday ? "Omba Likizo" : "Omba Marekebisho"}
+          </Button>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold">{session?.user?.name}</h1>
-          <p className="text-muted-foreground capitalize">{role} · {session?.user?.email}</p>
+
+        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+          <Badge variant={presentToday ? "success" : "warning"} className="whitespace-nowrap">
+            Leo: {presentToday ? "Umehudhuria" : "Haijathibitishwa"}
+          </Badge>
+          <Badge variant={unreadCount > 0 ? "destructive" : "secondary"} className="whitespace-nowrap">
+            Ujumbe: {unreadCount}
+          </Badge>
+          <Badge variant="secondary" className="whitespace-nowrap">
+            Likizo: {leaveRemaining ?? "-"} siku
+          </Badge>
+          <Badge variant="info" className="whitespace-nowrap">
+            Net: {summaryData ? formatCurrency(summaryData.financial.net_amount) : "-"}
+          </Badge>
         </div>
       </div>
 
-      {/* ── This-month summary strip ──────────────────────────────────────── */}
-      {summaryData && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Card>
-            <CardContent className="p-3 flex items-center gap-2">
-              <div className="rounded-lg p-1.5 bg-green-50">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Present</p>
-                <p className="text-xl font-bold text-green-700">
-                  {summaryData.attendance.present}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <ActionCard
+          icon={CalendarIcon}
+          title="Mahudhurio Yangu"
+          metric={`${summaryData?.attendance.effective_days ?? 0} siku`}
+          updatedAt="Mwezi huu"
+          action="Fungua"
+          onAction={() => scrollToSection("attendance")}
+        />
+        <ActionCard
+          icon={Receipt}
+          title="Payslips Zangu"
+          metric={latestPayslip ? formatCurrency(latestPayslip.net_amount) : "0"}
+          updatedAt={latestPayslip ? formatDate(latestPayslip.generated_at) : "Hakuna mpya"}
+          action="Angalia ya karibuni"
+          onAction={() => scrollToSection("payslips")}
+        />
+        <ActionCard
+          icon={Palmtree}
+          title="Likizo na Maombi"
+          metric={leaveRemaining !== null ? `${leaveRemaining} siku` : "-"}
+          updatedAt={latestLeave ? formatDate(latestLeave.submitted_at) : "Hakuna ombi"}
+          action="Omba likizo"
+          onAction={() => (window.location.href = "/leave")}
+        />
+        <ActionCard
+          icon={Inbox}
+          title="Ujumbe"
+          metric={`${unreadCount} mpya`}
+          updatedAt={unreadCount > 0 ? "Unahitaji kusoma" : "Hakuna mpya"}
+          action={unreadCount > 0 ? "Soma" : "Fungua"}
+          onAction={() => scrollToSection("messages")}
+        />
+      </section>
 
-          <Card>
-            <CardContent className="p-3 flex items-center gap-2">
-              <div className="rounded-lg p-1.5 bg-amber-50">
-                <Clock className="h-4 w-4 text-amber-600" />
+      <section>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Kilichotokea Karibuni</CardTitle>
+            <CardDescription>
+              Muhtasari wa mabadiliko muhimu kwenye akaunti yako
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {recentActivities.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                Hakuna taarifa mpya kwa sasa.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {recentActivities.map((item) => (
+                  <ActivityRow key={item.id} item={item} />
+                ))}
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Late</p>
-                <p className="text-xl font-bold text-amber-600">
-                  {summaryData.attendance.late}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-3 flex items-center gap-2">
-              <div className="rounded-lg p-1.5 bg-red-50">
-                <AlertCircle className="h-4 w-4 text-red-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Absent</p>
-                <p className="text-xl font-bold text-red-600">
-                  {summaryData.attendance.absent}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-3 flex items-center gap-2">
-              <div className="rounded-lg p-1.5 bg-blue-50">
-                <TrendingUp className="h-4 w-4 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Net earnings</p>
-                <p className="text-base font-bold text-blue-700 leading-tight">
-                  {formatCurrency(summaryData.financial.net_amount)}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      <Tabs defaultValue={unreadCount > 0 ? "inbox" : "financial"}>
-        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
-          <TabsTrigger value="financial">Financial</TabsTrigger>
-          <TabsTrigger value="attendance">Attendance</TabsTrigger>
-          <TabsTrigger value="payslips">Mishahara</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
-          <TabsTrigger value="inbox" className="relative">
-            <Inbox className="h-3.5 w-3.5 mr-1" />
-            Sanduku
-            {unreadCount > 0 && (
-              <Badge className="ml-1.5 h-5 px-1.5 text-xs" variant="destructive">
-                {unreadCount}
-              </Badge>
             )}
-          </TabsTrigger>
-        </TabsList>
+          </CardContent>
+        </Card>
+      </section>
 
-        {/* Financial Tab */}
-        <TabsContent value="financial" className="mt-4 space-y-4">
-          {selfEmployee ? (
-            <FinancialCard
-              employeeId={selfEmployee.id}
-              onRequestAdvance={() => setAdvanceOpen(true)}
-            />
-          ) : (
-            <Card>
-              <CardContent className="p-6 text-center text-muted-foreground">
-                <DollarSign className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                <p>No employee record linked to your account.</p>
-                <p className="text-xs mt-1">Contact HR to link your employee profile.</p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
+      <section id="financial" className="scroll-mt-28 space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">Fedha Zangu</h2>
+          <p className="text-sm text-muted-foreground">
+            Muhtasari wa mapato, makato, na maombi ya mkopo
+          </p>
+        </div>
+        {selfEmployee ? (
+          <FinancialCard
+            employeeId={selfEmployee.id}
+            onRequestAdvance={() => setAdvanceOpen(true)}
+          />
+        ) : (
+          <Card>
+            <CardContent className="p-6 text-center text-muted-foreground">
+              <DollarSign className="h-10 w-10 mx-auto mb-2 opacity-30" />
+              <p>Akaunti yako haijaunganishwa na rekodi ya mfanyakazi.</p>
+              <p className="text-xs mt-1">Wasiliana na HR ili kuunganisha taarifa zako.</p>
+            </CardContent>
+          </Card>
+        )}
+      </section>
 
-        {/* Attendance Tab */}
-        <TabsContent value="attendance" className="mt-4">
-          {selfEmployee ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <CalendarIcon className="h-4 w-4" />
-                  Monthly Attendance
-                </CardTitle>
-                <CardDescription>Your attendance record for the current month</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <AttendanceCalendar employeeId={selfEmployee.id} allowCorrection />
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="p-6 text-center text-muted-foreground">
-                No attendance records found.
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        {/* Payslips Tab */}
-        <TabsContent value="payslips" className="mt-4">
+      <section id="attendance" className="scroll-mt-28">
+        {selfEmployee ? (
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
-                <Receipt className="h-4 w-4" />
-                Mishahara Yangu
+                <CalendarIcon className="h-4 w-4" />
+                Mahudhurio ya Mwezi
               </CardTitle>
-              <CardDescription>
-                Vielelezo vya mshahara vya vipindi vilivyofungwa. Pakua kama PDF.
-              </CardDescription>
+              <CardDescription>Rekodi yako ya mahudhurio kwa mwezi huu</CardDescription>
             </CardHeader>
             <CardContent>
-              {payslipsLoading ? (
-                <div className="space-y-2">
-                  {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-14 w-full" />
-                  ))}
-                </div>
-              ) : !myPayslips?.length ? (
-                <p className="text-sm text-muted-foreground text-center py-6">
-                  Hakuna mshahara uliofungwa bado.
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {/* Mini earnings trend chart */}
-                  {myPayslips.length > 1 && (
-                    <div className="rounded-lg border bg-muted/20 p-3">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
-                        <TrendingUp className="h-3.5 w-3.5" />
-                        Earnings Trend
+              <AttendanceCalendar employeeId={selfEmployee.id} allowCorrection />
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="p-6 text-center text-muted-foreground">
+              Hakuna rekodi za mahudhurio.
+            </CardContent>
+          </Card>
+        )}
+      </section>
+
+      <section id="payslips" className="scroll-mt-28">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Receipt className="h-4 w-4" />
+              Payslips Zangu
+            </CardTitle>
+            <CardDescription>Pakia PDF za mishahara iliyofungwa</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {payslipsLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-14 w-full" />
+                ))}
+              </div>
+            ) : !myPayslips?.length ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                Hakuna payslip iliyofungwa bado.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {myPayslips.map((ps) => (
+                  <div
+                    key={ps.id}
+                    className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">
+                        {monthNames[ps.month - 1]} {ps.year}
                       </p>
-                      {(() => {
-                        const recent = [...myPayslips].slice(-6);
-                        const maxNet = Math.max(...recent.map((p) => p.net_amount), 1);
-                        const W = 400, H = 90;
-                        const PAD = { top: 12, right: 8, bottom: 28, left: 8 };
-                        const chartW = W - PAD.left - PAD.right;
-                        const chartH = H - PAD.top - PAD.bottom;
-                        const slotW = chartW / recent.length;
-                        const barW = Math.min(slotW * 0.6, 36);
-                        const shortMonths = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-                        return (
-                          <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
-                            {recent.map((ps, i) => {
-                              const cx = PAD.left + i * slotW + slotW / 2;
-                              const x = cx - barW / 2;
-                              const bH = Math.max((ps.net_amount / maxNet) * chartH, 2);
-                              const base = PAD.top + chartH;
-                              return (
-                                <g key={ps.id}>
-                                  <rect
-                                    x={x}
-                                    y={base - bH}
-                                    width={barW}
-                                    height={bH}
-                                    fill={ps.net_amount >= 0 ? "#86efac" : "#fca5a5"}
-                                    rx={3}
-                                  />
-                                  <text x={cx} y={base - bH - 3} textAnchor="middle" fontSize={7} fill="#374151" fontWeight="600">
-                                    {ps.net_amount >= 1000
-                                      ? `${Math.round(ps.net_amount / 1000)}K`
-                                      : ps.net_amount}
-                                  </text>
-                                  <text x={cx} y={H - PAD.bottom + 12} textAnchor="middle" fontSize={8} fill="#6b7280">
-                                    {shortMonths[ps.month - 1]}
-                                  </text>
-                                  <text x={cx} y={H - PAD.bottom + 22} textAnchor="middle" fontSize={7} fill="#9ca3af">
-                                    {"'" + String(ps.year).slice(2)}
-                                  </text>
-                                </g>
-                              );
-                            })}
-                          </svg>
-                        );
-                      })()}
+                      <p className="text-xs text-muted-foreground">
+                        {ps.days_worked} siku · Gross {formatCurrency(ps.gross_amount)} ·
+                        Makato {formatCurrency(ps.total_deductions ?? 0)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Imetengenezwa: {formatDate(ps.generated_at)}
+                      </p>
                     </div>
-                  )}
-
-                  <div className="space-y-2">
-                  {myPayslips.map((ps) => {
-                    const monthNames = [
-                      "Januari", "Februari", "Machi", "Aprili", "Mei", "Juni",
-                      "Julai", "Agosti", "Septemba", "Oktoba", "Novemba", "Desemba",
-                    ];
-                    return (
-                      <div
-                        key={ps.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border p-3"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold">
-                            {monthNames[ps.month - 1]} {ps.year}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {ps.days_worked} siku · Gross {formatCurrency(ps.gross_amount)} · Makato {formatCurrency(ps.total_deductions ?? 0)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Imehifadhiwa: {formatDate(ps.generated_at)}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <Badge variant="success" className="text-xs whitespace-nowrap">
-                            Net {formatCurrency(ps.net_amount)}
-                          </Badge>
-                          <PayslipPdfButton payslipId={ps.id} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Transaction History Tab */}
-        <TabsContent value="history" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Transaction History
-              </CardTitle>
-              <CardDescription>Advances and payments</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {txLoading ? (
-                <div className="space-y-2">
-                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
-                </div>
-              ) : !txData?.transactions?.length ? (
-                <p className="text-sm text-muted-foreground text-center py-6">
-                  No transactions found
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {txData.transactions.map((tx: {
-                    id: string;
-                    type: string;
-                    amount: number;
-                    description: string;
-                    created_at: string;
-                  }) => (
-                    <div key={tx.id} className="flex items-center justify-between rounded-lg border p-3">
-                      <div>
-                        <p className="text-sm font-medium capitalize">
-                          {tx.type.replace(/_/g, " ")}
-                        </p>
-                        {tx.description && (
-                          <p className="text-xs text-muted-foreground">{tx.description}</p>
-                        )}
-                        <p className="text-xs text-muted-foreground">{formatDate(tx.created_at)}</p>
-                      </div>
-                      <Badge variant={tx.amount >= 0 ? "success" : "destructive"}>
-                        {tx.amount >= 0 ? "+" : ""}{formatCurrency(tx.amount)}
+                    <div className="flex items-center gap-3">
+                      <Badge variant="success" className="text-xs whitespace-nowrap">
+                        Net {formatCurrency(ps.net_amount)}
                       </Badge>
+                      <PayslipPdfButton payslipId={ps.id} />
                     </div>
-                  ))}
-                  <div className="border-t pt-3 flex justify-between font-semibold text-sm">
-                    <span>Net Balance</span>
-                    <span className={txData.balance >= 0 ? "text-green-700" : "text-red-700"}>
-                      {formatCurrency(txData.balance)}
-                    </span>
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
 
-        {/* Inbox Tab */}
-        <TabsContent value="inbox" className="mt-4 space-y-4">
-          {/* Announcements */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Megaphone className="h-4 w-4" />
-                Matangazo Mapya
-              </CardTitle>
-              <CardDescription>Ujumbe kutoka kwa HR/Admin ambao haujasomwa</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!inbox?.announcements?.length ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Hakuna matangazo mapya.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {inbox.announcements.map(
-                    (a: {
-                      id: string;
-                      subject: string;
-                      message: string;
-                      created_at: string;
-                    }) => (
-                      <div
-                        key={a.id}
-                        className="rounded-lg border p-3 hover:bg-muted/30 transition cursor-pointer"
-                        onClick={() => markAnnouncementRead.mutate(a.id)}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-semibold">{a.subject}</p>
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {formatDate(a.created_at)}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
-                          {a.message}
-                        </p>
-                        <p className="text-xs text-primary mt-2">
-                          Gonga ili kuweka alama ya kusomwa
-                        </p>
-                      </div>
-                    )
-                  )}
-                </div>
+      <section id="leave" className="scroll-mt-28">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Palmtree className="h-4 w-4" />
+              Likizo na Maombi
+            </CardTitle>
+            <CardDescription>Bakaa yako na hali ya maombi ya likizo</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="info">Zilizobaki: {leaveRemaining ?? "-"} siku</Badge>
+              {latestLeave && (
+                <Badge
+                  variant={
+                    latestLeave.status === "approved"
+                      ? "success"
+                      : latestLeave.status === "denied"
+                      ? "destructive"
+                      : "warning"
+                  }
+                >
+                  Ombi la mwisho: {latestLeave.status}
+                </Badge>
               )}
-            </CardContent>
-          </Card>
+            </div>
+            <Button onClick={() => (window.location.href = "/leave")}>
+              Fungua Maombi ya Likizo
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
 
-          {/* Complaint responses */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <MessageSquareWarning className="h-4 w-4" />
-                Majibu ya Malalamiko
-              </CardTitle>
-              <CardDescription>Majibu kutoka kwa HR juu ya malalamiko yako</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!Array.isArray(inbox?.complaints) || inbox.complaints.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Hakuna malalamiko yaliyojibiwa.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {inbox.complaints
-                    .filter(
-                      (c: { status: string; response: string | null }) =>
-                        c.status === "resolved" && c.response
-                    )
-                    .map(
-                      (c: {
-                        id: string;
-                        subject: string;
-                        response: string;
-                        responded_at: string;
-                      }) => (
-                        <div key={c.id} className="rounded-lg border p-3">
-                          <p className="text-sm font-semibold">{c.subject}</p>
-                          <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
-                            {c.response}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            {formatDate(c.responded_at)}
-                          </p>
-                        </div>
-                      )
+      <section id="history" className="scroll-mt-28">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Historia ya Miamala
+            </CardTitle>
+            <CardDescription>Mikopo na malipo</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {txLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-10 w-full" />
+                ))}
+              </div>
+            ) : !txData?.transactions?.length ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                Hakuna miamala bado.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {txData.transactions.map((tx) => (
+                  <div key={tx.id} className="flex items-center justify-between rounded-lg border p-3">
+                    <div>
+                      <p className="text-sm font-medium capitalize">
+                        {tx.type.replace(/_/g, " ")}
+                      </p>
+                      {tx.description && (
+                        <p className="text-xs text-muted-foreground">{tx.description}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">{formatDate(tx.created_at)}</p>
+                    </div>
+                    <Badge variant={tx.amount >= 0 ? "success" : "destructive"}>
+                      {tx.amount >= 0 ? "+" : ""}
+                      {formatCurrency(tx.amount)}
+                    </Badge>
+                  </div>
+                ))}
+                <div className="border-t pt-3 flex justify-between font-semibold text-sm">
+                  <span>Bakaa Halisi</span>
+                  <span className={txData.balance >= 0 ? "text-green-700" : "text-red-700"}>
+                    {formatCurrency(txData.balance)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section id="messages" className="scroll-mt-28 space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Megaphone className="h-4 w-4" />
+              Matangazo
+            </CardTitle>
+            <CardDescription>Ujumbe mpya kutoka kwa HR/Admin</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!announcements.length ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Hakuna matangazo mapya.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {announcements.map((a) => (
+                  <div key={a.id} className="rounded-lg border p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-semibold">{a.subject}</p>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {formatDate(a.created_at)}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
+                      {a.message}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-3"
+                      onClick={() => markAnnouncementRead.mutate(a.id)}
+                      disabled={markAnnouncementRead.isPending}
+                    >
+                      Weka kama imesomwa
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <MessageSquareWarning className="h-4 w-4" />
+              Majibu ya Malalamiko
+            </CardTitle>
+            <CardDescription>Majibu kutoka HR kuhusu malalamiko yako</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!complaintResponses.length ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Hakuna malalamiko yaliyojibiwa.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {complaintResponses.map((c) => (
+                  <div key={c.id} className="rounded-lg border p-3">
+                    <p className="text-sm font-semibold">{c.subject}</p>
+                    <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
+                      {c.response}
+                    </p>
+                    {c.responded_at && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {formatDate(c.responded_at)}
+                      </p>
                     )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
 
-      {/* Request Advance Dialog */}
       <Dialog open={advanceOpen} onOpenChange={setAdvanceOpen}>
         <DialogContent>
           <DialogHeader>
@@ -610,7 +789,9 @@ export default function MePage() {
                 placeholder="50000"
                 {...register("amount", { valueAsNumber: true })}
               />
-              {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
+              {errors.amount && (
+                <p className="text-xs text-destructive">{errors.amount.message}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Sababu</Label>
@@ -625,8 +806,13 @@ export default function MePage() {
               </Button>
               <Button type="submit" disabled={advanceMutation.isPending}>
                 {advanceMutation.isPending ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Inatuma...</>
-                ) : "Tuma Ombi"}
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Inatuma...
+                  </>
+                ) : (
+                  "Tuma Ombi"
+                )}
               </Button>
             </DialogFooter>
           </form>
