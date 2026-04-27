@@ -30,7 +30,7 @@ interface Complaint {
   employee_phone?: string;
   subject: string;
   message: string;
-  status: "open" | "resolved";
+  status: "received" | "in_review" | "awaiting_employee" | "closed" | "open" | "resolved";
   response: string | null;
   responded_by: string | null;
   responded_at: string | null;
@@ -56,11 +56,16 @@ function daysSince(value: string) {
 }
 
 function complaintStage(complaint: Complaint) {
-  if (complaint.status === "resolved") return "Imefungwa";
-  if (complaint.response) return "Inasubiri jibu lako";
+  if (complaint.status === "closed" || complaint.status === "resolved") return "Imefungwa";
+  if (complaint.status === "awaiting_employee") return "Inasubiri jibu lako";
+  if (complaint.status === "in_review") return "Inakaguliwa";
   const age = daysSince(complaint.created_at);
   if (age >= 3) return "Inakaguliwa";
   return "Imepokelewa";
+}
+
+function isComplaintOpen(status: Complaint["status"]) {
+  return status === "received" || status === "in_review" || status === "awaiting_employee" || status === "open";
 }
 
 export default function ComplaintsPage() {
@@ -114,7 +119,7 @@ export default function ComplaintsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           response: data.response,
-          status: data.resolve ? "resolved" : "open",
+          status: data.resolve ? "closed" : "awaiting_employee",
         }),
       });
       const json = await res.json();
@@ -132,8 +137,8 @@ export default function ComplaintsPage() {
   });
 
   const rows = complaints ?? [];
-  const openCount = rows.filter((r) => r.status === "open").length;
-  const resolvedCount = rows.filter((r) => r.status === "resolved").length;
+  const openCount = rows.filter((r) => isComplaintOpen(r.status)).length;
+  const resolvedCount = rows.filter((r) => !isComplaintOpen(r.status)).length;
 
   return (
     <div className="space-y-6">
@@ -204,7 +209,7 @@ export default function ComplaintsPage() {
       ) : (
         <div className="space-y-3">
           {rows.map((c) => (
-            <Card key={c.id} className={c.status === "open" ? "border-amber-200" : ""}>
+            <Card key={c.id} className={isComplaintOpen(c.status) ? "border-amber-200" : ""}>
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -214,9 +219,9 @@ export default function ComplaintsPage() {
                       {formatDate(c.created_at)}
                     </p>
                   </div>
-                  <Badge variant={c.status === "open" ? "warning" : "success"} className="flex items-center gap-1">
-                    {c.status === "open" ? <Clock className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
-                    {c.status === "open" ? "Inasubiri" : "Imejibiwa"}
+                  <Badge variant={isComplaintOpen(c.status) ? "warning" : "success"} className="flex items-center gap-1">
+                    {isComplaintOpen(c.status) ? <Clock className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
+                    {complaintStage(c)}
                   </Badge>
                 </div>
               </CardHeader>
@@ -226,7 +231,7 @@ export default function ComplaintsPage() {
                     <Timer className="h-3 w-3" />
                     {complaintStage(c)}
                   </Badge>
-                  {c.status === "open" && (
+                  {isComplaintOpen(c.status) && (
                     <span>
                       SLA: {Math.max(0, 3 - daysSince(c.created_at))} working day
                       {Math.max(0, 3 - daysSince(c.created_at)) === 1 ? "" : "s"} before follow-up
@@ -245,7 +250,7 @@ export default function ComplaintsPage() {
                     <p className="text-sm whitespace-pre-wrap">{c.response}</p>
                   </div>
                 )}
-                {canRespond && c.status === "open" && (
+                {canRespond && isComplaintOpen(c.status) && (
                   <div className="flex justify-end">
                     <Button size="sm" onClick={() => { respondForm.reset(); setRespondTarget(c); }}>
                       <Send className="h-3 w-3 mr-1" />

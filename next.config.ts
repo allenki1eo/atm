@@ -1,9 +1,7 @@
 import type { NextConfig } from "next";
 
-let nextConfig: NextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ["bcryptjs", "@libsql/client"],
-  },
+const nextConfig: NextConfig = {
+  serverExternalPackages: ["bcryptjs", "@libsql/client"],
 };
 
 // Only apply Serwist PWA in production or when explicitly enabled

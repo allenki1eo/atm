@@ -103,7 +103,11 @@ export function Sidebar({ user }: SidebarProps) {
   const toggleGroup = (id: string) =>
     setOpenGroups((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
 
@@ -124,11 +128,14 @@ export function Sidebar({ user }: SidebarProps) {
       const res = await fetch("/api/complaints");
       if (!res.ok) return [];
       const rows = (await res.json()) as { status: string; response: string | null }[];
-      if (user.role === "hr" || user.role === "admin") return rows.filter((r) => r.status === "open");
+      const activeStatuses = ["received", "in_review", "awaiting_employee", "open"];
+      if (user.role === "hr" || user.role === "admin") {
+        return rows.filter((r) => activeStatuses.includes(r.status));
+      }
       const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
       return rows.filter((r) => {
         const resolved = r as { status: string; response: string | null; responded_at?: string };
-        if (resolved.status !== "resolved" || !resolved.response || !resolved.responded_at) return false;
+        if (!["closed", "resolved"].includes(resolved.status) || !resolved.response || !resolved.responded_at) return false;
         return new Date(resolved.responded_at).getTime() > sevenDaysAgo;
       });
     },

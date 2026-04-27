@@ -18,6 +18,7 @@ import {
   MessageSquareWarning,
   Palmtree,
   Receipt,
+  Settings,
   UserCircle,
 } from "lucide-react";
 import {
@@ -84,6 +85,21 @@ interface Complaint {
   response: string | null;
   status: string;
   responded_at: string | null;
+}
+
+interface AccountData {
+  user: {
+    name: string;
+    email: string | null;
+    phone: string | null;
+  } | null;
+  employee: {
+    name: string;
+    phone: string | null;
+    department: string | null;
+    emergency_contact_name: string | null;
+    emergency_contact_phone: string | null;
+  } | null;
 }
 
 interface LeaveRequest {
@@ -184,6 +200,7 @@ export default function MePage() {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
   const [advanceOpen, setAdvanceOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const userId = session?.user?.id;
   const now = new Date();
@@ -275,6 +292,16 @@ export default function MePage() {
     enabled: !!userId,
   });
 
+  const { data: accountData } = useQuery({
+    queryKey: ["me", "account"],
+    queryFn: async () => {
+      const res = await fetch("/api/me/account");
+      if (!res.ok) return null;
+      return (await res.json()) as AccountData;
+    },
+    enabled: !!userId,
+  });
+
   const {
     register,
     handleSubmit,
@@ -282,6 +309,16 @@ export default function MePage() {
     formState: { errors },
   } = useForm<AdvanceForm>({
     resolver: zodResolver(advanceSchema),
+  });
+  const accountForm = useForm({
+    defaultValues: {
+      email: "",
+      phone: "",
+      emergency_contact_name: "",
+      emergency_contact_phone: "",
+      current_password: "",
+      new_password: "",
+    },
   });
 
   const advanceMutation = useMutation({
@@ -333,10 +370,45 @@ export default function MePage() {
     },
   });
 
+  const accountMutation = useMutation({
+    mutationFn: async (data: {
+      email: string;
+      phone: string;
+      emergency_contact_name: string;
+      emergency_contact_phone: string;
+      current_password: string;
+      new_password: string;
+    }) => {
+      const res = await fetch("/api/me/account", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: data.email,
+          phone: data.phone,
+          emergency_contact_name: data.emergency_contact_name,
+          emergency_contact_phone: data.emergency_contact_phone,
+          current_password: data.current_password || undefined,
+          new_password: data.new_password || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Imeshindikana kuhifadhi");
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["me", "account"] });
+      queryClient.invalidateQueries({ queryKey: ["me", "employee"] });
+      setSettingsOpen(false);
+      toast({ title: "Taarifa zimehifadhiwa" });
+    },
+    onError: (err: Error) =>
+      toast({ title: "Hitilafu", description: err.message, variant: "destructive" }),
+  });
+
   const role = (session?.user as { role?: string })?.role;
   const announcements = inbox?.announcements ?? [];
   const complaintResponses =
-    inbox?.complaints.filter((c) => c.status === "resolved" && c.response) ?? [];
+    inbox?.complaints.filter((c) => ["closed", "resolved"].includes(c.status) && c.response) ?? [];
   const unreadCount = announcements.length + complaintResponses.length;
   const presentToday = (summaryData?.attendance.present ?? 0) > 0;
   const leaveRemaining = leaveData?.balance
@@ -452,7 +524,7 @@ export default function MePage() {
         </div>
       </div>
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <ActionCard
           icon={CalendarIcon}
           title="Mahudhurio Yangu"
@@ -484,6 +556,24 @@ export default function MePage() {
           updatedAt={unreadCount > 0 ? "Unahitaji kusoma" : "Hakuna mpya"}
           action={unreadCount > 0 ? "Soma" : "Fungua"}
           onAction={() => scrollToSection("messages")}
+        />
+        <ActionCard
+          icon={Settings}
+          title="Akaunti"
+          metric="Binafsi"
+          updatedAt={accountData?.employee?.phone ?? accountData?.user?.phone ?? "Weka taarifa"}
+          action="Hariri"
+          onAction={() => {
+            accountForm.reset({
+              email: accountData?.user?.email ?? "",
+              phone: accountData?.user?.phone ?? accountData?.employee?.phone ?? "",
+              emergency_contact_name: accountData?.employee?.emergency_contact_name ?? "",
+              emergency_contact_phone: accountData?.employee?.emergency_contact_phone ?? "",
+              current_password: "",
+              new_password: "",
+            });
+            setSettingsOpen(true);
+          }}
         />
       </section>
 
@@ -812,6 +902,67 @@ export default function MePage() {
                   </>
                 ) : (
                   "Tuma Ombi"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Akaunti na Taarifa Binafsi</DialogTitle>
+            <DialogDescription>
+              Sasisha mawasiliano, taarifa za dharura, au badilisha PIN yako.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={accountForm.handleSubmit((data) => accountMutation.mutate(data))}
+            className="space-y-4"
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Barua pepe</Label>
+                <Input type="email" {...accountForm.register("email")} />
+              </div>
+              <div className="space-y-2">
+                <Label>Simu</Label>
+                <Input placeholder="+255..." {...accountForm.register("phone")} />
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Jina la dharura</Label>
+                <Input {...accountForm.register("emergency_contact_name")} />
+              </div>
+              <div className="space-y-2">
+                <Label>Simu ya dharura</Label>
+                <Input placeholder="+255..." {...accountForm.register("emergency_contact_phone")} />
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>PIN ya sasa</Label>
+                <Input type="password" {...accountForm.register("current_password")} />
+              </div>
+              <div className="space-y-2">
+                <Label>PIN mpya</Label>
+                <Input type="password" {...accountForm.register("new_password")} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setSettingsOpen(false)}>
+                Ghairi
+              </Button>
+              <Button type="submit" disabled={accountMutation.isPending}>
+                {accountMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Inahifadhi...
+                  </>
+                ) : (
+                  "Hifadhi"
                 )}
               </Button>
             </DialogFooter>

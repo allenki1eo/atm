@@ -16,7 +16,7 @@ export async function ensureDatabase() {
   if (_initialized) return;
   await initializeDatabase();
   // Schema migrations — safe to run repeatedly (errors mean column already exists)
-  try { await db.execute("ALTER TABLE companies ADD COLUMN logo TEXT"); } catch (_) {}
+  try { await db.execute("ALTER TABLE companies ADD COLUMN logo TEXT"); } catch {}
   // Migrate announcements to support 'employee' audience_type if needed
   try {
     const schemaRes = await db.execute(
@@ -25,7 +25,7 @@ export async function ensureDatabase() {
     const ddl = (schemaRes.rows[0] as unknown as { sql: string } | undefined)?.sql ?? "";
     if (ddl && !ddl.includes("'employee'")) {
       // Drop the temp table if it survived a prior failed migration
-      try { await db.execute("DROP TABLE IF EXISTS announcements_new"); } catch (_) {}
+      try { await db.execute("DROP TABLE IF EXISTS announcements_new"); } catch {}
       await db.execute(`
         CREATE TABLE announcements_new (
           id TEXT PRIMARY KEY,
@@ -43,7 +43,7 @@ export async function ensureDatabase() {
       await db.execute("DROP TABLE announcements");
       await db.execute("ALTER TABLE announcements_new RENAME TO announcements");
     }
-  } catch (_) {}
+  } catch {}
   // Ensure overtime_entries table exists (added after initial deploy)
   try {
     await db.execute(`CREATE TABLE IF NOT EXISTS overtime_entries (
@@ -57,7 +57,46 @@ export async function ensureDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (employee_id) REFERENCES employees(id)
     )`);
-  } catch (_) {}
+  } catch {}
+  try { await db.execute("ALTER TABLE employees ADD COLUMN emergency_contact_name TEXT"); } catch {}
+  try { await db.execute("ALTER TABLE employees ADD COLUMN emergency_contact_phone TEXT"); } catch {}
+  try {
+    const schemaRes = await db.execute(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='complaints'"
+    );
+    const ddl = (schemaRes.rows[0] as unknown as { sql: string } | undefined)?.sql ?? "";
+    if (ddl && !ddl.includes("'received'")) {
+      try { await db.execute("DROP TABLE IF EXISTS complaints_new"); } catch {}
+      await db.execute(`
+        CREATE TABLE complaints_new (
+          id TEXT PRIMARY KEY,
+          employee_id TEXT NOT NULL,
+          subject TEXT NOT NULL,
+          message TEXT NOT NULL,
+          status TEXT CHECK(status IN ('received','in_review','awaiting_employee','closed','open','resolved')) DEFAULT 'received',
+          response TEXT,
+          responded_by TEXT,
+          responded_at DATETIME,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (employee_id) REFERENCES employees(id)
+        )
+      `);
+      await db.execute(`
+        INSERT INTO complaints_new
+          (id, employee_id, subject, message, status, response, responded_by, responded_at, created_at)
+        SELECT
+          id, employee_id, subject, message,
+          CASE status
+            WHEN 'resolved' THEN 'closed'
+            ELSE 'received'
+          END,
+          response, responded_by, responded_at, created_at
+        FROM complaints
+      `);
+      await db.execute("DROP TABLE complaints");
+      await db.execute("ALTER TABLE complaints_new RENAME TO complaints");
+    }
+  } catch {}
   _initialized = true;
 }
 
@@ -84,6 +123,8 @@ export async function initializeDatabase() {
       daily_rate INTEGER DEFAULT 0,
       monthly_salary INTEGER DEFAULT 0,
       overtime_rule TEXT CHECK(overtime_rule IN ('all_days', 'holidays_only', 'none')) DEFAULT 'none',
+      emergency_contact_name TEXT,
+      emergency_contact_phone TEXT,
       active INTEGER DEFAULT 1,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -234,7 +275,7 @@ export async function initializeDatabase() {
       employee_id TEXT NOT NULL,
       subject TEXT NOT NULL,
       message TEXT NOT NULL,
-      status TEXT CHECK(status IN ('open','resolved')) DEFAULT 'open',
+      status TEXT CHECK(status IN ('received','in_review','awaiting_employee','closed','open','resolved')) DEFAULT 'received',
       response TEXT,
       responded_by TEXT,
       responded_at DATETIME,
@@ -355,6 +396,11 @@ export async function migrateDatabase() {
     "ALTER TABLE employees ADD COLUMN leave_allowance_days INTEGER DEFAULT 28",
   ];
 
+  const employeeEmergencyColumns = [
+    "ALTER TABLE employees ADD COLUMN emergency_contact_name TEXT",
+    "ALTER TABLE employees ADD COLUMN emergency_contact_phone TEXT",
+  ];
+
   for (const sql of [
     ...employeeColumns,
     ...payslipColumns,
@@ -362,6 +408,7 @@ export async function migrateDatabase() {
     ...payrollPeriodColumns,
     ...leaveBalanceColumns,
     ...employeeLeaveColumns,
+    ...employeeEmergencyColumns,
   ]) {
     try {
       await db.execute(sql);
