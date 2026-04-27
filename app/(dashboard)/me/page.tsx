@@ -72,6 +72,26 @@ interface Transaction {
   created_at: string;
 }
 
+interface AdvanceRequest {
+  id: string;
+  amount: number;
+  description: string | null;
+  status: "pending" | "approved" | "denied";
+  requested_at: string;
+  reviewed_at?: string | null;
+  review_note?: string | null;
+}
+
+interface AdvanceSchedule {
+  id: string;
+  total_debt: number;
+  monthly_deduction: number;
+  remaining_debt: number;
+  status: "active" | "cleared";
+  created_at: string;
+  notes: string | null;
+}
+
 interface Announcement {
   id: string;
   subject: string;
@@ -251,6 +271,26 @@ export default function MePage() {
     enabled: !!employeeId,
   });
 
+  const { data: advanceRequests } = useQuery({
+    queryKey: ["advance-requests", "mine"],
+    queryFn: async () => {
+      const res = await fetch("/api/advance-requests");
+      if (!res.ok) return [];
+      return (await res.json()) as AdvanceRequest[];
+    },
+    enabled: !!employeeId,
+  });
+
+  const { data: advanceSchedules } = useQuery({
+    queryKey: ["advance-schedules", "mine"],
+    queryFn: async () => {
+      const res = await fetch("/api/advances/schedule");
+      if (!res.ok) return [];
+      return (await res.json()) as AdvanceSchedule[];
+    },
+    enabled: !!employeeId,
+  });
+
   const { data: myPayslips, isLoading: payslipsLoading } = useQuery({
     queryKey: ["my-payslips"],
     queryFn: async () => {
@@ -419,6 +459,13 @@ export default function MePage() {
   const latestPayslip = myPayslips?.[0];
   const latestLeave = leaveData?.requests?.[0];
   const latestTransaction = txData?.transactions?.[0];
+  const latestAdvanceRequest = advanceRequests?.[0];
+  const activeAdvanceSchedules =
+    advanceSchedules?.filter((schedule) => schedule.status === "active") ?? [];
+  const advanceRemaining = activeAdvanceSchedules.reduce(
+    (sum, schedule) => sum + schedule.remaining_debt,
+    0
+  );
 
   const recentActivities: ActivityItem[] = [
     ...(latestLeave
@@ -526,7 +573,7 @@ export default function MePage() {
         </div>
       </div>
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <ActionCard
           icon={CalendarIcon}
           title="Mahudhurio Yangu"
@@ -558,6 +605,14 @@ export default function MePage() {
           updatedAt={unreadCount > 0 ? "Unahitaji kusoma" : "Hakuna mpya"}
           action={unreadCount > 0 ? "Soma" : "Fungua"}
           onAction={() => scrollToSection("messages")}
+        />
+        <ActionCard
+          icon={DollarSign}
+          title="Salary Advance"
+          metric={advanceRemaining > 0 ? formatCurrency(advanceRemaining) : `${advanceRequests?.length ?? 0} maombi`}
+          updatedAt={latestAdvanceRequest ? formatDate(latestAdvanceRequest.requested_at) : "Hakuna ombi"}
+          action="Angalia"
+          onAction={() => scrollToSection("salary-advance")}
         />
         <ActionCard
           icon={Settings}
@@ -607,13 +662,13 @@ export default function MePage() {
         <div>
           <h2 className="text-lg font-semibold">Fedha Zangu</h2>
           <p className="text-sm text-muted-foreground">
-            Muhtasari wa mapato, makato, na maombi ya mkopo
+            Muhtasari wa mapato, makato, na salary advance
           </p>
         </div>
         {selfEmployee ? (
           <FinancialCard
             employeeId={selfEmployee.id}
-            onRequestAdvance={() => setAdvanceOpen(true)}
+            onRequestAdvance={() => scrollToSection("salary-advance")}
           />
         ) : (
           <Card>
@@ -624,6 +679,102 @@ export default function MePage() {
             </CardContent>
           </Card>
         )}
+      </section>
+
+      <section id="salary-advance" className="scroll-mt-28">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <DollarSign className="h-4 w-4" />
+              Salary Advance
+            </CardTitle>
+            <CardDescription>Angalia maombi, deni lililobaki, na makato ya kila mwezi</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border p-3">
+                <p className="text-xs text-muted-foreground">Deni lililobaki</p>
+                <p className="text-lg font-bold text-red-700">{formatCurrency(advanceRemaining)}</p>
+              </div>
+              <div className="rounded-lg border p-3">
+                <p className="text-xs text-muted-foreground">Makato ya mwezi</p>
+                <p className="text-lg font-bold">
+                  {formatCurrency(activeAdvanceSchedules.reduce((sum, s) => sum + s.monthly_deduction, 0))}
+                </p>
+              </div>
+              <div className="rounded-lg border p-3">
+                <p className="text-xs text-muted-foreground">Ombi la mwisho</p>
+                <p className="text-sm font-semibold capitalize">
+                  {latestAdvanceRequest?.status ?? "Hakuna"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <Button onClick={() => setAdvanceOpen(true)}>Omba Salary Advance</Button>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Maombi</h3>
+              {!advanceRequests?.length ? (
+                <p className="text-sm text-muted-foreground rounded-lg border p-3">
+                  Hakuna maombi ya salary advance bado.
+                </p>
+              ) : (
+                advanceRequests.slice(0, 5).map((request) => (
+                  <div key={request.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                    <div>
+                      <p className="text-sm font-medium">{formatCurrency(request.amount)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(request.requested_at)}
+                        {request.description ? ` · ${request.description}` : ""}
+                      </p>
+                    </div>
+                    <Badge
+                      variant={
+                        request.status === "approved"
+                          ? "success"
+                          : request.status === "denied"
+                          ? "destructive"
+                          : "warning"
+                      }
+                    >
+                      {request.status}
+                    </Badge>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Ratiba za Makato</h3>
+              {!activeAdvanceSchedules.length ? (
+                <p className="text-sm text-muted-foreground rounded-lg border p-3">
+                  Hakuna ratiba ya makato inayoendelea.
+                </p>
+              ) : (
+                activeAdvanceSchedules.map((schedule) => {
+                  const monthsLeft = Math.ceil(schedule.remaining_debt / schedule.monthly_deduction);
+                  return (
+                    <div key={schedule.id} className="rounded-lg border p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">
+                            {formatCurrency(schedule.remaining_debt)} imebaki
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatCurrency(schedule.monthly_deduction)} kila mwezi · takriban miezi {monthsLeft}
+                          </p>
+                        </div>
+                        <Badge variant="info">Active</Badge>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </section>
 
       <section id="attendance" className="scroll-mt-28">
@@ -868,9 +1019,9 @@ export default function MePage() {
       <Dialog open={advanceOpen} onOpenChange={setAdvanceOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Omba Mkopo</DialogTitle>
+            <DialogTitle>Omba Salary Advance</DialogTitle>
             <DialogDescription>
-              Tuma ombi la mkopo kwa HR. Mikopo iliyoidhinishwa itakatwa kwenye mshahara wako.
+              Tuma ombi la salary advance kwa HR. Ombi likiidhinishwa, HR ataweka makato ya kila mwezi.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit((data) => advanceMutation.mutate(data))} className="space-y-4">

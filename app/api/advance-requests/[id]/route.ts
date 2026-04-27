@@ -20,7 +20,11 @@ export async function PUT(
 
   const { id } = await params;
   const body = await request.json();
-  const { status, review_note } = body as { status?: string; review_note?: string };
+  const { status, review_note, monthly_deduction } = body as {
+    status?: string;
+    review_note?: string;
+    monthly_deduction?: number;
+  };
 
   if (!status || !["approved", "denied"].includes(status)) {
     return NextResponse.json({ error: "status must be 'approved' or 'denied'" }, { status: 400 });
@@ -48,6 +52,10 @@ export async function PUT(
   let transactionId: string | null = null;
   if (status === "approved") {
     transactionId = nanoid();
+    const deduction = Math.max(
+      1,
+      Math.min(Math.abs(req.amount), Math.round(monthly_deduction || req.amount))
+    );
     // advance_given is negative in the ledger (employee now owes company)
     await db.execute({
       sql: `INSERT INTO transactions (id, employee_id, type, amount, description, created_by)
@@ -57,6 +65,20 @@ export async function PUT(
         req.employee_id,
         -Math.abs(req.amount),
         review_note ?? "Advance approved",
+        session.user.id!,
+      ],
+    });
+    await db.execute({
+      sql: `INSERT INTO advance_schedules
+            (id, employee_id, total_debt, monthly_deduction, remaining_debt, notes, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        nanoid(),
+        req.employee_id,
+        Math.abs(req.amount),
+        deduction,
+        Math.abs(req.amount),
+        review_note ?? "Approved salary advance repayment plan",
         session.user.id!,
       ],
     });

@@ -5,8 +5,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { DollarSign, Plus, Search, TrendingDown, TrendingUp, Loader2, History, CalendarClock, AlertTriangle, CheckCircle2, Inbox, X } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DollarSign, Plus, Search, TrendingDown, TrendingUp, Loader2, CalendarClock, AlertTriangle, CheckCircle2, Inbox, X } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -149,15 +149,17 @@ export default function AdvancesPage() {
       id,
       status,
       review_note,
+      monthly_deduction,
     }: {
       id: string;
       status: "approved" | "denied";
       review_note?: string;
+      monthly_deduction?: number;
     }) => {
       const res = await fetch(`/api/advance-requests/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, review_note }),
+        body: JSON.stringify({ status, review_note, monthly_deduction }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Failed");
@@ -166,6 +168,7 @@ export default function AdvancesPage() {
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["advance-requests"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["advance-schedules"] });
       toast({
         title: vars.status === "approved" ? "Ombi limeidhinishwa" : "Ombi limekataliwa",
       });
@@ -427,9 +430,28 @@ export default function AdvancesPage() {
                             variant="outline"
                             className="h-7 text-xs text-green-700 hover:bg-green-50"
                             disabled={reviewRequestMutation.isPending}
-                            onClick={() =>
-                              reviewRequestMutation.mutate({ id: r.id, status: "approved" })
-                            }
+                            onClick={() => {
+                              const rawDeduction = window.prompt(
+                                "Kiasi cha kukata kila mwezi (TZS):",
+                                String(r.amount)
+                              );
+                              if (rawDeduction === null) return;
+                              const monthly_deduction = Math.max(1, Math.round(Number(rawDeduction)));
+                              if (!Number.isFinite(monthly_deduction)) {
+                                toast({
+                                  title: "Kiasi si sahihi",
+                                  description: "Weka namba sahihi ya makato ya kila mwezi.",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+                              reviewRequestMutation.mutate({
+                                id: r.id,
+                                status: "approved",
+                                review_note: `Monthly deduction: ${formatCurrency(monthly_deduction)}`,
+                                monthly_deduction,
+                              });
+                            }}
                           >
                             <CheckCircle2 className="h-3 w-3 mr-1" />
                             Idhinisha
@@ -566,7 +588,6 @@ export default function AdvancesPage() {
                 )
               ).map(([empId, empData]) => {
                 const active = empData.schedules.filter((s) => s.status === "active");
-                const cleared = empData.schedules.filter((s) => s.status === "cleared");
                 const totalRemaining = active.reduce((s, sc) => s + sc.remaining_debt, 0);
                 const totalMonthly = active.reduce((s, sc) => s + sc.monthly_deduction, 0);
                 const totalOriginal = empData.schedules.reduce((s, sc) => s + sc.total_debt, 0);

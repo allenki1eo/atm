@@ -8,14 +8,25 @@ export async function GET(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const role = (session.user as { role: string }).role;
-  if (role !== "hr" && role !== "admin") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
 
   await ensureDatabase();
 
   const { searchParams } = new URL(request.url);
-  const employeeId = searchParams.get("employee_id");
+  let employeeId = searchParams.get("employee_id");
+
+  if (role === "employee") {
+    const userRes = await db.execute({
+      sql: "SELECT employee_id FROM users WHERE id = ?",
+      args: [session.user.id!],
+    });
+    const linkedEmployeeId =
+      (userRes.rows[0] as unknown as { employee_id: string | null } | undefined)
+        ?.employee_id ?? null;
+    if (!linkedEmployeeId) return NextResponse.json([]);
+    employeeId = linkedEmployeeId;
+  } else if (role !== "hr" && role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   let sql: string;
   let args: (string | number)[];

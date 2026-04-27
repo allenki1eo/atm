@@ -94,6 +94,17 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const pendingCheck = await db.execute({
+    sql: "SELECT id FROM advance_requests WHERE employee_id = ? AND status = 'pending'",
+    args: [employeeId],
+  });
+  if (pendingCheck.rows.length > 0) {
+    return NextResponse.json(
+      { error: "Tayari una ombi la salary advance linalosubiri HR." },
+      { status: 400 }
+    );
+  }
+
   const id = nanoid();
   await db.execute({
     sql: `INSERT INTO advance_requests (id, employee_id, amount, description, status)

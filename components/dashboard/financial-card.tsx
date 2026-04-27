@@ -148,7 +148,7 @@ export function FinancialCard({ employeeId, onRequestAdvance }: FinancialCardPro
             onClick={onRequestAdvance}
           >
             <DollarSign className="h-4 w-4 mr-2" />
-            Omba Mkopo
+            Angalia Salary Advance
           </Button>
         )}
       </CardContent>
