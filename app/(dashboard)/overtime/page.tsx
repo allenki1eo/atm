@@ -61,6 +61,7 @@ export default function OvertimePage() {
   const [selectedYear] = useState(now.getFullYear());
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(null);
 
   // Form state
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
@@ -151,6 +152,18 @@ export default function OvertimePage() {
 
   const totalAmount = filtered.reduce((s, e) => s + e.amount, 0);
 
+  // Count entries per employee to know which names get a detail link
+  const employeeEntryCount = filtered.reduce<Record<string, number>>((acc, e) => {
+    acc[e.employee_id] = (acc[e.employee_id] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const detailEntries = detailEmployeeId
+    ? filtered.filter((e) => e.employee_id === detailEmployeeId)
+    : [];
+  const detailEmployee = detailEntries[0] ?? null;
+  const detailTotal = detailEntries.reduce((s, e) => s + e.amount, 0);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -229,7 +242,18 @@ export default function OvertimePage() {
               <TableBody>
                 {filtered.map((entry) => (
                   <TableRow key={entry.id}>
-                    <TableCell className="font-medium">{entry.employee_name}</TableCell>
+                    <TableCell className="font-medium">
+                      {employeeEntryCount[entry.employee_id] > 1 ? (
+                        <button
+                          className="text-blue-600 hover:underline text-left"
+                          onClick={() => setDetailEmployeeId(entry.employee_id)}
+                        >
+                          {entry.employee_name}
+                        </button>
+                      ) : (
+                        entry.employee_name
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={entry.employee_type === "casual" ? "secondary" : "outline"}>
                         {entry.employee_type === "casual" ? "Mkataba" : "Kudumu"}
@@ -263,6 +287,55 @@ export default function OvertimePage() {
           </div>
         </Card>
       )}
+
+      {/* Employee Detail Dialog */}
+      <Dialog open={!!detailEmployeeId} onOpenChange={(open) => { if (!open) setDetailEmployeeId(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Overtime — {detailEmployee?.employee_name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            {detailEntries.map((entry) => (
+              <div key={entry.id} className="flex items-start justify-between rounded-lg border p-3 gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">{formatDate(entry.date)}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {entry.hours === 4.5
+                      ? "4.5 saa (nusu siku)"
+                      : entry.hours === 9
+                      ? "9 saa (siku nzima)"
+                      : `${entry.hours} saa`}
+                    {entry.notes ? ` — ${entry.notes}` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="font-semibold text-blue-700">{formatCurrency(entry.amount)}</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-red-500 hover:text-red-700 h-7 w-7 p-0"
+                    onClick={() => deleteMutation.mutate(entry.id)}
+                    disabled={deleteMutation.isPending}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {detailEntries.length > 1 && (
+              <div className="flex justify-between items-center border-t pt-2 font-semibold text-sm">
+                <span>Jumla ({detailEntries.length} rekodi)</span>
+                <span className="text-blue-700">{formatCurrency(detailTotal)}</span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailEmployeeId(null)}>Funga</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
