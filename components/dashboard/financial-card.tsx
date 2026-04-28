@@ -110,13 +110,15 @@ export function FinancialCard({ employeeId, onRequestAdvance }: FinancialCardPro
             </span>
           </div>
 
-          <div className="flex justify-between items-center text-sm">
-            <span className="text-muted-foreground">Overtime cash</span>
-            <span className="font-medium text-green-700">
-              <ArrowUpRight className="h-3 w-3 inline" />
-              {formatCurrency(totalOvertime)}
-            </span>
-          </div>
+          {employee.type === "casual" && totalOvertime > 0 && (
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">Overtime cash</span>
+              <span className="font-medium text-green-700">
+                <ArrowUpRight className="h-3 w-3 inline" />
+                {formatCurrency(totalOvertime)}
+              </span>
+            </div>
+          )}
 
           <div className="flex justify-between items-center text-sm">
             <span className="text-muted-foreground">Jumla kabla ya makato</span>
@@ -168,6 +170,19 @@ export function FinancialCard({ employeeId, onRequestAdvance }: FinancialCardPro
             <p className="text-xs text-muted-foreground">Hakuwepo</p>
           </div>
         </div>
+
+        {employee.type !== "casual" && totalOvertime > 0 && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3 space-y-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+              Malipo ya Ziada (Overtime)
+            </p>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Overtime cash — malipo tofauti</span>
+              <span className="font-bold text-blue-700">{formatCurrency(totalOvertime)}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Haiingizwi kwenye payslip</p>
+          </div>
+        )}
 
         {onRequestAdvance && (
           <Button

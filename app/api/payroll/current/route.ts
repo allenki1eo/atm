@@ -76,7 +76,8 @@ export async function GET(request: NextRequest) {
     args: [employeeId!, startDate, endDate],
   });
   const totalOvertime = Math.round((overtimeRes.rows[0] as unknown as { total: number }).total);
-  const grossAmount = baseGross + totalOvertime;
+  // For full-time employees, overtime is paid separately — not rolled into payslip gross
+  const grossAmount = emp.type === "casual" ? baseGross + totalOvertime : baseGross;
 
   // Get advances
   const advanceResult = await db.execute({
