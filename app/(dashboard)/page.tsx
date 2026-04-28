@@ -765,19 +765,6 @@ export default async function DashboardPage() {
             </Card>
           )}
 
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader>
-              <CardTitle className="text-base">Full Profile</CardTitle>
-              <CardDescription>
-                Financial summary, leave requests, advances, payslips and inbox
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild size="sm">
-                <Link href="/me">Open My Dashboard</Link>
-              </Button>
-            </CardContent>
-          </Card>
         </div>
       )}
     </div>
