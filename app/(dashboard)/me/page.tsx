@@ -128,6 +128,24 @@ interface LeaveRequest {
   reviewed_at: string | null;
 }
 
+interface PayrollSummary {
+  attendance: {
+    present: number;
+    late: number;
+    absent: number;
+    effective_days: number;
+  };
+  financial: {
+    base_gross: number;
+    total_overtime: number;
+    gross_amount: number;
+    net_amount: number;
+    salary_advances?: number;
+    food_advance_amount: number;
+    total_advances: number;
+  };
+}
+
 const monthNames = [
   "Januari", "Februari", "Machi", "Aprili", "Mei", "Juni",
   "Julai", "Agosti", "Septemba", "Oktoba", "Novemba", "Desemba",
@@ -144,6 +162,10 @@ export default function MePage() {
 
   const userId = session?.user?.id;
   const now = new Date();
+  const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const previousMonth = previousMonthDate.getMonth() + 1;
+  const previousYear = previousMonthDate.getFullYear();
+  const previousMonthLabel = `${monthNames[previousMonth - 1]} ${previousYear}`;
 
   const { data: selfEmployee } = useQuery({
     queryKey: ["me", "employee"],
@@ -163,18 +185,20 @@ export default function MePage() {
         `/api/payroll/current?employee_id=${employeeId}&year=${now.getFullYear()}&month=${now.getMonth() + 1}`
       );
       if (!res.ok) return null;
-      return res.json() as Promise<{
-        attendance: { present: number; late: number; absent: number; effective_days: number };
-        financial: {
-          base_gross: number;
-          total_overtime: number;
-          gross_amount: number;
-          net_amount: number;
-          salary_advances?: number;
-          food_advance_amount: number;
-          total_advances: number;
-        };
-      }>;
+      return res.json() as Promise<PayrollSummary>;
+    },
+    enabled: !!employeeId,
+    staleTime: 60000,
+  });
+
+  const { data: previousMonthSummary, isLoading: previousMonthLoading } = useQuery({
+    queryKey: ["payroll", "previous", employeeId, previousYear, previousMonth],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/payroll/current?employee_id=${employeeId}&year=${previousYear}&month=${previousMonth}`
+      );
+      if (!res.ok) return null;
+      return res.json() as Promise<PayrollSummary>;
     },
     enabled: !!employeeId,
     staleTime: 60000,
@@ -352,8 +376,6 @@ export default function MePage() {
     : null;
   const latestLeave = leaveData?.requests?.[0];
   const latestAdvanceRequest = advanceRequests?.[0];
-  const latestPayslip = myPayslips?.[0];
-  const monthlyCash = summaryData?.financial.net_amount ?? latestPayslip?.net_amount ?? 0;
   const activeAdvanceSchedules = advanceSchedules?.filter((s) => s.status === "active") ?? [];
   const advanceRemaining = activeAdvanceSchedules.reduce((sum, s) => sum + s.remaining_debt, 0);
 
@@ -482,6 +504,59 @@ export default function MePage() {
               </CardContent>
             </Card>
           )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Receipt className="h-4 w-4" />
+                Fedha Halisi ya Mwezi Uliopita
+              </CardTitle>
+              <CardDescription>
+                Kiasi halisi kinachohitajika kwa {previousMonthLabel}, kimekokotolewa kutoka mahudhurio na makato
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {previousMonthLoading ? (
+                <div className="grid gap-3 sm:grid-cols-4">
+                  {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-20 w-full" />)}
+                </div>
+              ) : !previousMonthSummary ? (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  Hakuna taarifa za mwezi uliopita bado.
+                </p>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-4">
+                  <div className="rounded-lg border p-3 sm:col-span-2">
+                    <p className="text-xs text-muted-foreground">Fedha Inayohitajika</p>
+                    <p className="text-2xl font-bold text-green-700">
+                      {formatCurrency(previousMonthSummary.financial.net_amount)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Net pay ya {previousMonthLabel}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">Gross</p>
+                    <p className="text-lg font-bold">
+                      {formatCurrency(previousMonthSummary.financial.gross_amount)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {previousMonthSummary.attendance.effective_days} siku
+                    </p>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">Makato</p>
+                    <p className="text-lg font-bold text-red-700">
+                      {formatCurrency(previousMonthSummary.financial.total_advances)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Salary/Food advances
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>

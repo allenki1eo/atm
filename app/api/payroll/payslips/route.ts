@@ -30,3 +30,20 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(result.rows);
 }
+
+export async function DELETE() {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const role = (session.user as { role: string }).role;
+  if (role !== "hr" && role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const countResult = await db.execute("SELECT COUNT(*) as count FROM payslips");
+  const deleted = (countResult.rows[0] as unknown as { count: number }).count;
+
+  await db.execute("DELETE FROM payslips");
+
+  return NextResponse.json({ success: true, deleted });
+}
