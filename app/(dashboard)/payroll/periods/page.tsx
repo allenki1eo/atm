@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { DollarSign, Lock, LockOpen, Eye, FileText, CheckCircle, Clock, Loader2, ExternalLink } from "lucide-react";
+import { DollarSign, Lock, LockOpen, Eye, FileText, CheckCircle, Clock, Loader2, ExternalLink, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,6 +95,8 @@ export default function PayrollPeriodsPage() {
   const [payslipsOpen, setPayslipsOpen] = useState(false);
   const [payslipsPeriod, setPayslipsPeriod] = useState<PayrollPeriod | null>(null);
 
+  const [cleanConfirmOpen, setCleanConfirmOpen] = useState(false);
+
   // ─── Queries ──────────────────────────────────────────────────────────────
   const { data: periods, isLoading } = useQuery({
     queryKey: ["payroll", "periods"],
@@ -180,6 +182,26 @@ export default function PayrollPeriodsPage() {
     },
     onError: () => {
       toast({ title: "Hitilafu", description: "Imeshindwa kufungua kipindi", variant: "destructive" });
+    },
+  });
+
+  const cleanPayslipsMutation = useMutation({
+    mutationFn: async (periodId: string) => {
+      const res = await fetch(`/api/payroll/payslips?period_id=${periodId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to clean payslips");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["payroll"] });
+      setCleanConfirmOpen(false);
+      setPayslipsOpen(false);
+      toast({
+        title: "Payslips zimefutwa",
+        description: `Payslips ${data.deleted} zimefutwa. Unaweza kuzalisha upya kwa kufunga kipindi tena.`,
+      });
+    },
+    onError: () => {
+      toast({ title: "Hitilafu", description: "Imeshindwa kufuta payslips", variant: "destructive" });
     },
   });
 
@@ -502,13 +524,26 @@ export default function PayrollPeriodsPage() {
       <Sheet open={payslipsOpen} onOpenChange={setPayslipsOpen}>
         <SheetContent side="right" className="w-full sm:max-w-3xl overflow-y-auto">
           <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Payslips —{" "}
-              {payslipsPeriod
-                ? `${MONTHS[payslipsPeriod.month - 1]} ${payslipsPeriod.year}`
-                : ""}
-            </SheetTitle>
+            <div className="flex items-center justify-between">
+              <SheetTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Payslips —{" "}
+                {payslipsPeriod
+                  ? `${MONTHS[payslipsPeriod.month - 1]} ${payslipsPeriod.year}`
+                  : ""}
+              </SheetTitle>
+              {payslipsData && payslipsData.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+                  onClick={() => setCleanConfirmOpen(true)}
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Futa Payslips
+                </Button>
+              )}
+            </div>
           </SheetHeader>
 
           {payslipsLoading ? (
@@ -559,6 +594,39 @@ export default function PayrollPeriodsPage() {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* ── Clean Payslips Confirmation Dialog ── */}
+      <Dialog open={cleanConfirmOpen} onOpenChange={setCleanConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-destructive" />
+              Futa Payslips
+            </DialogTitle>
+            <DialogDescription>
+              Una uhakika unataka kufuta payslips zote za{" "}
+              {payslipsPeriod
+                ? `${MONTHS[payslipsPeriod.month - 1]} ${payslipsPeriod.year}`
+                : "kipindi hiki"}
+              ? Kipindi kitarudi hali ya wazi ili uweze kuzalisha upya.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCleanConfirmOpen(false)}>
+              Ghairi
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => payslipsPeriod && cleanPayslipsMutation.mutate(payslipsPeriod.id)}
+              disabled={cleanPayslipsMutation.isPending}
+            >
+              {cleanPayslipsMutation.isPending
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Inafuta...</>
+                : "Futa Payslips"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
