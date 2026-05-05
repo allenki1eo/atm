@@ -469,6 +469,31 @@ export async function migrateDatabase() {
       ON employee_transfer_history(employee_id);
   `);
 
+  try {
+    await db.execute(`
+      INSERT INTO employee_status_events
+        (id, employee_id, action, from_active, to_active, note, changed_by, changed_at)
+      SELECT
+        'status-created-' || e.id,
+        e.id,
+        'created',
+        NULL,
+        CASE WHEN COALESCE(e.active, 1) = 0 THEN 0 ELSE 1 END,
+        'Existing employee backfilled into lifecycle history',
+        NULL,
+        COALESCE(e.created_at, CURRENT_TIMESTAMP)
+      FROM employees e
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM employee_status_events ese
+        WHERE ese.employee_id = e.id
+          AND ese.action = 'created'
+      )
+    `);
+  } catch {
+    // Ignore backfill races or legacy rows that were already inserted.
+  }
+
   const employeeColumns = [
     "ALTER TABLE employees ADD COLUMN company_id TEXT",
     "ALTER TABLE employees ADD COLUMN section_id TEXT",
@@ -590,6 +615,27 @@ export async function seedDemoData() {
       ('emp-6', 'Dina Njau', '+255712345006', 'casual', 'Uendeshaji', 'user-sup-1', 18000, 0, 'none'),
       ('emp-7', 'Eva Moshi', '+255712345007', 'casual', 'Ghala', 'user-sup-1', 15000, 0, 'none'),
       ('emp-8', 'Frank Kimani', '+255712345008', 'casual', 'Ghala', 'user-sup-1', 15000, 0, 'none');
+  `);
+
+  await db.execute(`
+    INSERT INTO employee_status_events
+      (id, employee_id, action, from_active, to_active, note, changed_by, changed_at)
+    SELECT
+      'status-created-' || e.id,
+      e.id,
+      'created',
+      NULL,
+      CASE WHEN COALESCE(e.active, 1) = 0 THEN 0 ELSE 1 END,
+      'Employee record created by demo seed',
+      'user-admin-1',
+      COALESCE(e.created_at, CURRENT_TIMESTAMP)
+    FROM employees e
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM employee_status_events ese
+      WHERE ese.employee_id = e.id
+        AND ese.action = 'created'
+    )
   `);
 
   await db.execute(

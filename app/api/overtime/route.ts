@@ -198,6 +198,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await ensureDatabase();
 
   const role = (session.user as { role: string }).role;
   if (role !== "hr" && role !== "admin") {
