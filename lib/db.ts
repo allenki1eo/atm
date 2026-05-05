@@ -175,6 +175,33 @@ export async function initializeDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS employee_status_events (
+      id TEXT PRIMARY KEY,
+      employee_id TEXT NOT NULL,
+      action TEXT CHECK(action IN ('created','deactivated','rejoined')) NOT NULL,
+      from_active INTEGER,
+      to_active INTEGER NOT NULL,
+      note TEXT,
+      changed_by TEXT,
+      changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (employee_id) REFERENCES employees(id),
+      FOREIGN KEY (changed_by) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS employee_transfer_history (
+      id TEXT PRIMARY KEY,
+      employee_id TEXT NOT NULL,
+      from_company_id TEXT,
+      from_section_id TEXT,
+      to_company_id TEXT,
+      to_section_id TEXT,
+      changed_by TEXT,
+      changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      note TEXT,
+      FOREIGN KEY (employee_id) REFERENCES employees(id),
+      FOREIGN KEY (changed_by) REFERENCES users(id)
+    );
+
     CREATE TABLE IF NOT EXISTS attendance (
       id TEXT PRIMARY KEY,
       employee_id TEXT NOT NULL,
@@ -408,6 +435,40 @@ export async function initializeDatabase() {
 }
 
 export async function migrateDatabase() {
+  await db.executeMultiple(`
+    CREATE TABLE IF NOT EXISTS employee_status_events (
+      id TEXT PRIMARY KEY,
+      employee_id TEXT NOT NULL,
+      action TEXT CHECK(action IN ('created','deactivated','rejoined')) NOT NULL,
+      from_active INTEGER,
+      to_active INTEGER NOT NULL,
+      note TEXT,
+      changed_by TEXT,
+      changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (employee_id) REFERENCES employees(id),
+      FOREIGN KEY (changed_by) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS employee_transfer_history (
+      id TEXT PRIMARY KEY,
+      employee_id TEXT NOT NULL,
+      from_company_id TEXT,
+      from_section_id TEXT,
+      to_company_id TEXT,
+      to_section_id TEXT,
+      changed_by TEXT,
+      changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      note TEXT,
+      FOREIGN KEY (employee_id) REFERENCES employees(id),
+      FOREIGN KEY (changed_by) REFERENCES users(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_employee_status_events_employee_id
+      ON employee_status_events(employee_id);
+    CREATE INDEX IF NOT EXISTS idx_employee_transfer_history_employee_id
+      ON employee_transfer_history(employee_id);
+  `);
+
   const employeeColumns = [
     "ALTER TABLE employees ADD COLUMN company_id TEXT",
     "ALTER TABLE employees ADD COLUMN section_id TEXT",

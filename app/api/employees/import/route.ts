@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, ensureDatabase } from "@/lib/db";
 import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
 import { sendSMS } from "@/lib/at";
@@ -60,6 +60,7 @@ function generatePIN(): string {
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await ensureDatabase();
 
   const role = (session.user as { role: string }).role;
   if (role !== "admin") {
@@ -163,9 +164,16 @@ export async function POST(request: NextRequest) {
               VALUES (?, ?, 'employee', ?, ?, ?)`,
         args: [userId, name, phone, passwordHash, employeeId],
       });
+      await db.execute({
+        sql: `INSERT INTO employee_status_events
+              (id, employee_id, action, from_active, to_active, note, changed_by)
+              VALUES (?, ?, 'created', NULL, 1, ?, ?)`,
+        args: [nanoid(), employeeId, "Employee record created by CSV import", session.user.id ?? null],
+      });
     } catch (err) {
       // Rollback employee if user insert failed
       await db.execute({ sql: "DELETE FROM employees WHERE id = ?", args: [employeeId] }).catch(() => {});
+      await db.execute({ sql: "DELETE FROM users WHERE id = ?", args: [userId] }).catch(() => {});
       results.push({
         row: rowNum, name, phone, status: "error",
         error: err instanceof Error ? err.message : "Database error",

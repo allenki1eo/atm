@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { DollarSign, Lock, LockOpen, Eye, FileText, CheckCircle, Clock, Loader2, ExternalLink, Trash2 } from "lucide-react";
+import { AlertTriangle, DollarSign, Lock, LockOpen, Eye, FileText, CheckCircle, Clock, Loader2, ExternalLink, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -67,6 +67,21 @@ interface Payslip {
   gross_amount: number;
   total_deductions: number;
   net_amount: number;
+}
+
+interface PayrollWarning {
+  id: string;
+  type: string;
+  severity: "high" | "medium" | "low";
+  title: string;
+  description: string;
+  employee_name?: string | null;
+  date?: string | null;
+}
+
+interface PayrollWarningsResponse {
+  summary: { total: number; high: number; medium: number; low: number };
+  warnings: PayrollWarning[];
 }
 
 const MONTHS = [
@@ -136,6 +151,22 @@ export default function PayrollPeriodsPage() {
       const res = await fetch(`/api/payroll/payslips?period_id=${payslipsPeriod!.id}`);
       if (!res.ok) throw new Error("Failed");
       return res.json() as Promise<Payslip[]>;
+    },
+  });
+
+  const { data: payrollWarnings, isFetching: warningsLoading } = useQuery({
+    queryKey: ["payroll", "warnings", selectedPeriod, lockCompanyId],
+    enabled: lockDialogOpen && !!selectedPeriod,
+    queryFn: async () => {
+      const period = selectedPeriod!;
+      const params = new URLSearchParams({
+        month: String(period.month),
+        year: String(period.year),
+      });
+      if (lockCompanyId !== "__all__") params.set("company_id", lockCompanyId);
+      const res = await fetch(`/api/payroll/warnings?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed");
+      return res.json() as Promise<PayrollWarningsResponse>;
     },
   });
 
@@ -393,6 +424,59 @@ export default function PayrollPeriodsPage() {
                 <li>Payslips zinazalishwa na makato yote (NSSF, COTWU, Fadhila, HESLB, WCF)</li>
                 <li>Arifa za SMS zinatumwa (kama imewashwa)</li>
               </ul>
+            </div>
+
+            <div className="rounded-lg border p-3 text-sm space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 font-medium">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  Tahadhari kabla ya kufunga
+                </div>
+                {warningsLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                ) : payrollWarnings?.summary.total ? (
+                  <div className="flex gap-1">
+                    {payrollWarnings.summary.high > 0 && <Badge variant="destructive">{payrollWarnings.summary.high} kubwa</Badge>}
+                    {payrollWarnings.summary.medium > 0 && <Badge variant="warning">{payrollWarnings.summary.medium} kati</Badge>}
+                    {payrollWarnings.summary.low > 0 && <Badge variant="info">{payrollWarnings.summary.low} ndogo</Badge>}
+                  </div>
+                ) : (
+                  <Badge variant="success">Hakuna</Badge>
+                )}
+              </div>
+
+              {payrollWarnings?.warnings.length ? (
+                <div className="max-h-44 overflow-y-auto space-y-2 pr-1">
+                  {payrollWarnings.warnings.slice(0, 8).map((warning) => (
+                    <div key={warning.id} className="rounded-md bg-muted/30 p-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-medium text-xs">{warning.title}</p>
+                        <Badge
+                          variant={
+                            warning.severity === "high"
+                              ? "destructive"
+                              : warning.severity === "medium"
+                              ? "warning"
+                              : "info"
+                          }
+                        >
+                          {warning.severity}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">{warning.description}</p>
+                    </div>
+                  ))}
+                  {payrollWarnings.warnings.length > 8 && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      +{payrollWarnings.warnings.length - 8} tahadhari nyingine
+                    </p>
+                  )}
+                </div>
+              ) : !warningsLoading ? (
+                <p className="text-xs text-muted-foreground">
+                  Hakuna marekebisho yanayosubiri, migongano ya overtime, au setup kubwa iliyogunduliwa.
+                </p>
+              ) : null}
             </div>
 
             <label className="flex items-center gap-2 cursor-pointer">

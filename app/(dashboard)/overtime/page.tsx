@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Clock, Plus, Trash2, Loader2, Search } from "lucide-react";
+import { AlertTriangle, CalendarDays, Clock, Plus, Trash2, Loader2, Search, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
@@ -35,6 +35,8 @@ interface OvertimeEntry {
   hours: number;
   amount: number;
   notes: string | null;
+  overtime_rule: string;
+  attendance_status: string | null;
 }
 
 interface Employee {
@@ -60,6 +62,7 @@ export default function OvertimePage() {
   const [selectedMonth, setSelectedMonth] = useState(String(now.getMonth() + 1));
   const [selectedYear] = useState(now.getFullYear());
   const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(null);
 
@@ -101,6 +104,10 @@ export default function OvertimePage() {
       ? Math.round((previewHours / 9) * selectedEmployee.daily_rate)
       : Math.round((selectedEmployee.monthly_salary / 28 / 9) * previewHours)
     : 0;
+  const previewDays = Math.round((previewHours / 9) * 100) / 100;
+  const existingSelectedHours = (entries ?? [])
+    .filter((entry) => entry.employee_id === selectedEmployeeId && entry.date === date)
+    .reduce((sum, entry) => sum + entry.hours, 0);
 
   const addMutation = useMutation({
     mutationFn: async () => {
@@ -137,7 +144,10 @@ export default function OvertimePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
-      if (!res.ok) throw new Error("Hitilafu ya kufuta");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "Hitilafu ya kufuta");
+      }
     },
     onSuccess: () => {
       toast({ title: "Imefutwa" });
@@ -146,11 +156,23 @@ export default function OvertimePage() {
     onError: (e: Error) => toast({ title: "Hitilafu", description: e.message, variant: "destructive" }),
   });
 
-  const filtered = (entries ?? []).filter((e) =>
-    e.employee_name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = (entries ?? []).filter((e) => {
+    const matchesSearch =
+      e.employee_name.toLowerCase().includes(search.toLowerCase()) ||
+      (e.notes ?? "").toLowerCase().includes(search.toLowerCase());
+    const hasConflict = !e.attendance_status || e.attendance_status === "absent";
+    const matchesType =
+      typeFilter === "all" ||
+      e.employee_type === typeFilter ||
+      (typeFilter === "conflicts" && hasConflict);
+    return matchesSearch && matchesType;
+  });
 
   const totalAmount = filtered.reduce((s, e) => s + e.amount, 0);
+  const totalHours = filtered.reduce((s, e) => s + e.hours, 0);
+  const totalDays = Math.round((totalHours / 9) * 100) / 100;
+  const employeeCount = new Set(filtered.map((e) => e.employee_id)).size;
+  const conflictCount = filtered.filter((e) => !e.attendance_status || e.attendance_status === "absent").length;
 
   // Count entries per employee to know which names get a detail link
   const employeeEntryCount = filtered.reduce<Record<string, number>>((acc, e) => {
@@ -163,6 +185,21 @@ export default function OvertimePage() {
     : [];
   const detailEmployee = detailEntries[0] ?? null;
   const detailTotal = detailEntries.reduce((s, e) => s + e.amount, 0);
+  const detailHours = detailEntries.reduce((s, e) => s + e.hours, 0);
+
+  const formatHours = (value: number) =>
+    Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, "");
+  const formatDays = (value: number) =>
+    Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, "");
+  const formatShift = (value: number) =>
+    value === 4.5 ? "4.5 (nusu siku)" : value === 9 ? "9 (siku nzima)" : `${formatHours(value)} saa`;
+  const attendanceLabel = (status: string | null) => {
+    if (!status) return { label: "Hakuna attendance", variant: "warning" as const };
+    if (status === "absent") return { label: "Absent", variant: "destructive" as const };
+    if (status === "half_day") return { label: "Nusu siku", variant: "info" as const };
+    if (status === "late") return { label: "Late", variant: "warning" as const };
+    return { label: "Present", variant: "success" as const };
+  };
 
   return (
     <div className="space-y-6">
@@ -187,12 +224,23 @@ export default function OvertimePage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Tafuta mfanyakazi..."
+            placeholder="Tafuta mfanyakazi au maelezo..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
           />
         </div>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-full sm:w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Aina zote</SelectItem>
+            <SelectItem value="casual">Mkataba</SelectItem>
+            <SelectItem value="fulltime">Kudumu</SelectItem>
+            <SelectItem value="conflicts">Zenye tahadhari</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={selectedMonth} onValueChange={setSelectedMonth}>
           <SelectTrigger className="w-full sm:w-40">
             <SelectValue />
@@ -206,14 +254,45 @@ export default function OvertimePage() {
       </div>
 
       {/* Summary */}
-      {filtered.length > 0 && (
-        <Card className="border-blue-200 bg-blue-50/50">
-          <CardContent className="p-4 flex items-center justify-between">
-            <span className="text-sm font-medium">Rekodi {filtered.length} — {MONTHS[parseInt(selectedMonth) - 1]} {selectedYear}</span>
-            <span className="font-bold text-blue-700">{formatCurrency(totalAmount)}</span>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Rekodi</p>
+            <p className="text-2xl font-bold">{filtered.length}</p>
+            <p className="text-xs text-muted-foreground">{MONTHS[parseInt(selectedMonth) - 1]} {selectedYear}</p>
           </CardContent>
         </Card>
-      )}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Wafanyakazi</p>
+            </div>
+            <p className="text-2xl font-bold">{employeeCount}</p>
+            <p className="text-xs text-muted-foreground">wenye overtime</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Saa / Siku</p>
+            </div>
+            <p className="text-2xl font-bold">{formatHours(totalHours)}</p>
+            <p className="text-xs text-muted-foreground">{formatDays(totalDays)} siku</p>
+          </CardContent>
+        </Card>
+        <Card className={conflictCount > 0 ? "border-amber-300" : ""}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Malipo</p>
+              {conflictCount > 0 && <Badge variant="warning">{conflictCount} tahadhari</Badge>}
+            </div>
+            <p className="text-xl font-bold text-blue-700">{formatCurrency(totalAmount)}</p>
+            <p className="text-xs text-muted-foreground">jumla ya overtime</p>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Table */}
       {isLoading ? (
@@ -234,6 +313,7 @@ export default function OvertimePage() {
                   <TableHead>Aina</TableHead>
                   <TableHead>Tarehe</TableHead>
                   <TableHead className="text-center">Saa</TableHead>
+                  <TableHead className="hidden md:table-cell">Attendance</TableHead>
                   <TableHead className="text-right">Kiasi</TableHead>
                   <TableHead className="hidden sm:table-cell">Maelezo</TableHead>
                   <TableHead />
@@ -261,13 +341,32 @@ export default function OvertimePage() {
                     </TableCell>
                     <TableCell>{formatDate(entry.date)}</TableCell>
                     <TableCell className="text-center">
-                      {entry.hours === 4.5 ? "4.5 (nusu siku)" : entry.hours === 9 ? "9 (siku nzima)" : entry.hours}
+                      {formatShift(entry.hours)}
+                      {entry.employee_type === "casual" && (
+                        <p className="text-[11px] text-muted-foreground">
+                          {formatDays(entry.hours / 9)} siku
+                        </p>
+                      )}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {(() => {
+                        const status = attendanceLabel(entry.attendance_status);
+                        return <Badge variant={status.variant}>{status.label}</Badge>;
+                      })()}
                     </TableCell>
                     <TableCell className="text-right font-semibold text-blue-700">
                       {formatCurrency(entry.amount)}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
-                      {entry.notes ?? "—"}
+                      <div className="space-y-1">
+                        {(!entry.attendance_status || entry.attendance_status === "absent") && (
+                          <p className="flex items-center gap-1 text-amber-700">
+                            <AlertTriangle className="h-3 w-3" />
+                            Angalia attendance
+                          </p>
+                        )}
+                        <p>{entry.notes ?? "—"}</p>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Button
@@ -302,13 +401,14 @@ export default function OvertimePage() {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium">{formatDate(entry.date)}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {entry.hours === 4.5
-                      ? "4.5 saa (nusu siku)"
-                      : entry.hours === 9
-                      ? "9 saa (siku nzima)"
-                      : `${entry.hours} saa`}
+                    {formatShift(entry.hours)}
                     {entry.notes ? ` — ${entry.notes}` : ""}
                   </p>
+                  {(!entry.attendance_status || entry.attendance_status === "absent") && (
+                    <Badge variant={attendanceLabel(entry.attendance_status).variant} className="mt-1">
+                      {attendanceLabel(entry.attendance_status).label}
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="font-semibold text-blue-700">{formatCurrency(entry.amount)}</span>
@@ -326,7 +426,7 @@ export default function OvertimePage() {
             ))}
             {detailEntries.length > 1 && (
               <div className="flex justify-between items-center border-t pt-2 font-semibold text-sm">
-                <span>Jumla ({detailEntries.length} rekodi)</span>
+                <span>Jumla ({detailEntries.length} rekodi, {formatHours(detailHours)} saa)</span>
                 <span className="text-blue-700">{formatCurrency(detailTotal)}</span>
               </div>
             )}
@@ -342,6 +442,9 @@ export default function OvertimePage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Ongeza Overtime</DialogTitle>
+            <CardDescription>
+              Mfumo utakataa overtime kwenye kipindi kilichofungwa, absent day, au nje ya sheria ya mfanyakazi.
+            </CardDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
@@ -366,6 +469,11 @@ export default function OvertimePage() {
               {employees && employees.filter((e) => e.overtime_rule === "none").length > 0 && (
                 <p className="text-xs text-muted-foreground">
                   Wafanyakazi wasio na ruhusa ya overtime hawaorodheshwa. Badilisha kwenye ukurasa wa Wafanyakazi.
+                </p>
+              )}
+              {selectedEmployee?.overtime_rule === "holidays_only" && (
+                <p className="text-xs text-amber-700">
+                  Mfanyakazi huyu anaruhusiwa overtime kwenye sikukuu tu.
                 </p>
               )}
             </div>
@@ -408,6 +516,11 @@ export default function OvertimePage() {
                     />
                   </>
                 )}
+                {existingSelectedHours > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Tayari kuna {formatHours(existingSelectedHours)} saa za overtime kwa tarehe hii.
+                  </p>
+                )}
               </div>
             )}
 
@@ -419,11 +532,18 @@ export default function OvertimePage() {
 
             {/* Preview */}
             {previewAmount > 0 && (
-              <div className="rounded-lg bg-muted p-3 flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  Malipo ya overtime ({previewHours} saa)
-                </span>
-                <span className="font-bold text-blue-700">{formatCurrency(previewAmount)}</span>
+              <div className="rounded-lg bg-muted p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    Malipo ya overtime ({formatHours(previewHours)} saa)
+                  </span>
+                  <span className="font-bold text-blue-700">{formatCurrency(previewAmount)}</span>
+                </div>
+                {isCasual && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Hii ni sawa na {formatDays(previewDays)} siku ya mkataba.
+                  </p>
+                )}
               </div>
             )}
           </div>

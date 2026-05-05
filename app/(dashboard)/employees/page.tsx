@@ -9,7 +9,8 @@ import { z } from "zod";
 import {
   Plus, Search, Users, Pencil, Trash2, Upload, Download,
   FileText, CheckCircle2, XCircle, Loader2, KeyRound,
-  ShieldCheck, ShieldOff,
+  ShieldCheck, ShieldOff, History, RotateCcw, UserCheck,
+  UserX, ArrowRightLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +26,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 
 interface Employee {
   id: string;
@@ -80,6 +81,32 @@ interface ImportSummary {
   succeeded: number;
   failed: number;
   smsSent: number;
+}
+
+interface EmployeeStatusEvent {
+  id: string;
+  action: "created" | "deactivated" | "rejoined";
+  from_active: number | null;
+  to_active: number;
+  note: string | null;
+  changed_by_name: string | null;
+  changed_at: string;
+}
+
+interface EmployeeTransfer {
+  id: string;
+  from_company_name: string | null;
+  from_section_name: string | null;
+  to_company_name: string | null;
+  to_section_name: string | null;
+  changed_by_name: string | null;
+  changed_at: string;
+  note: string | null;
+}
+
+interface EmployeeHistoryResponse {
+  status_events: EmployeeStatusEvent[];
+  transfers: EmployeeTransfer[];
 }
 
 const nanToZero = (v: unknown) => (typeof v === "number" && isNaN(v) ? 0 : v);
@@ -167,6 +194,42 @@ function parseCSVPreview(text: string): Record<string, string>[] {
   });
 }
 
+function employeeToPayload(emp: Employee, active = emp.active) {
+  return {
+    id: emp.id,
+    name: emp.name,
+    phone: emp.phone,
+    type: emp.type,
+    department: emp.department ?? "",
+    supervisor_id: emp.supervisor_id ?? "",
+    company_id: emp.company_id ?? "",
+    section_id: emp.section_id ?? "",
+    daily_rate: emp.daily_rate ?? 0,
+    monthly_salary: emp.monthly_salary ?? 0,
+    food_advance_amount: emp.food_advance_amount ?? 0,
+    overtime_rule: emp.overtime_rule ?? "none",
+    active,
+    deduct_nssf: !!emp.deduct_nssf,
+    deduct_cotwu: !!emp.deduct_cotwu,
+    deduct_fadhila: !!emp.deduct_fadhila,
+    heslb_amount: emp.heslb_amount ?? 0,
+    wcf_amount: emp.wcf_amount ?? 0,
+  };
+}
+
+function statusLabel(action: EmployeeStatusEvent["action"]) {
+  if (action === "created") return "Ameongezwa";
+  if (action === "rejoined") return "Amerejoin";
+  return "Amewekwa inactive";
+}
+
+function locationLabel(company?: string | null, section?: string | null) {
+  if (company && section) return `${company} / ${section}`;
+  if (company) return company;
+  if (section) return section;
+  return "Hakuna kampuni/sehemu";
+}
+
 export default function EmployeesPage() {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
@@ -179,6 +242,8 @@ export default function EmployeesPage() {
   const [resetTarget, setResetTarget] = useState<Employee | null>(null);
   const [resetPassword, setResetPassword] = useState("");
   const [showResetPw, setShowResetPw] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
+  const [historyTarget, setHistoryTarget] = useState<Employee | null>(null);
 
   // CSV import state
   const [importOpen, setImportOpen] = useState(false);
@@ -194,12 +259,24 @@ export default function EmployeesPage() {
   const canManage = role === "admin" || role === "hr";
 
   const { data: employees, isLoading } = useQuery({
-    queryKey: ["employees"],
+    queryKey: ["employees", showInactive],
     queryFn: async () => {
-      const res = await fetch("/api/employees");
+      const qs = canManage && showInactive ? "?include_inactive=1" : "";
+      const res = await fetch(`/api/employees${qs}`);
       if (!res.ok) throw new Error("Failed");
       return res.json() as Promise<Employee[]>;
     },
+  });
+
+  const { data: employeeHistory, isLoading: historyLoading } = useQuery({
+    queryKey: ["employee-history", historyTarget?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/employees/history?employee_id=${historyTarget?.id}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed");
+      return json as EmployeeHistoryResponse;
+    },
+    enabled: !!historyTarget && canManage,
   });
 
   const { data: allUsers } = useQuery({
@@ -263,6 +340,7 @@ export default function EmployeesPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-history"] });
       setDialogOpen(false);
       setEditingEmployee(null);
       reset();
@@ -298,8 +376,30 @@ export default function EmployeesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-history"] });
       setDeleteTarget(null);
-      toast({ title: "Employee removed", description: "Record deactivated. History preserved." });
+      toast({ title: "Mfanyakazi amewekwa inactive", description: "Historia yake imehifadhiwa." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const rejoinMutation = useMutation({
+    mutationFn: async (employee: Employee) => {
+      const res = await fetch("/api/employees", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(employeeToPayload(employee, 1)),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed");
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["employee-history"] });
+      toast({ title: "Mfanyakazi amerejoin", description: "Amewekwa active tena." });
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -398,6 +498,8 @@ export default function EmployeesPage() {
       e.department?.toLowerCase().includes(search.toLowerCase()) ||
       e.phone.includes(search)
   );
+  const activeEmployees = (employees ?? []).filter((e) => e.active !== 0);
+  const inactiveEmployees = (employees ?? []).filter((e) => e.active === 0);
 
   const onSubmit = (data: EmployeeForm) => {
     const payload = {
@@ -495,33 +597,48 @@ export default function EmployeesPage() {
       </div>
 
       {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Tafuta wafanyakazi..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="relative max-w-sm flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Tafuta wafanyakazi..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        {canManage && (
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={showInactive}
+              onChange={(e) => setShowInactive(e.target.checked)}
+              className="accent-primary"
+            />
+            <span>Onyesha inactive/rejoined</span>
+          </label>
+        )}
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <Card><CardContent className="p-3">
           <p className="text-xl font-bold">{employees?.length ?? 0}</p>
           <p className="text-xs text-muted-foreground">Jumla</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-3">
+          <p className="text-xl font-bold text-emerald-600">{activeEmployees.length}</p>
+          <p className="text-xs text-muted-foreground">Active</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-3">
+          <p className="text-xl font-bold text-amber-600">{inactiveEmployees.length}</p>
+          <p className="text-xs text-muted-foreground">Inactive</p>
         </CardContent></Card>
         <Card><CardContent className="p-3">
           <p className="text-xl font-bold text-blue-600">
             {employees?.filter((e) => e.type === "casual").length ?? 0}
           </p>
           <p className="text-xs text-muted-foreground">Mkataba</p>
-        </CardContent></Card>
-        <Card><CardContent className="p-3">
-          <p className="text-xl font-bold text-green-600">
-            {employees?.filter((e) => e.type === "fulltime").length ?? 0}
-          </p>
-          <p className="text-xs text-muted-foreground">Kudumu</p>
         </CardContent></Card>
       </div>
 
@@ -555,10 +672,23 @@ export default function EmployeesPage() {
               </TableRow>
             ) : (
               filtered.map((emp) => (
-                <TableRow key={emp.id}>
+                <TableRow key={emp.id} className={emp.active === 0 ? "bg-muted/30 opacity-75" : undefined}>
                   <TableCell>
                     <div>
-                      <p className="font-medium leading-tight">{emp.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium leading-tight">{emp.name}</p>
+                        {emp.active === 0 ? (
+                          <Badge variant="outline" className="text-xs text-amber-700 border-amber-300">
+                            <UserX className="h-3 w-3 mr-1" />
+                            Inactive
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs text-emerald-700 border-emerald-300">
+                            <UserCheck className="h-3 w-3 mr-1" />
+                            Active
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground sm:hidden">
                         {emp.type === "casual"
                           ? `${formatCurrency(emp.daily_rate)}/siku`
@@ -588,48 +718,71 @@ export default function EmployeesPage() {
                   {canManage && (
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(emp)} title="Hariri">
-                          <Pencil className="h-4 w-4" />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Historia"
+                          onClick={() => setHistoryTarget(emp)}
+                        >
+                          <History className="h-4 w-4" />
                         </Button>
-                        {isAdmin && roleByEmployeeId.get(emp.id) === "employee" && (
+                        {emp.active === 0 ? (
                           <Button
                             variant="ghost"
                             size="icon"
-                            title="Pandisha kuwa supervisor"
+                            title="Rejoin"
                             className="text-emerald-700 hover:text-emerald-700"
-                            onClick={() => setRoleTarget({ emp, action: "promote" })}
+                            disabled={rejoinMutation.isPending}
+                            onClick={() => rejoinMutation.mutate(emp)}
                           >
-                            <ShieldCheck className="h-4 w-4" />
+                            <RotateCcw className="h-4 w-4" />
                           </Button>
+                        ) : (
+                          <>
+                            <Button variant="ghost" size="icon" onClick={() => openEdit(emp)} title="Hariri">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            {isAdmin && roleByEmployeeId.get(emp.id) === "employee" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Pandisha kuwa supervisor"
+                                className="text-emerald-700 hover:text-emerald-700"
+                                onClick={() => setRoleTarget({ emp, action: "promote" })}
+                              >
+                                <ShieldCheck className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {isAdmin && roleByEmployeeId.get(emp.id) === "supervisor" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Rudisha kuwa mfanyakazi"
+                                className="text-amber-700 hover:text-amber-700"
+                                onClick={() => setRoleTarget({ emp, action: "demote" })}
+                              >
+                                <ShieldOff className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Badilisha Nywila"
+                              onClick={() => { setResetTarget(emp); setResetPassword(""); setShowResetPw(false); }}
+                            >
+                              <KeyRound className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => setDeleteTarget(emp)}
+                              title="Weka inactive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
                         )}
-                        {isAdmin && roleByEmployeeId.get(emp.id) === "supervisor" && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Rudisha kuwa mfanyakazi"
-                            className="text-amber-700 hover:text-amber-700"
-                            onClick={() => setRoleTarget({ emp, action: "demote" })}
-                          >
-                            <ShieldOff className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Badilisha Nywila"
-                          onClick={() => { setResetTarget(emp); setResetPassword(""); setShowResetPw(false); }}
-                        >
-                          <KeyRound className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => setDeleteTarget(emp)}
-                          title="Futa"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
                       </div>
                     </TableCell>
                   )}
@@ -878,9 +1031,9 @@ export default function EmployeesPage() {
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Futa Mfanyakazi</DialogTitle>
+            <DialogTitle>Weka Mfanyakazi Inactive</DialogTitle>
             <DialogDescription>
-              Una uhakika unataka kuondoa <strong>{deleteTarget?.name}</strong>? Historia ya mahudhurio na malipo itahifadhiwa.
+              Una uhakika unataka kumweka <strong>{deleteTarget?.name}</strong> inactive? Historia ya mahudhurio, malipo, na status itahifadhiwa.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -891,10 +1044,115 @@ export default function EmployeesPage() {
               onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
             >
               {deleteMutation.isPending ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Inafuta...</>
-              ) : "Ndio, Futa"}
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Inahifadhi...</>
+              ) : "Ndio, Weka Inactive"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Employee history dialog */}
+      <Dialog open={!!historyTarget} onOpenChange={(open) => { if (!open) setHistoryTarget(null); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Historia ya {historyTarget?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Angalia inactive/rejoined events na transfer kati ya kampuni au sehemu.
+            </DialogDescription>
+          </DialogHeader>
+
+          {historyLoading ? (
+            <div className="py-8 text-center text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+              Inapakia historia...
+            </div>
+          ) : (
+            <div className="grid gap-5 md:grid-cols-2">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold">Status</h3>
+                </div>
+                {(employeeHistory?.status_events?.length ?? 0) === 0 ? (
+                  <p className="rounded-md border p-3 text-sm text-muted-foreground">
+                    Hakuna status history bado.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {employeeHistory?.status_events.map((event) => (
+                      <div key={event.id} className="rounded-md border p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <Badge
+                            variant={
+                              event.action === "deactivated"
+                                ? "warning"
+                                : event.action === "rejoined"
+                                  ? "success"
+                                  : "secondary"
+                            }
+                          >
+                            {statusLabel(event.action)}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {formatDate(event.changed_at)}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm">{event.note ?? "Status changed"}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Na: {event.changed_by_name ?? "System"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold">Transfers</h3>
+                </div>
+                {(employeeHistory?.transfers?.length ?? 0) === 0 ? (
+                  <p className="rounded-md border p-3 text-sm text-muted-foreground">
+                    Hakuna transfer history bado.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {employeeHistory?.transfers.map((transfer) => (
+                      <div key={transfer.id} className="rounded-md border p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <Badge variant="info">Transfer</Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {formatDate(transfer.changed_at)}
+                          </span>
+                        </div>
+                        <div className="mt-3 grid gap-2 text-sm">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Kutoka</p>
+                            <p className="font-medium">
+                              {locationLabel(transfer.from_company_name, transfer.from_section_name)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Kwenda</p>
+                            <p className="font-medium">
+                              {locationLabel(transfer.to_company_name, transfer.to_section_name)}
+                            </p>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Na: {transfer.changed_by_name ?? "System"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

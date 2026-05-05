@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, ensureDatabase } from "@/lib/db";
 import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
 import { sendSMS } from "@/lib/at";
@@ -16,18 +16,38 @@ function normalizeFoodAdvance(value: unknown) {
   return FOOD_ADVANCE_AMOUNTS.has(amount) ? amount : 0;
 }
 
+interface EmployeeRow {
+  id: string;
+  active: number | null;
+  company_id: string | null;
+  section_id: string | null;
+}
+
+function normalizeOptionalId(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function normalizeActive(value: unknown, fallback: number) {
+  return value === undefined || value === null ? fallback : value ? 1 : 0;
+}
+
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await ensureDatabase();
 
   const { searchParams } = new URL(request.url);
   const department = searchParams.get("department");
   const search = searchParams.get("search");
   const supervisorId = searchParams.get("supervisor_id");
+  const includeInactive = searchParams.get("include_inactive") === "1";
 
   const role = (session.user as { role: string }).role;
 
-  let sql = "SELECT * FROM employees WHERE active = 1";
+  let sql =
+    includeInactive && (role === "hr" || role === "admin")
+      ? "SELECT * FROM employees WHERE 1 = 1"
+      : "SELECT * FROM employees WHERE active = 1";
   const args: string[] = [];
 
   if (role === "employee") {
@@ -70,6 +90,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await ensureDatabase();
 
   const role = (session.user as { role: string }).role;
   if (role !== "hr" && role !== "admin") {
@@ -114,6 +135,12 @@ export async function POST(request: NextRequest) {
         foodAdvanceAmount,
         overtime_rule ?? "none",
       ],
+    });
+    await db.execute({
+      sql: `INSERT INTO employee_status_events
+            (id, employee_id, action, from_active, to_active, note, changed_by)
+            VALUES (?, ?, 'created', NULL, 1, ?, ?)`,
+      args: [nanoid(), employeeId, "Employee record created", session.user.id ?? null],
     });
   } catch (err) {
     console.error("Employee insert error:", err);
@@ -173,6 +200,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await ensureDatabase();
 
   const role = (session.user as { role: string }).role;
   if (role !== "hr" && role !== "admin") {
@@ -188,6 +216,22 @@ export async function PUT(request: NextRequest) {
 
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   const foodAdvanceAmount = normalizeFoodAdvance(food_advance_amount);
+  const existing = await db.execute({
+    sql: "SELECT id, active, company_id, section_id FROM employees WHERE id = ?",
+    args: [id],
+  });
+  const current = existing.rows[0] as unknown as EmployeeRow | undefined;
+  if (!current) {
+    return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+  }
+
+  const currentActive = Number(current.active ?? 1) ? 1 : 0;
+  const nextActive = normalizeActive(active, currentActive);
+  const nextCompanyId = normalizeOptionalId(company_id);
+  const nextSectionId = normalizeOptionalId(section_id);
+  const moved =
+    (current.company_id ?? null) !== nextCompanyId ||
+    (current.section_id ?? null) !== nextSectionId;
 
   try {
     await db.execute({
@@ -197,12 +241,45 @@ export async function PUT(request: NextRequest) {
                 deduct_nssf=?, deduct_cotwu=?, deduct_fadhila=?, heslb_amount=?, wcf_amount=?
             WHERE id=?`,
       args: [
-        name, phone, type, department ?? null, supervisor_id ?? null, company_id ?? null,
-        section_id ?? null, daily_rate ?? 0, monthly_salary ?? 0, foodAdvanceAmount, overtime_rule ?? "none", active ?? 1,
+        name, phone, type, department ?? null, supervisor_id ?? null, nextCompanyId,
+        nextSectionId, daily_rate ?? 0, monthly_salary ?? 0, foodAdvanceAmount, overtime_rule ?? "none", nextActive,
         deduct_nssf ? 1 : 0, deduct_cotwu ? 1 : 0, deduct_fadhila ? 1 : 0,
         heslb_amount ?? 0, wcf_amount ?? 0, id,
       ],
     });
+    if (currentActive !== nextActive) {
+      await db.execute({
+        sql: `INSERT INTO employee_status_events
+              (id, employee_id, action, from_active, to_active, note, changed_by)
+              VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          nanoid(),
+          id,
+          nextActive ? "rejoined" : "deactivated",
+          currentActive,
+          nextActive,
+          nextActive ? "Employee rejoined" : "Employee marked inactive",
+          session.user.id ?? null,
+        ],
+      });
+    }
+    if (moved) {
+      await db.execute({
+        sql: `INSERT INTO employee_transfer_history
+              (id, employee_id, from_company_id, from_section_id, to_company_id, to_section_id, changed_by, note)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          nanoid(),
+          id,
+          current.company_id ?? null,
+          current.section_id ?? null,
+          nextCompanyId,
+          nextSectionId,
+          session.user.id ?? null,
+          "Employee company/section assignment changed",
+        ],
+      });
+    }
   } catch (err) {
     console.error("Employee update error:", err);
     return NextResponse.json(
@@ -221,6 +298,7 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await ensureDatabase();
 
   const role = (session.user as { role: string }).role;
   if (role !== "hr" && role !== "admin") {
@@ -231,11 +309,35 @@ export async function DELETE(request: NextRequest) {
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   try {
+    const existing = await db.execute({
+      sql: "SELECT id, active FROM employees WHERE id = ?",
+      args: [id],
+    });
+    const current = existing.rows[0] as unknown as EmployeeRow | undefined;
+    if (!current) {
+      return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+    }
+    const currentActive = Number(current.active ?? 1) ? 1 : 0;
+
     // Soft-delete: preserve attendance/payroll history
     await db.execute({
       sql: "UPDATE employees SET active = 0 WHERE id = ?",
       args: [id],
     });
+    if (currentActive !== 0) {
+      await db.execute({
+        sql: `INSERT INTO employee_status_events
+              (id, employee_id, action, from_active, to_active, note, changed_by)
+              VALUES (?, ?, 'deactivated', ?, 0, ?, ?)`,
+        args: [
+          nanoid(),
+          id,
+          currentActive,
+          "Employee deactivated from employee page",
+          session.user.id ?? null,
+        ],
+      });
+    }
     // Also deactivate linked user account
     await db.execute({
       sql: "UPDATE users SET role = 'employee' WHERE employee_id = ?",
