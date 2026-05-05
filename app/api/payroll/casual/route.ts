@@ -87,17 +87,22 @@ export async function GET(request: NextRequest) {
   }
 
   const overtimeResult = await db.execute({
-    sql: `SELECT employee_id, COALESCE(SUM(amount), 0) as total
+    sql: `SELECT
+            employee_id,
+            COALESCE(SUM(amount), 0) as total,
+            COALESCE(SUM(hours), 0) as total_hours
           FROM overtime_entries
           WHERE date LIKE ?
           GROUP BY employee_id`,
     args: [`${datePrefix}%`],
   });
 
-  type OvertimeRow = { employee_id: string; total: number };
+  type OvertimeRow = { employee_id: string; total: number; total_hours: number };
   const overtimeMap = new Map<string, number>();
+  const overtimeDaysMap = new Map<string, number>();
   for (const row of overtimeResult.rows as unknown as OvertimeRow[]) {
     overtimeMap.set(row.employee_id, Math.round(row.total ?? 0));
+    overtimeDaysMap.set(row.employee_id, Math.round(((row.total_hours ?? 0) / 9) * 100) / 100);
   }
 
   type EmpRow = {
@@ -110,8 +115,10 @@ export async function GET(request: NextRequest) {
     const att = attMap.get(e.id);
     const full = att?.full_days ?? 0;
     const half = att?.half_days ?? 0;
-    const days_worked = full + half * 0.5;
-    const baseGross = Math.round(days_worked * (e.daily_rate ?? 0));
+    const attendanceDays = full + half * 0.5;
+    const overtimeDays = overtimeDaysMap.get(e.id) ?? 0;
+    const days_worked = Math.round((attendanceDays + overtimeDays) * 100) / 100;
+    const baseGross = Math.round(attendanceDays * (e.daily_rate ?? 0));
     const overtime = overtimeMap.get(e.id) ?? 0;
     const gross = baseGross + overtime;
     const salaryAdvances = advMap.get(e.id) ?? 0;
@@ -127,6 +134,8 @@ export async function GET(request: NextRequest) {
       company_name: e.company_name ?? "Kampuni Haijawekwa",
       section_id: e.section_id ?? null,
       section_name: e.section_name ?? "Sehemu Haijawekwa",
+      attendance_days: attendanceDays,
+      overtime_days: overtimeDays,
       days_worked,
       base_gross: baseGross,
       total_overtime: overtime,

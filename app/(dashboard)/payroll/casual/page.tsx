@@ -21,7 +21,10 @@ interface EmployeeRow {
   company_name: string;
   section_id: string | null;
   section_name: string;
+  attendance_days: number;
+  overtime_days: number;
   days_worked: number;
+  total_overtime: number;
   gross_amount: number;
   salary_advances?: number;
   food_advance_amount: number;
@@ -33,6 +36,8 @@ const MONTHS = [
   "Januari","Februari","Machi","Aprili","Mei","Juni",
   "Julai","Agosti","Septemba","Oktoba","Novemba","Desemba",
 ];
+
+const formatDays = (days: number) => Number.isInteger(days) ? String(days) : days.toFixed(2).replace(/\.?0+$/, "");
 
 interface CompanyOpt { id: string; name: string }
 interface SectionOpt { id: string; name: string; company_id: string }
@@ -103,6 +108,8 @@ export default function CasualPayrollPage() {
   const totalNet = filtered.reduce((s, r) => s + r.net_amount, 0);
   const totalAdvances = filtered.reduce((s, r) => s + r.advances, 0);
   const totalFoodAdvances = filtered.reduce((s, r) => s + (r.food_advance_amount ?? 0), 0);
+  const totalDays = filtered.reduce((s, r) => s + r.days_worked, 0);
+  const totalOvertimeDays = filtered.reduce((s, r) => s + r.overtime_days, 0);
 
   const toggleCompany = (key: string) => {
     setCollapsedCompanies((prev) => {
@@ -114,9 +121,9 @@ export default function CasualPayrollPage() {
   };
 
   const exportCSV = () => {
-    const header = "Kampuni,Sehemu,Jina,Siku,Kiwango,Jumla,Salary Advance,Food Advance,Jumla Makato,Malipo\n";
+    const header = "Kampuni,Sehemu,Jina,Siku Kawaida,Siku Overtime,Jumla Siku,Kiwango,Jumla,Overtime,Salary Advance,Food Advance,Jumla Makato,Malipo\n";
     const rows_csv = filtered.map((r) =>
-      `"${r.company_name}","${r.section_name}","${r.employee_name}",${r.days_worked},${r.daily_rate},${r.gross_amount},${r.salary_advances ?? 0},${r.food_advance_amount ?? 0},${r.advances},${r.net_amount}`
+      `"${r.company_name}","${r.section_name}","${r.employee_name}",${r.attendance_days},${r.overtime_days},${r.days_worked},${r.daily_rate},${r.gross_amount},${r.total_overtime},${r.salary_advances ?? 0},${r.food_advance_amount ?? 0},${r.advances},${r.net_amount}`
     ).join("\n");
     const blob = new Blob([header + rows_csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -204,7 +211,16 @@ export default function CasualPayrollPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <Card>
+          <CardContent className="p-3">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Jumla Siku</p>
+            <p className="text-lg font-bold">{formatDays(totalDays)}</p>
+            {totalOvertimeDays > 0 && (
+              <p className="text-xs text-muted-foreground">OT: {formatDays(totalOvertimeDays)}</p>
+            )}
+          </CardContent>
+        </Card>
         <Card>
           <CardContent className="p-3">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Jumla Gross</p>
@@ -299,7 +315,8 @@ export default function CasualPayrollPage() {
                             <TableHeader>
                               <TableRow className="bg-muted/10">
                                 <TableHead>Jina</TableHead>
-                                <TableHead className="text-center">Siku</TableHead>
+                                <TableHead className="text-center">Jumla Siku</TableHead>
+                                <TableHead className="hidden md:table-cell text-center">OT Siku</TableHead>
                                 <TableHead className="hidden sm:table-cell text-right">Kiwango</TableHead>
                                 <TableHead className="hidden sm:table-cell text-right">Gross</TableHead>
                                 <TableHead className="hidden sm:table-cell text-right">Makato</TableHead>
@@ -310,12 +327,27 @@ export default function CasualPayrollPage() {
                               {employees.map((row) => (
                                 <TableRow key={row.employee_id}>
                                   <TableCell className="font-medium text-sm">{row.employee_name}</TableCell>
-                                  <TableCell className="text-center text-sm">{row.days_worked}</TableCell>
+                                  <TableCell className="text-center text-sm">
+                                    <span className="font-medium">{formatDays(row.days_worked)}</span>
+                                    {row.overtime_days > 0 && (
+                                      <p className="md:hidden text-[11px] text-muted-foreground">
+                                        Kawaida {formatDays(row.attendance_days)} + OT {formatDays(row.overtime_days)}
+                                      </p>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="hidden md:table-cell text-center text-sm text-muted-foreground">
+                                    {row.overtime_days > 0 ? formatDays(row.overtime_days) : "-"}
+                                  </TableCell>
                                   <TableCell className="hidden sm:table-cell text-right text-sm text-muted-foreground">
                                     {formatCurrency(row.daily_rate)}
                                   </TableCell>
                                   <TableCell className="hidden sm:table-cell text-right text-sm text-blue-700">
                                     {formatCurrency(row.gross_amount)}
+                                    {row.total_overtime > 0 && (
+                                      <p className="text-[11px] text-muted-foreground">
+                                        OT: {formatCurrency(row.total_overtime)}
+                                      </p>
+                                    )}
                                   </TableCell>
                                   <TableCell className="hidden sm:table-cell text-right text-sm text-red-600">
                                     {row.advances > 0 ? `-${formatCurrency(row.advances)}` : "—"}
@@ -327,7 +359,7 @@ export default function CasualPayrollPage() {
                               ))}
                               {/* Section subtotal */}
                               <TableRow className="bg-muted/20 font-medium border-t-2">
-                                <TableCell colSpan={2} className="text-sm">Jumla ya Sehemu</TableCell>
+                                <TableCell colSpan={3} className="text-sm">Jumla ya Sehemu</TableCell>
                                 <TableCell className="hidden sm:table-cell" />
                                 <TableCell className="hidden sm:table-cell text-right text-sm text-blue-700">
                                   {formatCurrency(sectionGross)}
