@@ -8,7 +8,8 @@ import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard, Users, Calendar, CalendarDays, ClipboardList, ClipboardEdit,
   DollarSign, UserCircle, LogOut, ChevronDown, Shield, Building2, Palmtree,
-  Upload, UserCog, Megaphone, MessageSquareWarning, Clock,
+  Upload, UserCog, Megaphone, MessageSquareWarning, Clock, PanelLeftOpen,
+  PanelLeftClose,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -90,9 +91,11 @@ const navGroups: NavGroup[] = [
 
 interface SidebarProps {
   user: { name?: string | null; email?: string | null; role: string };
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
 }
 
-export function Sidebar({ user }: SidebarProps) {
+export function Sidebar({ user, collapsed = false, onToggleCollapsed }: SidebarProps) {
   const pathname = usePathname();
 
   // Initialise all groups open; user can collapse
@@ -181,15 +184,21 @@ export function Sidebar({ user }: SidebarProps) {
     return (
       <li key={item.href}>
         <Link href={item.href}
+          title={collapsed ? item.label : undefined}
           className={cn(
-            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+            "relative flex items-center rounded-md py-2 text-sm font-medium transition-colors",
+            collapsed ? "justify-center px-2" : "gap-3 px-3",
             active
               ? "bg-sidebar-accent text-sidebar-accent-foreground"
               : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
           )}>
           <item.icon className="h-4 w-4 shrink-0" />
-          <span className="flex-1">{item.label}</span>
-          {count > 0 && <Badge className="text-xs" variant="destructive">{count}</Badge>}
+          {!collapsed && <span className="flex-1">{item.label}</span>}
+          {count > 0 && (
+            collapsed
+              ? <span className="absolute ml-5 mt-[-1rem] h-2 w-2 rounded-full bg-destructive" />
+              : <Badge className="text-xs" variant="destructive">{count}</Badge>
+          )}
         </Link>
       </li>
     );
@@ -202,6 +211,16 @@ export function Sidebar({ user }: SidebarProps) {
     const isOpen   = openGroups.has(group.id);
     const active   = isGroupActive(group);
     const badges   = groupBadgeCount(group);
+
+    if (collapsed) {
+      return (
+        <li key={group.id}>
+          <ul className="space-y-1">
+            {visibleItems.map(renderItem)}
+          </ul>
+        </li>
+      );
+    }
 
     return (
       <li key={group.id}>
@@ -253,18 +272,41 @@ export function Sidebar({ user }: SidebarProps) {
   return (
     <div className="flex h-full flex-col bg-sidebar-background text-sidebar-foreground">
       {/* Logo */}
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-sidebar-border">
+      <div className={cn(
+        "relative flex items-center border-b border-sidebar-border",
+        collapsed ? "justify-center px-3 py-4" : "gap-3 px-6 py-5"
+      )}>
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary">
           <Shield className="h-5 w-5 text-sidebar-primary-foreground" />
         </div>
-        <div>
-          <p className="text-sm font-bold text-sidebar-foreground">TrustTrack</p>
-          <p className="text-xs text-sidebar-foreground/60">Attendance System</p>
-        </div>
+        {!collapsed && (
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-sidebar-foreground">TrustTrack</p>
+            <p className="text-xs text-sidebar-foreground/60">Attendance System</p>
+          </div>
+        )}
+        {onToggleCollapsed && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "hidden lg:inline-flex text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50",
+              collapsed && "absolute left-14 top-4 h-8 w-8"
+            )}
+            onClick={onToggleCollapsed}
+            title={collapsed ? "Onyesha sidebar" : "Ficha sidebar"}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+          </Button>
+        )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
+      <nav className={cn("flex-1 overflow-y-auto py-4", collapsed ? "px-2" : "px-3")}>
         <ul className="space-y-1">
           {/* Dashboard — standalone top */}
           {standaloneTop.roles.includes(user.role) && renderItem(standaloneTop)}
@@ -280,22 +322,29 @@ export function Sidebar({ user }: SidebarProps) {
       <Separator className="bg-sidebar-border" />
 
       {/* User info */}
-      <div className="p-4">
-        <div className="flex items-center gap-3 mb-3">
+      <div className={cn("p-4", collapsed && "px-2")}>
+        <div className={cn("flex items-center mb-3", collapsed ? "justify-center" : "gap-3")}>
           <Avatar className="h-8 w-8">
             <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-xs">
               {initials}
             </AvatarFallback>
           </Avatar>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-sidebar-foreground truncate">{user.name}</p>
-            <p className="text-xs text-sidebar-foreground/60 capitalize">{user.role}</p>
-          </div>
+          {!collapsed && (
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-sidebar-foreground truncate">{user.name}</p>
+              <p className="text-xs text-sidebar-foreground/60 capitalize">{user.role}</p>
+            </div>
+          )}
         </div>
         <Button variant="ghost" size="sm"
-          className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+          title={collapsed ? "Sign out" : undefined}
+          className={cn(
+            "w-full text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50",
+            collapsed ? "justify-center px-2" : "justify-start"
+          )}
           onClick={() => signOut({ callbackUrl: "/login" })}>
-          <LogOut className="h-4 w-4 mr-2" />Sign out
+          <LogOut className={cn("h-4 w-4", !collapsed && "mr-2")} />
+          {!collapsed && "Sign out"}
         </Button>
       </div>
     </div>
