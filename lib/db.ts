@@ -142,6 +142,21 @@ export async function ensureDatabase() {
   try { await db.execute("ALTER TABLE leave_requests ADD COLUMN supervisor_reviewed_by TEXT"); } catch {}
   try { await db.execute("ALTER TABLE leave_requests ADD COLUMN supervisor_reviewed_at DATETIME"); } catch {}
   try { await db.execute("ALTER TABLE leave_requests ADD COLUMN supervisor_note TEXT"); } catch {}
+  try {
+    await db.execute(`CREATE TABLE IF NOT EXISTS service_certificates (
+      id TEXT PRIMARY KEY,
+      employee_id TEXT NOT NULL,
+      date_employed DATE,
+      date_of_leaving DATE,
+      position_held TEXT,
+      general_conduct TEXT DEFAULT 'Good',
+      efficiency TEXT DEFAULT 'Good',
+      additional_notes TEXT,
+      issued_by TEXT,
+      issued_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (employee_id) REFERENCES employees(id)
+    )`);
+  } catch {}
   _initialized = true;
 }
 
