@@ -9,7 +9,7 @@ import {
   LayoutDashboard, Users, Calendar, CalendarDays, ClipboardList, ClipboardEdit,
   DollarSign, UserCircle, LogOut, ChevronDown, Shield, Building2, Palmtree,
   Upload, UserCog, Megaphone, MessageSquareWarning, Clock, PanelLeftOpen,
-  PanelLeftClose,
+  PanelLeftClose, UserX,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -60,10 +60,11 @@ const navGroups: NavGroup[] = [
     label: "Wafanyakazi",
     icon: Users,
     items: [
-      { href: "/employees", label: "Wafanyakazi",        icon: Users,      roles: ["hr", "admin"] },
-      { href: "/companies",  label: "Makampuni & Sehemu", icon: Building2,  roles: ["admin"] },
-      { href: "/holidays",   label: "Sikukuu",            icon: CalendarDays, roles: ["hr", "admin"] },
-      { href: "/users",      label: "Watumiaji wa Mfumo", icon: UserCog,    roles: ["admin"] },
+      { href: "/employees",        label: "Wafanyakazi",        icon: Users,        roles: ["hr", "admin"] },
+      { href: "/former-employees", label: "Wafanyakazi wa Zamani", icon: UserX,        roles: ["hr", "admin"] },
+      { href: "/companies",        label: "Makampuni & Sehemu",    icon: Building2,    roles: ["admin"] },
+      { href: "/holidays",         label: "Sikukuu",               icon: CalendarDays, roles: ["hr", "admin"] },
+      { href: "/users",            label: "Watumiaji wa Mfumo",    icon: UserCog,      roles: ["admin"] },
     ],
   },
   {
