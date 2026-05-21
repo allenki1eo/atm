@@ -35,19 +35,23 @@ function fmtDate(dateStr: string | null | undefined) {
 }
 
 const css = `
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     font-family: 'Georgia', 'Times New Roman', serif;
     background: #f5f0e8;
     min-height: 100vh;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
-    padding: 24px;
+    padding: 32px 24px;
   }
   .cert-outer {
-    width: 100%;
-    max-width: 600px;
+    width: 210mm;
+    min-height: 297mm;
     background: #faf8f0;
     border: 10px solid #c9a227;
     padding: 4px;
@@ -55,10 +59,10 @@ const css = `
   }
   .cert-inner {
     border: 2px solid #c9a227;
-    padding: 32px 40px 40px;
+    padding: 44px 56px 48px;
     position: relative;
     overflow: hidden;
-    min-height: 800px;
+    min-height: calc(297mm - 28px);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -66,8 +70,8 @@ const css = `
   /* Corner flourishes */
   .corner {
     position: absolute;
-    width: 80px;
-    height: 80px;
+    width: 100px;
+    height: 100px;
     opacity: 0.55;
   }
   .corner svg { width: 100%; height: 100%; }
@@ -77,13 +81,13 @@ const css = `
   .corner-br { bottom: 0; right: 0; transform: rotate(180deg); }
 
   .logo-wrap {
-    margin-bottom: 10px;
+    margin-bottom: 14px;
     display: flex;
     justify-content: center;
   }
   .logo-wrap img {
-    width: 90px;
-    height: 90px;
+    width: 110px;
+    height: 110px;
     object-fit: contain;
     border-radius: 50%;
     border: 3px solid #c9a227;
@@ -91,8 +95,8 @@ const css = `
     background: #fff;
   }
   .logo-placeholder {
-    width: 90px;
-    height: 90px;
+    width: 110px;
+    height: 110px;
     border-radius: 50%;
     border: 3px solid #c9a227;
     background: #fff;
@@ -100,130 +104,148 @@ const css = `
     align-items: center;
     justify-content: center;
     color: #aaa;
-    font-size: 11pt;
+    font-size: 12pt;
     font-family: Arial, sans-serif;
   }
 
   .cert-title {
     font-family: 'Palatino Linotype', 'Book Antiqua', 'Palatino', cursive, serif;
-    font-size: 34pt;
+    font-size: 40pt;
     color: #2c2c2c;
     font-style: italic;
     text-align: center;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
     line-height: 1.1;
   }
   .cert-subtitle {
-    font-size: 10pt;
+    font-size: 12pt;
     font-style: italic;
     color: #555;
     text-align: center;
-    margin-bottom: 18px;
+    margin-bottom: 22px;
     font-family: 'Georgia', serif;
   }
   .divider {
     width: 60%;
-    height: 1px;
+    height: 1.5px;
     background: linear-gradient(to right, transparent, #c9a227, transparent);
-    margin: 6px auto 16px;
+    margin: 8px auto 20px;
   }
   .employee-name {
-    font-size: 18pt;
+    font-size: 22pt;
     font-weight: bold;
     text-align: center;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
     color: #1a1a1a;
     text-transform: uppercase;
-    margin-bottom: 10px;
-    border-bottom: 1px solid #c9a227;
-    padding-bottom: 8px;
-    width: 80%;
+    margin-bottom: 14px;
+    border-bottom: 1.5px solid #c9a227;
+    padding-bottom: 12px;
+    width: 85%;
   }
   .employed-by {
-    font-size: 11pt;
+    font-size: 13pt;
     text-align: center;
     color: #333;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
   }
   .employed-by strong { font-style: italic; font-weight: bold; }
   .service-line {
-    font-size: 10pt;
+    font-size: 11pt;
     color: #555;
     text-align: center;
-    margin-bottom: 22px;
+    margin-bottom: 28px;
     font-style: italic;
   }
 
   .details-table {
-    width: 70%;
-    margin: 0 auto 18px;
+    width: 72%;
+    margin: 0 auto 24px;
   }
   .details-table tr td {
-    padding: 3px 0;
-    font-size: 10.5pt;
+    padding: 5px 0;
+    font-size: 12pt;
     color: #222;
   }
   .details-table tr td:first-child {
     color: #555;
-    padding-right: 12px;
+    padding-right: 16px;
     white-space: nowrap;
   }
   .details-table tr td:last-child {
-    font-weight: 500;
+    font-weight: 600;
   }
 
   .section-heading {
-    font-size: 9.5pt;
+    font-size: 11pt;
     font-weight: bold;
     text-transform: uppercase;
-    letter-spacing: 1.5px;
+    letter-spacing: 2px;
     color: #333;
     text-align: center;
-    margin-bottom: 10px;
+    margin-bottom: 14px;
   }
   .conduct-table {
     width: 60%;
-    margin: 0 auto 30px;
+    margin: 0 auto 0;
   }
   .conduct-table tr td {
-    padding: 2px 0;
-    font-size: 10.5pt;
+    padding: 5px 0;
+    font-size: 12pt;
     text-align: center;
     color: #222;
   }
   .conduct-table tr td:first-child {
     text-align: left;
     color: #555;
-    padding-right: 16px;
+    padding-right: 20px;
   }
 
+  .spacer { flex: 1; }
+
   .sig-area {
-    margin-top: auto;
     width: 55%;
     text-align: center;
+    margin-top: 40px;
   }
   .sig-line {
     border-bottom: 1px solid #555;
-    margin: 32px auto 6px;
+    margin: 48px auto 8px;
     width: 100%;
   }
   .sig-label {
-    font-size: 10pt;
+    font-size: 11pt;
     color: #444;
     font-style: italic;
   }
 
   .footer-note {
-    font-size: 8pt;
+    font-size: 9pt;
     color: #999;
     text-align: center;
-    margin-top: 18px;
+    margin-top: 24px;
     font-family: Arial, sans-serif;
   }
 
   @media print {
-    html, body { background: #fff; padding: 0; }
-    .cert-outer { max-width: 100%; border-width: 8px; }
+    html, body {
+      background: #fff;
+      padding: 0;
+      width: 210mm;
+      height: 297mm;
+      display: block;
+    }
+    .cert-outer {
+      width: 210mm;
+      height: 297mm;
+      min-height: unset;
+      border-width: 10px;
+      page-break-inside: avoid;
+    }
+    .cert-inner {
+      height: calc(297mm - 28px);
+      min-height: unset;
+    }
     .no-print { display: none !important; }
   }
 `;
@@ -350,6 +372,9 @@ export default async function CertificatePrintPage({ params }: { params: Promise
               )}
             </tbody>
           </table>
+
+          {/* Vertical spacer pushes signature to lower third */}
+          <div className="spacer" />
 
           {/* Signature */}
           <div className="sig-area">
