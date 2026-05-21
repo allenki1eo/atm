@@ -6,11 +6,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import Link from "next/link";
 import {
   Plus, Search, Users, Pencil, Trash2, Upload, Download,
   FileText, CheckCircle2, XCircle, Loader2, KeyRound,
   ShieldCheck, ShieldOff, History, RotateCcw, UserCheck,
-  UserX, ArrowRightLeft,
+  UserX, ArrowRightLeft, ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -630,10 +631,16 @@ export default function EmployeesPage() {
           <p className="text-xl font-bold text-emerald-600">{activeEmployees.length}</p>
           <p className="text-xs text-muted-foreground">Active</p>
         </CardContent></Card>
-        <Card><CardContent className="p-3">
-          <p className="text-xl font-bold text-amber-600">{inactiveEmployees.length}</p>
-          <p className="text-xs text-muted-foreground">Inactive</p>
-        </CardContent></Card>
+        <Link href="/former-employees" className="block">
+          <Card className="hover:border-amber-400 transition-colors cursor-pointer">
+            <CardContent className="p-3">
+              <p className="text-xl font-bold text-amber-600">{inactiveEmployees.length}</p>
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                Inactive <ExternalLink className="h-3 w-3" />
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
         <Card><CardContent className="p-3">
           <p className="text-xl font-bold text-blue-600">
             {employees?.filter((e) => e.type === "casual").length ?? 0}
@@ -641,6 +648,25 @@ export default function EmployeesPage() {
           <p className="text-xs text-muted-foreground">Mkataba</p>
         </CardContent></Card>
       </div>
+
+      {/* Inactive employees callout */}
+      {canManage && inactiveEmployees.length > 0 && (
+        <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-400">
+            <UserX className="h-4 w-4 shrink-0" />
+            <span>
+              <strong>{inactiveEmployees.length}</strong>{" "}
+              {inactiveEmployees.length === 1 ? "mfanyakazi amewekwa" : "wafanyakazi wamewekwa"} inactive — wanapatikana katika sehemu ya Wafanyakazi wa Zamani.
+            </span>
+          </div>
+          <Button variant="outline" size="sm" asChild className="shrink-0 border-amber-300 text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-400">
+            <Link href="/former-employees">
+              Wafanyakazi wa Zamani
+              <ExternalLink className="h-3 w-3 ml-1" />
+            </Link>
+          </Button>
+        </div>
+      )}
 
       {/* Table */}
       <Card className="overflow-hidden">
