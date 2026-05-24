@@ -18,6 +18,10 @@ import {
   DollarSign,
   FileText,
   BarChart2,
+  Download,
+  MoreHorizontal,
+  Plus,
+  Search,
 } from "lucide-react";
 import {
   Card,
@@ -32,6 +36,15 @@ import { Button } from "@/components/ui/button";
 
 type DayData = { date: string; present: number; late: number; absent: number };
 type AttRow = { date: string; status: string; count: number };
+type RecentAttRow = {
+  id: string;
+  employee_name: string;
+  section_name: string | null;
+  company_name: string | null;
+  status: string;
+  date: string;
+  marked_at: string | null;
+};
 
 function buildTrend(rows: AttRow[], startDate: Date): DayData[] {
   const map = new Map<string, DayData>();
@@ -50,6 +63,21 @@ function buildTrend(rows: AttRow[], startDate: Date): DayData[] {
     }
   }
   return Array.from(map.values());
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; className: string }> = {
+    present:  { label: "Present",  className: "bg-green-100 text-green-700 border-green-200" },
+    late:     { label: "Late",     className: "bg-amber-100 text-amber-700 border-amber-200" },
+    absent:   { label: "Absent",   className: "bg-red-100 text-red-700 border-red-200" },
+    half_day: { label: "Half Day", className: "bg-blue-100 text-blue-700 border-blue-200" },
+  };
+  const s = map[status] ?? { label: status, className: "bg-muted text-muted-foreground border-border" };
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${s.className}`}>
+      {s.label}
+    </span>
+  );
 }
 
 export default async function DashboardPage() {
@@ -75,6 +103,12 @@ export default async function DashboardPage() {
     "Jul","Aug","Sep","Oct","Nov","Dec",
   ];
 
+  const formattedDate = now.toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
   // ── Today's attendance counts ──────────────────────────────────────────────
   let totalEmployees = 0;
   let presentToday = 0;
@@ -89,6 +123,9 @@ export default async function DashboardPage() {
   let pendingCorrections = 0;
   let pendingLeaves = 0;
   let pendingAdvances = 0;
+
+  // ── Recent attendance records (management view) ────────────────────────────
+  let recentAttendance: RecentAttRow[] = [];
 
   // ── Employee personal stats (role=employee) ────────────────────────────────
   let myPresent = 0;
@@ -125,7 +162,6 @@ export default async function DashboardPage() {
         else if (row.status === "absent") absentToday = row.count;
       }
 
-      // 7-day trend for supervisor's team
       const trendResult = await db.execute({
         sql: `SELECT a.date, a.status, COUNT(*) as count
               FROM attendance a
@@ -140,7 +176,6 @@ export default async function DashboardPage() {
         sevenDaysAgo
       );
 
-      // Pending corrections for their team
       const corrResult = await db.execute({
         sql: `SELECT COUNT(*) as count
               FROM attendance_corrections ac
@@ -168,6 +203,21 @@ export default async function DashboardPage() {
       pendingLeaves = (
         leaveResult.rows[0] as unknown as { count: number }
       ).count;
+
+      const recentResult = await db.execute({
+        sql: `SELECT a.id, e.name as employee_name,
+                     s.name as section_name, c.name as company_name,
+                     a.status, a.date, a.marked_at
+              FROM attendance a
+              JOIN employees e ON e.id = a.employee_id
+              LEFT JOIN sections s ON s.id = e.section_id
+              LEFT JOIN companies c ON c.id = e.company_id
+              WHERE a.date = ? AND e.supervisor_id = ?
+              ORDER BY a.marked_at DESC
+              LIMIT 10`,
+        args: [today, userId],
+      });
+      recentAttendance = recentResult.rows as unknown as RecentAttRow[];
     } else if (role === "admin" || role === "hr") {
       // ── Admin / HR: company-wide ─────────────────────────────────────────
       const empResult = await db.execute(
@@ -188,7 +238,6 @@ export default async function DashboardPage() {
         else if (row.status === "absent") absentToday = row.count;
       }
 
-      // 7-day attendance trend
       const trendResult = await db.execute({
         sql: `SELECT date, status, COUNT(*) as count
               FROM attendance
@@ -202,7 +251,6 @@ export default async function DashboardPage() {
         sevenDaysAgo
       );
 
-      // 6-month casual payroll trend from locked payslips
       const sixMonthsAgo = new Date(now);
       sixMonthsAgo.setMonth(now.getMonth() - 5);
       const pyResult = await db.execute({
@@ -220,7 +268,6 @@ export default async function DashboardPage() {
         ],
       });
 
-      // Current-month projected total from live attendance * daily_rate
       const projResult = await db.execute({
         sql: `SELECT COALESCE(SUM(att.a_days * e.daily_rate), 0) as projected
               FROM (
@@ -259,7 +306,6 @@ export default async function DashboardPage() {
           projected: false,
         });
       }
-      // Inject current month as projected if payroll not yet locked
       if (!payrollMap.has(`${currentYear}-${currentMonth}`)) {
         payrollMap.set(`${currentYear}-${currentMonth}`, {
           month: currentMonth,
@@ -273,7 +319,6 @@ export default async function DashboardPage() {
         a.year !== b.year ? a.year - b.year : a.month - b.month
       );
 
-      // Pending action items
       const [corrRes, leaveRes, advRes] = await Promise.all([
         db.execute(
           "SELECT COUNT(*) as count FROM attendance_corrections WHERE status = 'pending'"
@@ -290,6 +335,21 @@ export default async function DashboardPage() {
       ).count;
       pendingLeaves = (leaveRes.rows[0] as unknown as { count: number }).count;
       pendingAdvances = (advRes.rows[0] as unknown as { count: number }).count;
+
+      const recentResult = await db.execute({
+        sql: `SELECT a.id, e.name as employee_name,
+                     s.name as section_name, c.name as company_name,
+                     a.status, a.date, a.marked_at
+              FROM attendance a
+              JOIN employees e ON e.id = a.employee_id
+              LEFT JOIN sections s ON s.id = e.section_id
+              LEFT JOIN companies c ON c.id = e.company_id
+              WHERE a.date = ?
+              ORDER BY a.marked_at DESC
+              LIMIT 10`,
+        args: [today],
+      });
+      recentAttendance = recentResult.rows as unknown as RecentAttRow[];
     } else if (role === "employee" && employeeId) {
       // ── Employee: personal stats for this month ──────────────────────────
       const empRow = await db.execute({
@@ -351,6 +411,7 @@ export default async function DashboardPage() {
       icon: Users,
       color: "text-blue-600",
       bgColor: "bg-blue-50",
+      sparklineData: attendanceTrend.map((d) => d.present + d.late + d.absent),
     },
     {
       label: "Present Today",
@@ -360,8 +421,9 @@ export default async function DashboardPage() {
       bgColor: "bg-green-50",
       change:
         totalEmployees > 0
-          ? `${Math.round(((presentToday + lateToday) / totalEmployees) * 100)}% rate`
+          ? `${Math.round(((presentToday + lateToday) / totalEmployees) * 100)}% attendance rate`
           : undefined,
+      sparklineData: attendanceTrend.map((d) => d.present),
     },
     {
       label: "Late Today",
@@ -369,6 +431,7 @@ export default async function DashboardPage() {
       icon: Clock,
       color: "text-amber-600",
       bgColor: "bg-amber-50",
+      sparklineData: attendanceTrend.map((d) => d.late),
     },
     {
       label: "Absent Today",
@@ -376,37 +439,40 @@ export default async function DashboardPage() {
       icon: AlertCircle,
       color: "text-red-600",
       bgColor: "bg-red-50",
+      sparklineData: attendanceTrend.map((d) => d.absent),
     },
   ];
 
   return (
     <div className="space-y-6">
-      {/* ── Page header ────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
+      {/* ── Page header ─────────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Welcome back,{" "}
-            <span className="font-medium text-foreground">
-              {session.user.name}
-            </span>
-            .{" "}
-            {new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "long",
-              day: "numeric",
-            })}
-            .
+          <h1 className="text-2xl font-bold tracking-tight">
+            Welcome back, {session.user.name?.split(" ")[0]}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Here&apos;s what&apos;s happening with your team today.
           </p>
         </div>
-        {isManagement && (
-          <Button asChild>
-            <Link href="/attendance/today">
-              <ClipboardList className="h-4 w-4 mr-2" />
-              Mark Attendance
-            </Link>
-          </Button>
-        )}
+
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Date pill */}
+          <div className="flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 h-9 text-sm text-muted-foreground">
+            <Calendar className="h-3.5 w-3.5" />
+            <span>{formattedDate}</span>
+          </div>
+
+          {/* Export / action button */}
+          {isManagement && (
+            <Button asChild>
+              <Link href="/attendance/today">
+                <Download className="h-4 w-4 mr-1.5" />
+                Export Attendance
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* ════════════════════════════════════════════════════════════════════ */}
@@ -414,7 +480,7 @@ export default async function DashboardPage() {
       {/* ════════════════════════════════════════════════════════════════════ */}
       {isManagement && (
         <>
-          {/* Stats grid */}
+          {/* Stats grid with sparklines */}
           <StatsGrid stats={stats} />
 
           {/* Pending action alerts */}
@@ -448,9 +514,7 @@ export default async function DashboardPage() {
                           {pendingLeaves} Leave Request
                           {pendingLeaves !== 1 ? "s" : ""}
                         </p>
-                        <p className="text-xs text-blue-700">
-                          Awaiting approval
-                        </p>
+                        <p className="text-xs text-blue-700">Awaiting approval</p>
                       </div>
                     </CardContent>
                   </Card>
@@ -477,22 +541,39 @@ export default async function DashboardPage() {
             </div>
           )}
 
-          {/* Charts */}
+          {/* Charts row */}
           <div
             className={`grid gap-6 ${
-              role === "admin" || role === "hr" ? "lg:grid-cols-2" : ""
+              role === "admin" || role === "hr" ? "lg:grid-cols-[3fr_2fr]" : ""
             }`}
           >
             {/* 7-day attendance trend */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <BarChart2 className="h-4 w-4 text-green-600" />
-                  7-Day Attendance Trend
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+                      Attendance Trend
+                    </p>
+                    <CardTitle className="text-lg">
+                      {presentToday + lateToday} Present / Late
+                    </CardTitle>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <span className="h-2 w-2 rounded-sm bg-green-400 inline-block" />
+                      Present
+                    </span>
+                    <span className="mx-1 text-muted-foreground">·</span>
+                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <span className="h-2 w-2 rounded-sm bg-amber-400 inline-block" />
+                      Late
+                    </span>
+                  </div>
+                </div>
                 <CardDescription>
-                  Daily breakdown — present / late / absent
-                  {role === "supervisor" ? " for your team" : ""}
+                  Daily breakdown for the past 7 days
+                  {role === "supervisor" ? " — your team" : ""}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -504,13 +585,17 @@ export default async function DashboardPage() {
             {(role === "admin" || role === "hr") && (
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-blue-600" />
-                    Casual Payroll Trend
-                  </CardTitle>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+                      Payroll Breakdown
+                    </p>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-blue-500" />
+                      Casual Wages
+                    </CardTitle>
+                  </div>
                   <CardDescription>
-                    Monthly casual wages — red = high, green = low vs average.
-                    Current month is projected from live attendance.
+                    6-month casual payroll. Current month is projected.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -520,11 +605,142 @@ export default async function DashboardPage() {
             )}
           </div>
 
+          {/* Recent Attendance Table */}
+          <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+            {/* Table header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border-b">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">
+                  Recent Attendance
+                </p>
+                <p className="text-sm font-semibold">Today&apos;s Records</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 h-9 text-sm text-muted-foreground cursor-text">
+                  <Search className="h-3.5 w-3.5 shrink-0" />
+                  <span className="text-xs">Search attendance...</span>
+                </div>
+                <Button asChild size="sm">
+                  <Link href="/attendance/today">
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Mark Attendance
+                  </Link>
+                </Button>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/20">
+                    <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      ID
+                    </th>
+                    <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Employee
+                    </th>
+                    <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell">
+                      Section
+                    </th>
+                    <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Status
+                    </th>
+                    <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden lg:table-cell">
+                      Date
+                    </th>
+                    <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hidden lg:table-cell">
+                      Marked At
+                    </th>
+                    <th className="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentAttendance.length > 0 ? (
+                    recentAttendance.map((row) => (
+                      <tr
+                        key={row.id}
+                        className="border-b last:border-0 hover:bg-muted/20 transition-colors"
+                      >
+                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                          #{row.id.slice(0, 8).toUpperCase()}
+                        </td>
+                        <td className="px-4 py-3 font-medium">
+                          {row.employee_name}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground text-sm hidden md:table-cell">
+                          {row.section_name ?? row.company_name ?? "—"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <StatusBadge status={row.status} />
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs hidden lg:table-cell">
+                          {row.date}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs hidden lg:table-cell">
+                          {row.marked_at
+                            ? new Date(row.marked_at).toLocaleTimeString(
+                                "en-US",
+                                { hour: "2-digit", minute: "2-digit" }
+                              )
+                            : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            asChild
+                          >
+                            <Link href="/attendance/today">
+                              <MoreHorizontal className="h-3.5 w-3.5" />
+                            </Link>
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="px-4 py-10 text-center text-sm text-muted-foreground"
+                      >
+                        No attendance recorded for today yet.
+                        <Link
+                          href="/attendance/today"
+                          className="ml-1 text-primary underline-offset-4 hover:underline"
+                        >
+                          Mark attendance
+                        </Link>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Table footer */}
+            {recentAttendance.length > 0 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/10">
+                <p className="text-xs text-muted-foreground">
+                  Showing {recentAttendance.length} most recent record
+                  {recentAttendance.length !== 1 ? "s" : ""} for today
+                </p>
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/attendance/today">View all</Link>
+                </Button>
+              </div>
+            )}
+          </div>
+
           {/* Quick-action cards */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Card className="hover:shadow-md transition-shadow">
               <CardHeader>
-                <CardTitle className="text-base">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ClipboardList className="h-4 w-4 text-green-600" />
                   Today&apos;s Attendance
                 </CardTitle>
                 <CardDescription>
@@ -554,7 +770,8 @@ export default async function DashboardPage() {
             {(role === "hr" || role === "admin") && (
               <Card className="hover:shadow-md transition-shadow">
                 <CardHeader>
-                  <CardTitle className="text-base">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <BarChart2 className="h-4 w-4 text-blue-600" />
                     Payroll Management
                   </CardTitle>
                   <CardDescription>
@@ -576,7 +793,10 @@ export default async function DashboardPage() {
 
             <Card className="hover:shadow-md transition-shadow">
               <CardHeader>
-                <CardTitle className="text-base">My Profile</CardTitle>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="h-4 w-4 text-purple-600" />
+                  My Profile
+                </CardTitle>
                 <CardDescription>
                   View your personal attendance and earnings
                 </CardDescription>
@@ -600,67 +820,59 @@ export default async function DashboardPage() {
             <>
               {/* Personal stats for the current month */}
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Present
-                    </p>
-                    <p className="text-3xl font-bold text-green-700 mt-1">
-                      {myPresent}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      days this month
-                    </p>
-                  </CardContent>
-                </Card>
+                <div className="rounded-xl border bg-card p-5 shadow-sm">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+                    Present
+                  </p>
+                  <p className="text-3xl font-bold text-green-700 mt-1">
+                    {myPresent}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    days this month
+                  </p>
+                </div>
 
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Late
-                    </p>
-                    <p className="text-3xl font-bold text-amber-600 mt-1">
-                      {myLate}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      days this month
-                    </p>
-                  </CardContent>
-                </Card>
+                <div className="rounded-xl border bg-card p-5 shadow-sm">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+                    Late
+                  </p>
+                  <p className="text-3xl font-bold text-amber-600 mt-1">
+                    {myLate}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    days this month
+                  </p>
+                </div>
 
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Absent
-                    </p>
-                    <p className="text-3xl font-bold text-red-600 mt-1">
-                      {myAbsent}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      days this month
-                    </p>
-                  </CardContent>
-                </Card>
+                <div className="rounded-xl border bg-card p-5 shadow-sm">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+                    Absent
+                  </p>
+                  <p className="text-3xl font-bold text-red-600 mt-1">
+                    {myAbsent}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    days this month
+                  </p>
+                </div>
 
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      {myEmployeeType === "casual" ? "Earned" : "Salary"}
-                    </p>
-                    <p className="text-2xl font-bold text-blue-700 mt-1 leading-tight">
-                      {formatCurrency(myEarnings)}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {myEmployeeType === "casual"
-                        ? `${myPresent + myLate} days × ${formatCurrency(myDailyRate)}`
-                        : "monthly salary"}
-                    </p>
-                  </CardContent>
-                </Card>
+                <div className="rounded-xl border bg-card p-5 shadow-sm">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+                    {myEmployeeType === "casual" ? "Earned" : "Salary"}
+                  </p>
+                  <p className="text-2xl font-bold text-blue-700 mt-1 leading-tight">
+                    {formatCurrency(myEarnings)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {myEmployeeType === "casual"
+                      ? `${myPresent + myLate} days × ${formatCurrency(myDailyRate)}`
+                      : "monthly salary"}
+                  </p>
+                </div>
               </div>
 
               {/* Attendance rate progress bar */}
-              {(myPresent + myLate + myAbsent) > 0 && (
+              {myPresent + myLate + myAbsent > 0 && (
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-2">
@@ -692,8 +904,8 @@ export default async function DashboardPage() {
                       />
                     </div>
                     <p className="text-xs text-muted-foreground mt-1.5">
-                      {myPresent + myLate} out of {myPresent + myLate + myAbsent} days
-                      marked
+                      {myPresent + myLate} out of{" "}
+                      {myPresent + myLate + myAbsent} days marked
                     </p>
                   </CardContent>
                 </Card>
@@ -764,7 +976,6 @@ export default async function DashboardPage() {
               </CardContent>
             </Card>
           )}
-
         </div>
       )}
     </div>

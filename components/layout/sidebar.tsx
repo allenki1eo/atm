@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard, Users, Calendar, CalendarDays, ClipboardList, ClipboardEdit,
-  DollarSign, UserCircle, LogOut, ChevronDown, Shield, Building2, Palmtree,
+  DollarSign, UserCircle, LogOut, Shield, Building2, Palmtree,
   Upload, UserCog, Megaphone, MessageSquareWarning, Clock, PanelLeftOpen,
   PanelLeftClose, UserX,
 } from "lucide-react";
@@ -48,11 +47,11 @@ const navGroups: NavGroup[] = [
     label: "Mahudhurio",
     icon: ClipboardList,
     items: [
-      { href: "/attendance/today",       label: "Leo",             icon: ClipboardList,  roles: ["supervisor", "hr", "admin"] },
-      { href: "/attendance/history",     label: "Historia",        icon: Calendar,       roles: ["supervisor", "hr", "admin"] },
-      { href: "/attendance/edit",        label: "Hariri",          icon: CalendarDays,   roles: ["admin"] },
-      { href: "/attendance/import",      label: "Ingiza",          icon: Upload,         roles: ["admin"] },
-      { href: "/attendance/corrections", label: "Marekebisho",     icon: ClipboardEdit,  roles: ["supervisor", "hr", "admin"], badgeKey: "corrections" },
+      { href: "/attendance/today",       label: "Leo",         icon: ClipboardList,        roles: ["supervisor", "hr", "admin"] },
+      { href: "/attendance/history",     label: "Historia",    icon: Calendar,             roles: ["supervisor", "hr", "admin"] },
+      { href: "/attendance/edit",        label: "Hariri",      icon: CalendarDays,         roles: ["admin"] },
+      { href: "/attendance/import",      label: "Ingiza",      icon: Upload,               roles: ["admin"] },
+      { href: "/attendance/corrections", label: "Marekebisho", icon: ClipboardEdit,        roles: ["supervisor", "hr", "admin"], badgeKey: "corrections" },
     ],
   },
   {
@@ -60,7 +59,7 @@ const navGroups: NavGroup[] = [
     label: "Wafanyakazi",
     icon: Users,
     items: [
-      { href: "/employees",        label: "Wafanyakazi",        icon: Users,        roles: ["hr", "admin"] },
+      { href: "/employees",        label: "Wafanyakazi",           icon: Users,        roles: ["hr", "admin"] },
       { href: "/former-employees", label: "Wafanyakazi wa Zamani", icon: UserX,        roles: ["hr", "admin"] },
       { href: "/companies",        label: "Makampuni & Sehemu",    icon: Building2,    roles: ["admin"] },
       { href: "/holidays",         label: "Sikukuu",               icon: CalendarDays, roles: ["hr", "admin"] },
@@ -72,10 +71,10 @@ const navGroups: NavGroup[] = [
     label: "Mishahara",
     icon: DollarSign,
     items: [
-      { href: "/payroll/periods", label: "Vipindi vya Mshahara",  icon: DollarSign, roles: ["hr", "admin"] },
-      { href: "/payroll/casual",  label: "Mshahara wa Mkataba",   icon: DollarSign, roles: ["hr", "admin"] },
-      { href: "/overtime",        label: "Overtime / Ziada",      icon: Clock,      roles: ["hr", "admin"] },
-      { href: "/advances",        label: "Salary Advance",        icon: DollarSign, roles: ["hr", "admin"] },
+      { href: "/payroll/periods", label: "Vipindi vya Mshahara", icon: DollarSign, roles: ["hr", "admin"] },
+      { href: "/payroll/casual",  label: "Mshahara wa Mkataba",  icon: DollarSign, roles: ["hr", "admin"] },
+      { href: "/overtime",        label: "Overtime / Ziada",     icon: Clock,      roles: ["hr", "admin"] },
+      { href: "/advances",        label: "Salary Advance",       icon: DollarSign, roles: ["hr", "admin"] },
     ],
   },
   {
@@ -83,8 +82,8 @@ const navGroups: NavGroup[] = [
     label: "Mawasiliano",
     icon: Megaphone,
     items: [
-      { href: "/leave",         label: "Likizo",     icon: Palmtree,           roles: ["supervisor", "hr", "admin", "employee"] },
-      { href: "/announcements", label: "Matangazo",  icon: Megaphone,          roles: ["supervisor", "hr", "admin", "employee"], badgeKey: "announcements" },
+      { href: "/leave",         label: "Likizo",     icon: Palmtree,             roles: ["supervisor", "hr", "admin", "employee"] },
+      { href: "/announcements", label: "Matangazo",  icon: Megaphone,            roles: ["supervisor", "hr", "admin", "employee"], badgeKey: "announcements" },
       { href: "/complaints",    label: "Malalamiko", icon: MessageSquareWarning, roles: ["hr", "admin", "employee"], badgeKey: "complaints" },
     ],
   },
@@ -99,23 +98,6 @@ interface SidebarProps {
 export function Sidebar({ user, collapsed = false, onToggleCollapsed }: SidebarProps) {
   const pathname = usePathname();
 
-  // Initialise all groups open; user can collapse
-  const [openGroups, setOpenGroups] = useState<Set<string>>(
-    () => new Set(navGroups.map((g) => g.id))
-  );
-
-  const toggleGroup = (id: string) =>
-    setOpenGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-
-  // Badge queries
   const { data: unreadAnnouncements } = useQuery({
     queryKey: ["sidebar", "announcements-unread"],
     queryFn: async () => {
@@ -160,8 +142,8 @@ export function Sidebar({ user, collapsed = false, onToggleCollapsed }: SidebarP
 
   const badgeFor = (key?: "announcements" | "complaints" | "corrections") => {
     if (key === "announcements") return unreadAnnouncements?.length ?? 0;
-    if (key === "complaints")    return openComplaints?.length ?? 0;
-    if (key === "corrections")   return pendingCorrections?.length ?? 0;
+    if (key === "complaints") return openComplaints?.length ?? 0;
+    if (key === "corrections") return pendingCorrections?.length ?? 0;
     return 0;
   };
 
@@ -171,9 +153,6 @@ export function Sidebar({ user, collapsed = false, onToggleCollapsed }: SidebarP
   const groupBadgeCount = (group: NavGroup) =>
     group.items.reduce((sum, item) => sum + badgeFor(item.badgeKey), 0);
 
-  const isGroupActive = (group: NavGroup) =>
-    group.items.some((item) => isItemActive(item.href));
-
   const initials = user.name
     ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "U";
@@ -181,10 +160,11 @@ export function Sidebar({ user, collapsed = false, onToggleCollapsed }: SidebarP
   const renderItem = (item: NavItem) => {
     if (!item.roles.includes(user.role)) return null;
     const active = isItemActive(item.href);
-    const count  = badgeFor(item.badgeKey);
+    const count = badgeFor(item.badgeKey);
     return (
       <li key={item.href}>
-        <Link href={item.href}
+        <Link
+          href={item.href}
           title={collapsed ? item.label : undefined}
           className={cn(
             "relative flex items-center rounded-md py-2 text-sm font-medium transition-colors",
@@ -192,7 +172,8 @@ export function Sidebar({ user, collapsed = false, onToggleCollapsed }: SidebarP
             active
               ? "bg-sidebar-accent text-sidebar-accent-foreground"
               : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-          )}>
+          )}
+        >
           <item.icon className="h-4 w-4 shrink-0" />
           {!collapsed && <span className="flex-1">{item.label}</span>}
           {count > 0 && (
@@ -209,14 +190,12 @@ export function Sidebar({ user, collapsed = false, onToggleCollapsed }: SidebarP
     const visibleItems = group.items.filter((i) => i.roles.includes(user.role));
     if (visibleItems.length === 0) return null;
 
-    const isOpen   = openGroups.has(group.id);
-    const active   = isGroupActive(group);
-    const badges   = groupBadgeCount(group);
+    const badges = groupBadgeCount(group);
 
     if (collapsed) {
       return (
-        <li key={group.id}>
-          <ul className="space-y-1">
+        <li key={group.id} className="mt-2">
+          <ul className="space-y-0.5">
             {visibleItems.map(renderItem)}
           </ul>
         </li>
@@ -224,66 +203,45 @@ export function Sidebar({ user, collapsed = false, onToggleCollapsed }: SidebarP
     }
 
     return (
-      <li key={group.id}>
-        {/* Group header button */}
-        <button
-          onClick={() => toggleGroup(group.id)}
-          className={cn(
-            "w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-colors",
-            active
-              ? "text-sidebar-foreground bg-sidebar-accent/30"
-              : "text-sidebar-foreground/80 hover:bg-sidebar-accent/30 hover:text-sidebar-foreground"
-          )}>
-          <group.icon className="h-4 w-4 shrink-0" />
-          <span className="flex-1 text-left">{group.label}</span>
-          {!isOpen && badges > 0 && (
-            <Badge className="text-xs" variant="destructive">{badges}</Badge>
+      <li key={group.id} className="mt-5">
+        {/* Static section label */}
+        <div className="flex items-center justify-between px-3 mb-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
+            {group.label}
+          </p>
+          {badges > 0 && (
+            <Badge variant="destructive" className="text-[10px] h-4 px-1 min-w-[1rem] flex items-center justify-center">
+              {badges}
+            </Badge>
           )}
-          <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 transition-transform duration-200 opacity-60", isOpen && "rotate-180")} />
-        </button>
-
-        {/* Children */}
-        {isOpen && (
-          <ul className="mt-0.5 ml-3 pl-3 border-l border-sidebar-border/50 space-y-0.5">
-            {visibleItems.map((item) => {
-              const itemActive = isItemActive(item.href);
-              const count      = badgeFor(item.badgeKey);
-              return (
-                <li key={item.href}>
-                  <Link href={item.href}
-                    className={cn(
-                      "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors",
-                      itemActive
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                        : "text-sidebar-foreground/65 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground"
-                    )}>
-                    <item.icon className="h-3.5 w-3.5 shrink-0" />
-                    <span className="flex-1">{item.label}</span>
-                    {count > 0 && <Badge className="text-xs" variant="destructive">{count}</Badge>}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        </div>
+        <ul className="space-y-0.5">
+          {visibleItems.map(renderItem)}
+        </ul>
       </li>
     );
   };
 
   return (
     <div className="flex h-full flex-col bg-sidebar-background text-sidebar-foreground">
-      {/* Logo */}
-      <div className={cn(
-        "relative flex items-center border-b border-sidebar-border",
-        collapsed ? "justify-center px-3 py-4" : "gap-3 px-6 py-5"
-      )}>
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary">
+      {/* Logo / branding */}
+      <div
+        className={cn(
+          "relative flex items-center border-b border-sidebar-border",
+          collapsed ? "justify-center px-3 py-4" : "gap-3 px-6 py-5"
+        )}
+      >
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary">
           <Shield className="h-5 w-5 text-sidebar-primary-foreground" />
         </div>
         {!collapsed && (
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-sidebar-foreground">TrustTrack</p>
-            <p className="text-xs text-sidebar-foreground/60">Attendance System</p>
+            <p className="text-xs text-sidebar-foreground/50 leading-none mb-0.5">
+              System
+            </p>
+            <p className="text-sm font-bold text-sidebar-foreground leading-none">
+              TrustTrack
+            </p>
           </div>
         )}
         {onToggleCollapsed && (
@@ -308,15 +266,35 @@ export function Sidebar({ user, collapsed = false, onToggleCollapsed }: SidebarP
 
       {/* Navigation */}
       <nav className={cn("flex-1 overflow-y-auto py-4", collapsed ? "px-2" : "px-3")}>
-        <ul className="space-y-1">
+        <ul className="space-y-0.5">
           {/* Dashboard — standalone top */}
-          {standaloneTop.roles.includes(user.role) && renderItem(standaloneTop)}
+          {standaloneTop.roles.includes(user.role) && (
+            <>
+              {!collapsed && (
+                <li>
+                  <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
+                    Main Menu
+                  </p>
+                </li>
+              )}
+              {renderItem(standaloneTop)}
+            </>
+          )}
 
           {/* Grouped sections */}
           {navGroups.map(renderGroup)}
 
           {/* My Dashboard — standalone bottom */}
-          {standaloneBottom.roles.includes(user.role) && renderItem(standaloneBottom)}
+          {standaloneBottom.roles.includes(user.role) && (
+            <li className="mt-5">
+              {!collapsed && (
+                <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
+                  My Account
+                </p>
+              )}
+              {renderItem(standaloneBottom)}
+            </li>
+          )}
         </ul>
       </nav>
 
@@ -325,8 +303,8 @@ export function Sidebar({ user, collapsed = false, onToggleCollapsed }: SidebarP
       {/* User info */}
       <div className={cn("p-4", collapsed && "px-2")}>
         <div className={cn("flex items-center mb-3", collapsed ? "justify-center" : "gap-3")}>
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-xs">
+          <Avatar className="h-8 w-8 shrink-0">
+            <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-xs font-semibold">
               {initials}
             </AvatarFallback>
           </Avatar>
@@ -337,13 +315,16 @@ export function Sidebar({ user, collapsed = false, onToggleCollapsed }: SidebarP
             </div>
           )}
         </div>
-        <Button variant="ghost" size="sm"
+        <Button
+          variant="ghost"
+          size="sm"
           title={collapsed ? "Sign out" : undefined}
           className={cn(
             "w-full text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50",
             collapsed ? "justify-center px-2" : "justify-start"
           )}
-          onClick={() => signOut({ callbackUrl: "/login" })}>
+          onClick={() => signOut({ callbackUrl: "/login" })}
+        >
           <LogOut className={cn("h-4 w-4", !collapsed && "mr-2")} />
           {!collapsed && "Sign out"}
         </Button>
