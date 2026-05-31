@@ -8,11 +8,10 @@ import {
   LayoutDashboard, Users, Calendar, CalendarDays, ClipboardList, ClipboardEdit,
   DollarSign, UserCircle, LogOut, Shield, Building2, Palmtree,
   Upload, UserCog, Megaphone, MessageSquareWarning, Clock, PanelLeftOpen,
-  PanelLeftClose, UserX, CalendarRange, ChevronRight,
+  PanelLeftClose, UserX, CalendarRange, Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 
 interface NavItem {
   href: string;
@@ -25,7 +24,6 @@ interface NavItem {
 interface NavGroup {
   id: string;
   label: string;
-  icon: React.ElementType;
   items: NavItem[];
 }
 
@@ -43,7 +41,6 @@ const navGroups: NavGroup[] = [
   {
     id: "attendance",
     label: "Mahudhurio",
-    icon: ClipboardList,
     items: [
       { href: "/attendance/today",       label: "Leo",           icon: ClipboardList,  roles: ["supervisor", "hr", "admin"] },
       { href: "/attendance/history",     label: "Historia",      icon: Calendar,       roles: ["supervisor", "hr", "admin"] },
@@ -56,7 +53,6 @@ const navGroups: NavGroup[] = [
   {
     id: "employees",
     label: "Wafanyakazi",
-    icon: Users,
     items: [
       { href: "/employees",        label: "Wafanyakazi",           icon: Users,        roles: ["hr", "admin"] },
       { href: "/former-employees", label: "Wafanyakazi wa Zamani", icon: UserX,        roles: ["hr", "admin"] },
@@ -68,7 +64,6 @@ const navGroups: NavGroup[] = [
   {
     id: "payroll",
     label: "Mishahara",
-    icon: DollarSign,
     items: [
       { href: "/payroll/periods", label: "Vipindi vya Mshahara", icon: DollarSign, roles: ["hr", "admin"] },
       { href: "/payroll/casual",  label: "Mshahara wa Mkataba",  icon: DollarSign, roles: ["hr", "admin"] },
@@ -79,7 +74,6 @@ const navGroups: NavGroup[] = [
   {
     id: "communication",
     label: "Mawasiliano",
-    icon: Megaphone,
     items: [
       { href: "/leave",         label: "Likizo",     icon: Palmtree,             roles: ["supervisor", "hr", "admin", "employee"] },
       { href: "/announcements", label: "Matangazo",  icon: Megaphone,            roles: ["supervisor", "hr", "admin", "employee"], badgeKey: "announcements" },
@@ -87,13 +81,6 @@ const navGroups: NavGroup[] = [
     ],
   },
 ];
-
-const roleColors: Record<string, string> = {
-  admin:      "bg-violet-500/20 text-violet-300",
-  hr:         "bg-blue-500/20 text-blue-300",
-  supervisor: "bg-emerald-500/20 text-emerald-300",
-  employee:   "bg-slate-500/20 text-slate-300",
-};
 
 interface SidebarProps {
   user: { name?: string | null; email?: string | null; role: string };
@@ -153,19 +140,18 @@ export function Sidebar({ user, collapsed = false, onToggleCollapsed }: SidebarP
     return 0;
   };
 
-  const isItemActive = (href: string) =>
+  const isActive = (href: string) =>
     pathname === href || (href !== "/" && pathname.startsWith(href));
-
-  const groupBadgeCount = (group: NavGroup) =>
-    group.items.reduce((sum, item) => sum + badgeFor(item.badgeKey), 0);
 
   const initials = user.name
     ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "U";
 
+  const totalBadges = (unreadAnnouncements?.length ?? 0) + (openComplaints?.length ?? 0) + (pendingCorrections?.length ?? 0);
+
   const renderItem = (item: NavItem) => {
     if (!item.roles.includes(user.role)) return null;
-    const active = isItemActive(item.href);
+    const active = isActive(item.href);
     const count = badgeFor(item.badgeKey);
 
     return (
@@ -174,34 +160,34 @@ export function Sidebar({ user, collapsed = false, onToggleCollapsed }: SidebarP
           href={item.href}
           title={collapsed ? item.label : undefined}
           className={cn(
-            "group relative flex items-center rounded-lg text-sm font-medium transition-all duration-150",
-            collapsed ? "justify-center h-9 w-9 mx-auto" : "gap-2.5 px-3 py-2",
+            "flex items-center rounded-xl text-sm font-medium transition-all duration-150 group",
+            collapsed ? "justify-center w-10 h-10 mx-auto" : "gap-3 px-3 py-2.5",
             active
-              ? "bg-white/10 text-white shadow-sm"
-              : "text-white/55 hover:bg-white/6 hover:text-white/90"
+              ? "bg-primary/10 text-primary font-semibold"
+              : "text-sidebar-foreground/60 hover:bg-muted/60 hover:text-sidebar-foreground"
           )}
         >
-          {/* Active left-bar indicator */}
-          {active && !collapsed && (
-            <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-0.5 rounded-full bg-primary" />
-          )}
-
-          <item.icon className={cn("shrink-0 transition-colors", collapsed ? "h-4.5 w-4.5" : "h-4 w-4", active ? "text-primary" : "")} />
+          <span className={cn(
+            "flex items-center justify-center rounded-lg shrink-0 transition-colors",
+            collapsed ? "h-5 w-5" : "h-5 w-5",
+            active ? "text-primary" : "text-sidebar-foreground/50 group-hover:text-sidebar-foreground"
+          )}>
+            <item.icon className="h-[18px] w-[18px]" />
+          </span>
 
           {!collapsed && (
             <>
               <span className="flex-1 leading-none">{item.label}</span>
               {count > 0 && (
-                <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold text-destructive-foreground">
+                <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-bold text-white">
                   {count}
                 </span>
               )}
             </>
           )}
 
-          {/* Collapsed dot indicator */}
           {collapsed && count > 0 && (
-            <span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-destructive" />
+            <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-primary border-2 border-white" />
           )}
         </Link>
       </li>
@@ -211,31 +197,15 @@ export function Sidebar({ user, collapsed = false, onToggleCollapsed }: SidebarP
   const renderGroup = (group: NavGroup) => {
     const visibleItems = group.items.filter((i) => i.roles.includes(user.role));
     if (visibleItems.length === 0) return null;
-    const badges = groupBadgeCount(group);
-
-    if (collapsed) {
-      return (
-        <li key={group.id} className="mt-3">
-          <div className="mx-auto mb-1.5 h-px w-6 bg-white/10 rounded" />
-          <ul className="space-y-0.5 flex flex-col items-center">
-            {visibleItems.map(renderItem)}
-          </ul>
-        </li>
-      );
-    }
 
     return (
       <li key={group.id} className="mt-5">
-        <div className="flex items-center justify-between px-3 mb-1">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-white/30 select-none">
+        {!collapsed && (
+          <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground/70 select-none">
             {group.label}
           </p>
-          {badges > 0 && (
-            <span className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-destructive/80 px-1 text-[10px] font-bold text-white">
-              {badges}
-            </span>
-          )}
-        </div>
+        )}
+        {collapsed && <div className="mx-auto mb-1 h-px w-5 bg-border" />}
         <ul className="space-y-0.5">
           {visibleItems.map(renderItem)}
         </ul>
@@ -244,39 +214,31 @@ export function Sidebar({ user, collapsed = false, onToggleCollapsed }: SidebarP
   };
 
   return (
-    <div className="flex h-full flex-col" style={{ background: "hsl(224 71% 9%)" }}>
+    <div className="flex h-full flex-col bg-sidebar-background border-r border-sidebar-border">
 
       {/* ── Branding ──────────────────────────────────────────────────────── */}
       <div className={cn(
-        "flex items-center border-b shrink-0",
-        "border-white/8",
-        collapsed ? "justify-center px-3 py-4 gap-0" : "gap-3 px-5 py-4"
+        "flex items-center border-b border-sidebar-border shrink-0",
+        collapsed ? "justify-center px-3 py-4" : "px-5 py-4 gap-3"
       )}>
-        {/* Logo mark */}
-        <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary shadow-lg shadow-primary/30">
-          <Shield className="h-4 w-4 text-white" />
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary shadow-md shadow-primary/30">
+          <Shield className="h-[18px] w-[18px] text-white" />
         </div>
-
         {!collapsed && (
           <div className="flex-1 min-w-0">
-            <p className="text-[11px] font-medium text-white/35 leading-none tracking-wide uppercase">
-              Attendance
+            <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider leading-none mb-0.5">
+              Platform
             </p>
-            <p className="text-sm font-bold text-white leading-snug tracking-tight">
+            <p className="text-sm font-bold text-sidebar-foreground leading-none tracking-tight">
               TrustTrack
             </p>
           </div>
         )}
-
-        {/* Collapse toggle */}
         {onToggleCollapsed && (
           <button
             onClick={onToggleCollapsed}
-            title={collapsed ? "Onyesha sidebar" : "Ficha sidebar"}
-            className={cn(
-              "hidden lg:flex h-7 w-7 items-center justify-center rounded-md text-white/35 transition-colors hover:bg-white/8 hover:text-white/70",
-              collapsed && "mt-1 ml-0"
-            )}
+            title={collapsed ? "Onyesha" : "Ficha"}
+            className="hidden lg:flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/60 hover:bg-muted/60 hover:text-foreground transition-colors"
           >
             {collapsed ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
           </button>
@@ -284,14 +246,13 @@ export function Sidebar({ user, collapsed = false, onToggleCollapsed }: SidebarP
       </div>
 
       {/* ── Navigation ────────────────────────────────────────────────────── */}
-      <nav className={cn("flex-1 overflow-y-auto py-3", collapsed ? "px-2" : "px-3")}>
+      <nav className={cn("flex-1 overflow-y-auto py-3", collapsed ? "px-1.5" : "px-3")}>
         <ul className="space-y-0.5">
-          {/* Dashboard standalone */}
           {standaloneTop.roles.includes(user.role) && (
             <>
               {!collapsed && (
                 <li>
-                  <p className="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-white/30 select-none">
+                  <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground/70 select-none">
                     Menyu Kuu
                   </p>
                 </li>
@@ -300,70 +261,64 @@ export function Sidebar({ user, collapsed = false, onToggleCollapsed }: SidebarP
             </>
           )}
 
-          {/* Groups */}
           {navGroups.map(renderGroup)}
 
-          {/* My Account standalone */}
           {standaloneBottom.roles.includes(user.role) && (
             <li className="mt-5">
               {!collapsed && (
-                <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-white/30 select-none">
+                <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground/70 select-none">
                   Akaunti
                 </p>
               )}
+              {collapsed && <div className="mx-auto mb-1 h-px w-5 bg-border" />}
               {renderItem(standaloneBottom)}
             </li>
           )}
         </ul>
       </nav>
 
-      {/* ── User card ─────────────────────────────────────────────────────── */}
-      <div className={cn(
-        "shrink-0 border-t border-white/8",
-        collapsed ? "px-2 py-3" : "px-3 py-3"
-      )}>
+      {/* ── User footer ───────────────────────────────────────────────────── */}
+      <div className={cn("shrink-0 border-t border-sidebar-border", collapsed ? "px-1.5 py-3" : "px-3 py-3")}>
         {collapsed ? (
           <div className="flex flex-col items-center gap-2">
             <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-primary text-white text-xs font-bold">
+              <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
                 {initials}
               </AvatarFallback>
             </Avatar>
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
               title="Sign out"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-white/35 hover:bg-white/8 hover:text-white/70 transition-colors"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/60 hover:bg-muted/60 hover:text-foreground transition-colors"
             >
               <LogOut className="h-3.5 w-3.5" />
             </button>
           </div>
         ) : (
-          <div className="rounded-lg bg-white/5 px-3 py-2.5">
-            <div className="flex items-center gap-2.5">
-              <Avatar className="h-8 w-8 shrink-0">
-                <AvatarFallback className="bg-primary text-white text-xs font-bold">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white truncate leading-snug">
-                  {user.name}
-                </p>
-                <span className={cn(
-                  "inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded capitalize leading-none mt-0.5",
-                  roleColors[user.role] ?? "bg-white/10 text-white/60"
-                )}>
-                  {user.role}
-                </span>
-              </div>
-              <button
-                onClick={() => signOut({ callbackUrl: "/login" })}
-                title="Sign out"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/35 hover:bg-white/10 hover:text-white/70 transition-colors"
-              >
-                <LogOut className="h-3.5 w-3.5" />
-              </button>
+          <div className="flex items-center gap-3 rounded-xl bg-muted/50 px-3 py-2.5">
+            <Avatar className="h-8 w-8 shrink-0">
+              <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-sidebar-foreground truncate leading-snug">
+                {user.name}
+              </p>
+              <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
             </div>
+            {totalBadges > 0 && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white shrink-0">
+                {totalBadges > 9 ? "9+" : totalBadges}
+              </span>
+            )}
+            <button
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              title="Sign out"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground/60 hover:bg-muted/60 hover:text-foreground transition-colors"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </button>
           </div>
         )}
       </div>

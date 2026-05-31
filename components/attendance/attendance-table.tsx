@@ -160,7 +160,7 @@ export function AttendanceTable({ records, isLoading, date, isLocked = false }: 
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border bg-card overflow-x-auto">
+      <div className="rounded-2xl border border-border/60 bg-card overflow-x-auto shadow-sm">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/30">
@@ -200,9 +200,9 @@ export function AttendanceTable({ records, isLoading, date, isLocked = false }: 
                       : record.company_name ?? null;
                     if (label) {
                       rows.push(
-                        <TableRow key={`group-${groupKey}`} className="bg-muted/40 hover:bg-muted/40">
+                        <TableRow key={`group-${groupKey}`} className="bg-accent/30 hover:bg-accent/30">
                           <TableCell colSpan={isLocked ? 5 : 6} className="py-1.5 px-4">
-                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</span>
+                            <span className="text-[10px] font-bold text-primary/70 uppercase tracking-widest">{label}</span>
                           </TableCell>
                         </TableRow>
                       );

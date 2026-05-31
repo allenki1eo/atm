@@ -606,7 +606,7 @@ export default async function DashboardPage() {
           </div>
 
           {/* Recent Attendance Table */}
-          <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden">
             {/* Table header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border-b">
               <div>
@@ -820,7 +820,7 @@ export default async function DashboardPage() {
             <>
               {/* Personal stats for the current month */}
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <div className="rounded-xl border bg-card p-5 shadow-sm">
+                <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
                     Present
                   </p>
@@ -832,7 +832,7 @@ export default async function DashboardPage() {
                   </p>
                 </div>
 
-                <div className="rounded-xl border bg-card p-5 shadow-sm">
+                <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
                     Late
                   </p>
@@ -844,7 +844,7 @@ export default async function DashboardPage() {
                   </p>
                 </div>
 
-                <div className="rounded-xl border bg-card p-5 shadow-sm">
+                <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
                     Absent
                   </p>
@@ -856,7 +856,7 @@ export default async function DashboardPage() {
                   </p>
                 </div>
 
-                <div className="rounded-xl border bg-card p-5 shadow-sm">
+                <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
                     {myEmployeeType === "casual" ? "Earned" : "Salary"}
                   </p>
