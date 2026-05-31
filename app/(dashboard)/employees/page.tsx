@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useAttendanceVisibility } from "@/hooks/use-attendance-visibility";
 import { useSession } from "next-auth/react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm, type Resolver } from "react-hook-form";
@@ -260,6 +261,7 @@ export default function EmployeesPage() {
   const role = (session?.user as { role?: string })?.role;
   const isAdmin = role === "admin";
   const canManage = role === "admin" || role === "hr";
+  const { hidden } = useAttendanceVisibility();
 
   const { data: employees, isLoading } = useQuery({
     queryKey: ["employees", showInactive],
@@ -515,9 +517,13 @@ export default function EmployeesPage() {
 
   const filtered = (employees ?? []).filter(
     (e) =>
-      e.name.toLowerCase().includes(search.toLowerCase()) ||
-      e.department?.toLowerCase().includes(search.toLowerCase()) ||
-      e.phone.includes(search)
+      !hidden.employees.includes(e.id) &&
+      (!e.section_id || !hidden.sections.includes(e.section_id)) &&
+      (
+        e.name.toLowerCase().includes(search.toLowerCase()) ||
+        e.department?.toLowerCase().includes(search.toLowerCase()) ||
+        e.phone.includes(search)
+      )
   );
   const activeEmployees = (employees ?? []).filter((e) => e.active !== 0);
   const inactiveEmployees = (employees ?? []).filter((e) => e.active === 0);

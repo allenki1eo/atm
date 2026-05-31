@@ -2,8 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
-import { CalendarDays, RefreshCw, Lock, EyeOff, Settings } from "lucide-react";
-import Link from "next/link";
+import { CalendarDays, RefreshCw, Lock } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +21,6 @@ export default function TodayAttendancePage() {
   const { data: session } = useSession();
   const role = (session?.user as { role?: string } | undefined)?.role;
   const canUnlock = role === "admin";
-  const isAdmin = role === "admin";
   const { data: records, isLoading, refetch } = useTodayAttendance();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
@@ -53,7 +51,6 @@ export default function TodayAttendancePage() {
 
   const unmarkedCount = visibleRecords.filter((r) => !r.status).length;
   const isAnyLocked = records?.some((r) => r.is_locked) ?? false;
-  const hiddenCount = hidden.employees.length + hidden.sections.length;
 
   const formattedDate = format(new Date(today + "T12:00:00"), "EEEE, MMMM d, yyyy");
 
@@ -76,22 +73,6 @@ export default function TodayAttendancePage() {
         </div>
 
         <div className="flex gap-2 flex-wrap">
-          {isAdmin && hiddenCount > 0 && (
-            <Link href="/settings">
-              <Button variant="outline" size="sm" className="text-amber-600 border-amber-200 hover:bg-amber-50">
-                <EyeOff className="h-4 w-4 mr-1.5" />
-                {hiddenCount} imefichwa
-              </Button>
-            </Link>
-          )}
-          {isAdmin && (
-            <Link href="/settings">
-              <Button variant="outline" size="sm">
-                <Settings className="h-4 w-4 mr-1.5" />
-                Mipangilio
-              </Button>
-            </Link>
-          )}
           <Button
             variant="outline"
             size="sm"

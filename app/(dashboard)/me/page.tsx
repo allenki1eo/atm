@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ElementType } from "react";
+import { useState, useMemo, type ElementType } from "react";
 import { useSession } from "next-auth/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -18,6 +18,12 @@ import {
   Receipt,
   Settings,
   UserCircle,
+  Eye,
+  EyeOff,
+  Search,
+  RotateCcw,
+  Building2,
+  Users,
 } from "lucide-react";
 import {
   Card,
@@ -30,6 +36,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -42,8 +49,10 @@ import {
 import { FinancialCard } from "@/components/dashboard/financial-card";
 import { AttendanceCalendar } from "@/components/attendance/attendance-calendar";
 import { PayslipPdfButton } from "@/components/payroll/payslip-pdf-button";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { useAttendanceVisibility } from "@/hooks/use-attendance-visibility";
 
 const advanceSchema = z.object({
   amount: z.number().min(1, "Kiasi lazima kiwe angalau TZS 1"),
@@ -366,6 +375,67 @@ export default function MePage() {
   });
 
   const role = (session?.user as { role?: string })?.role;
+  const isAdmin = role === "admin";
+
+  // Admin-only: visibility controls
+  const { hidden, toggleEmployee, toggleSection, reset: resetVisibility } = useAttendanceVisibility();
+  const [visEmpSearch, setVisEmpSearch] = useState("");
+
+  const { data: allEmployees } = useQuery<{ id: string; name: string; department: string; section_id: string | null }[]>({
+    queryKey: ["employees-vis"],
+    queryFn: async () => {
+      const res = await fetch("/api/employees");
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isAdmin,
+  });
+
+  const { data: allSections } = useQuery<{ id: string; name: string; company_id: string }[]>({
+    queryKey: ["sections-vis"],
+    queryFn: async () => {
+      const res = await fetch("/api/sections");
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isAdmin,
+  });
+
+  const { data: allCompanies } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ["companies-vis"],
+    queryFn: async () => {
+      const res = await fetch("/api/companies");
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isAdmin,
+  });
+
+  const companyMap = useMemo(
+    () => new Map((allCompanies ?? []).map((c) => [c.id, c.name])),
+    [allCompanies]
+  );
+
+  const sectionsByCompany = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }[]>();
+    for (const sec of allSections ?? []) {
+      if (!map.has(sec.company_id)) map.set(sec.company_id, []);
+      map.get(sec.company_id)!.push(sec);
+    }
+    return map;
+  }, [allSections]);
+
+  const filteredVisEmployees = useMemo(
+    () =>
+      (allEmployees ?? []).filter(
+        (e) =>
+          e.name.toLowerCase().includes(visEmpSearch.toLowerCase()) ||
+          e.department?.toLowerCase().includes(visEmpSearch.toLowerCase())
+      ),
+    [allEmployees, visEmpSearch]
+  );
+
+  const hiddenCount = hidden.employees.length + hidden.sections.length;
   const announcements = inbox?.announcements ?? [];
   const complaintResponses =
     inbox?.complaints.filter((c) => ["closed", "resolved"].includes(c.status) && c.response) ?? [];
@@ -916,6 +986,109 @@ export default function MePage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* ── Admin: Visibility settings ─────────────────────────────────────── */}
+      {isAdmin && (
+        <section className="space-y-4">
+          <Separator />
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                {hiddenCount > 0 ? (
+                  <EyeOff className="h-4 w-4 text-amber-500" />
+                ) : (
+                  <Eye className="h-4 w-4 text-muted-foreground" />
+                )}
+                <h2 className="font-semibold text-sm">Mipangilio ya Mfumo — Ficha kutoka Mahudhurio</h2>
+              </div>
+              {hiddenCount > 0 && (
+                <Button variant="ghost" size="sm" onClick={resetVisibility} className="h-7 text-xs">
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  Rudisha Yote
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">
+              {hiddenCount > 0
+                ? `${hiddenCount} ${hiddenCount === 1 ? "kipengele kimefichwa" : "vipengele vimefichwa"} kutoka kwenye ukurasa wa mahudhurio na orodha ya wafanyakazi.`
+                : "Wafanyakazi na sehemu zilizochaguliwa hapa hazitaonekana kwenye mahudhurio na orodha ya wafanyakazi."}
+            </p>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Sections */}
+              {(allSections ?? []).length > 0 && (
+                <div className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm font-medium">Sehemu</p>
+                  </div>
+                  <div className="space-y-3">
+                    {Array.from(sectionsByCompany.entries()).map(([companyId, secs]) => (
+                      <div key={companyId}>
+                        {companyMap.get(companyId) && (
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-1.5">
+                            {companyMap.get(companyId)}
+                          </p>
+                        )}
+                        <div className="space-y-1.5 pl-1">
+                          {secs.map((sec) => (
+                            <label key={sec.id} className="flex items-center gap-2.5 cursor-pointer p-1.5 rounded hover:bg-muted/50">
+                              <Checkbox
+                                checked={hidden.sections.includes(sec.id)}
+                                onCheckedChange={() => toggleSection(sec.id)}
+                              />
+                              <span className="text-sm">{sec.name}</span>
+                              {hidden.sections.includes(sec.id) && (
+                                <EyeOff className="h-3 w-3 text-amber-500 ml-auto" />
+                              )}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Employees */}
+              {(allEmployees ?? []).length > 0 && (
+                <div className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm font-medium">Wafanyakazi</p>
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      placeholder="Tafuta..."
+                      value={visEmpSearch}
+                      onChange={(e) => setVisEmpSearch(e.target.value)}
+                      className="pl-8 h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
+                    {filteredVisEmployees.map((emp) => (
+                      <label key={emp.id} className="flex items-center gap-2.5 cursor-pointer p-1.5 rounded hover:bg-muted/50">
+                        <Checkbox
+                          checked={hidden.employees.includes(emp.id)}
+                          onCheckedChange={() => toggleEmployee(emp.id)}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm truncate">{emp.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{emp.department ?? "—"}</p>
+                        </div>
+                        {hidden.employees.includes(emp.id) && (
+                          <EyeOff className="h-3 w-3 text-amber-500 shrink-0" />
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── Account settings dialog ─────────────────────────────────────────── */}
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>

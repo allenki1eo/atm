@@ -6,7 +6,6 @@ import { Settings, Eye, EyeOff, RotateCcw, Search, Building2, Users } from "luci
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useAttendanceVisibility } from "@/hooks/use-attendance-visibility";
@@ -110,14 +109,12 @@ export default function AdminSettingsPage() {
               )}
               <div>
                 <CardTitle className="text-base">
-                  Ficha kutoka kwenye Mahudhurio
-                  {hiddenCount > 0 && (
-                    <Badge variant="warning" className="ml-2 text-xs">{hiddenCount} imefichwa</Badge>
-                  )}
+                  Ficha kutoka kwenye Mahudhurio na Orodha ya Wafanyakazi
                 </CardTitle>
                 <CardDescription>
-                  Wafanyakazi na sehemu zilizochaguliwa hapa hazitaonekana kwenye ukurasa wa mahudhurio ya leo.
-                  Mipangilio hii inahifadhiwa kwenye kivinjari hiki.
+                  {hiddenCount > 0
+                    ? `${hiddenCount} ${hiddenCount === 1 ? "kipengele kimefichwa" : "vipengele vimefichwa"} kutoka kwenye mahudhurio na orodha ya wafanyakazi.`
+                    : "Wafanyakazi na sehemu zilizochaguliwa hapa hazitaonekana kwenye mahudhurio na orodha ya wafanyakazi. Mipangilio huhifadhiwa kwenye kivinjari hiki."}
                 </CardDescription>
               </div>
             </div>

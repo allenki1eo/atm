@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Users, Calendar, CalendarDays, ClipboardList, ClipboardEdit,
   DollarSign, UserCircle, LogOut, Shield, Building2, Palmtree,
   Upload, UserCog, Megaphone, MessageSquareWarning, Clock, PanelLeftOpen,
-  PanelLeftClose, UserX, Settings, CalendarRange,
+  PanelLeftClose, UserX, CalendarRange,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -65,7 +65,6 @@ const navGroups: NavGroup[] = [
       { href: "/companies",        label: "Makampuni & Sehemu",    icon: Building2,    roles: ["admin"] },
       { href: "/holidays",         label: "Sikukuu",               icon: CalendarDays, roles: ["hr", "admin"] },
       { href: "/users",            label: "Watumiaji wa Mfumo",    icon: UserCog,      roles: ["admin"] },
-      { href: "/settings",         label: "Mipangilio",            icon: Settings,     roles: ["admin"] },
     ],
   },
   {
