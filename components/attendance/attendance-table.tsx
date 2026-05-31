@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { Check, Clock, X, Minus, Search, CheckSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,7 +50,8 @@ export function AttendanceTable({ records, isLoading, date, isLocked = false }: 
 
   const filtered = records.filter((r) =>
     r.employee_name.toLowerCase().includes(search.toLowerCase()) ||
-    r.department?.toLowerCase().includes(search.toLowerCase())
+    r.department?.toLowerCase().includes(search.toLowerCase()) ||
+    r.section_name?.toLowerCase().includes(search.toLowerCase())
   );
 
   const handleMark = useCallback(
@@ -187,11 +188,29 @@ export function AttendanceTable({ records, isLoading, date, isLocked = false }: 
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((record) => {
-                const isSaving = savingIds.has(record.employee_id);
-                const config = record.status ? statusConfig[record.status] : null;
-
-                return (
+              (() => {
+                const rows: React.ReactNode[] = [];
+                let lastGroupKey = "";
+                filtered.forEach((record) => {
+                  const groupKey = `${record.company_name ?? ""}::${record.section_name ?? ""}`;
+                  if (groupKey !== lastGroupKey) {
+                    lastGroupKey = groupKey;
+                    const label = record.section_name
+                      ? `${record.company_name ? record.company_name + " — " : ""}${record.section_name}`
+                      : record.company_name ?? null;
+                    if (label) {
+                      rows.push(
+                        <TableRow key={`group-${groupKey}`} className="bg-muted/40 hover:bg-muted/40">
+                          <TableCell colSpan={isLocked ? 5 : 6} className="py-1.5 px-4">
+                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</span>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                  }
+                  const isSaving = savingIds.has(record.employee_id);
+                  const config = record.status ? statusConfig[record.status] : null;
+                  rows.push(
                   <TableRow
                     key={record.employee_id}
                     className={cn(
@@ -291,8 +310,10 @@ export function AttendanceTable({ records, isLoading, date, isLocked = false }: 
                       </TableCell>
                     )}
                   </TableRow>
-                );
-              })
+                  );
+                });
+                return rows;
+              })()
             )}
           </TableBody>
         </Table>

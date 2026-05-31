@@ -25,6 +25,10 @@ export async function GET(request: NextRequest) {
         e.phone,
         e.type,
         e.department,
+        e.company_id,
+        e.section_id,
+        c.name as company_name,
+        s.name as section_name,
         a.id,
         a.date,
         a.status,
@@ -33,9 +37,11 @@ export async function GET(request: NextRequest) {
         a.notes,
         a.is_locked
       FROM employees e
+      LEFT JOIN companies c ON c.id = e.company_id
+      LEFT JOIN sections s ON s.id = e.section_id
       LEFT JOIN attendance a ON a.employee_id = e.id AND a.date = ?
       WHERE e.supervisor_id = ? AND e.active = 1
-      ORDER BY e.name
+      ORDER BY c.name, s.name, e.name
     `;
     args = [date, userId];
   } else {
@@ -46,6 +52,10 @@ export async function GET(request: NextRequest) {
         e.phone,
         e.type,
         e.department,
+        e.company_id,
+        e.section_id,
+        c.name as company_name,
+        s.name as section_name,
         a.id,
         a.date,
         a.status,
@@ -54,9 +64,11 @@ export async function GET(request: NextRequest) {
         a.notes,
         a.is_locked
       FROM employees e
+      LEFT JOIN companies c ON c.id = e.company_id
+      LEFT JOIN sections s ON s.id = e.section_id
       LEFT JOIN attendance a ON a.employee_id = e.id AND a.date = ?
       WHERE e.active = 1
-      ORDER BY e.department, e.name
+      ORDER BY c.name, s.name, e.name
     `;
     args = [date];
   }
