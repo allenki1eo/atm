@@ -59,16 +59,16 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-950 to-slate-800 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-violet-950 to-slate-900 p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/40">
             <Shield className="h-7 w-7 text-white" />
           </div>
           <div className="text-white">
             <h1 className="text-2xl font-bold">TrustTrack</h1>
-            <p className="text-sm text-blue-300">Attendance Management</p>
+            <p className="text-sm text-violet-300">Attendance Management</p>
           </div>
         </div>
 
