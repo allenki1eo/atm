@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Sidebar } from "./sidebar";
 import { NotificationsBell } from "./notifications-bell";
+import { ThemeToggle } from "./theme-toggle";
 
 interface MobileNavProps {
   user: {
@@ -28,6 +29,7 @@ export function MobileNav({ user }: MobileNavProps) {
           <span className="text-sm font-bold text-foreground">TrustTrack</span>
         </div>
         <div className="flex items-center gap-1">
+          <ThemeToggle />
           <NotificationsBell role={user.role} />
           <Button
             variant="ghost"
