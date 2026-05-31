@@ -20,19 +20,19 @@ export function MobileNav({ user }: MobileNavProps) {
 
   return (
     <>
-      <div className="flex h-14 items-center justify-between border-b bg-sidebar-background px-4 lg:hidden">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-sidebar-primary">
-            <Shield className="h-4 w-4 text-sidebar-primary-foreground" />
+      <div className="flex h-[60px] items-center justify-between border-b bg-card px-4 lg:hidden">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary shadow-sm shadow-primary/30">
+            <Shield className="h-4 w-4 text-white" />
           </div>
-          <span className="text-sm font-bold text-sidebar-foreground">TrustTrack</span>
+          <span className="text-sm font-bold text-foreground">TrustTrack</span>
         </div>
         <div className="flex items-center gap-1">
           <NotificationsBell role={user.role} />
           <Button
             variant="ghost"
             size="icon"
-            className="text-sidebar-foreground"
+            className="text-foreground"
             onClick={() => setOpen(true)}
           >
             <Menu className="h-5 w-5" />
