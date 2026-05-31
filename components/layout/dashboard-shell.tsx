@@ -7,6 +7,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { OfflineBanner } from "@/components/layout/offline-banner";
 import { NotificationsBell } from "@/components/layout/notifications-bell";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -83,6 +84,9 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
               <span className="text-[13px]">Tafuta...</span>
               <kbd className="ml-2 text-[10px] border rounded px-1.5 py-0.5 bg-muted font-mono opacity-60">⌘K</kbd>
             </div>
+
+            {/* Theme toggle */}
+            <ThemeToggle />
 
             {/* Notifications */}
             <div className="flex h-9 w-9 items-center justify-center rounded-xl border bg-card hover:border-primary/40 transition-colors">
