@@ -2,13 +2,12 @@
 
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
-import { CalendarDays, RefreshCw, Lock, Eye, EyeOff, ChevronDown, ChevronUp, Search, RotateCcw } from "lucide-react";
+import { CalendarDays, RefreshCw, Lock, EyeOff, Settings } from "lucide-react";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { AttendanceTable } from "@/components/attendance/attendance-table";
 import { LockDayDialog } from "@/components/attendance/lock-day-dialog";
 import { UnlockDayDialog } from "@/components/attendance/unlock-day-dialog";
@@ -23,12 +22,11 @@ export default function TodayAttendancePage() {
   const { data: session } = useSession();
   const role = (session?.user as { role?: string } | undefined)?.role;
   const canUnlock = role === "admin";
+  const isAdmin = role === "admin";
   const { data: records, isLoading, refetch } = useTodayAttendance();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
-  const [visibilityOpen, setVisibilityOpen] = useState(false);
-  const [empSearch, setEmpSearch] = useState("");
-  const { hidden, toggleEmployee, toggleSection, reset: resetVisibility } = useAttendanceVisibility();
+  const { hidden } = useAttendanceVisibility();
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -45,17 +43,6 @@ export default function TodayAttendancePage() {
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }, [records]);
 
-  const sections = useMemo(() => {
-    if (!records) return [];
-    const map = new Map<string, { id: string; name: string; company_id: string }>();
-    for (const r of records) {
-      if (r.section_id && r.section_name) {
-        map.set(r.section_id, { id: r.section_id, name: r.section_name, company_id: r.company_id ?? "" });
-      }
-    }
-    return Array.from(map.values());
-  }, [records]);
-
   const visibleRecords = useMemo(() => {
     if (!records) return [];
     return records
@@ -66,20 +53,9 @@ export default function TodayAttendancePage() {
 
   const unmarkedCount = visibleRecords.filter((r) => !r.status).length;
   const isAnyLocked = records?.some((r) => r.is_locked) ?? false;
+  const hiddenCount = hidden.employees.length + hidden.sections.length;
 
   const formattedDate = format(new Date(today + "T12:00:00"), "EEEE, MMMM d, yyyy");
-
-  const filteredEmployeesForPanel = useMemo(() => {
-    if (!records) return [];
-    const seen = new Set<string>();
-    return records.filter((r) => {
-      if (seen.has(r.employee_id)) return false;
-      seen.add(r.employee_id);
-      return r.employee_name.toLowerCase().includes(empSearch.toLowerCase());
-    });
-  }, [records, empSearch]);
-
-  const hiddenCount = hidden.employees.length + hidden.sections.length;
 
   return (
     <div className="space-y-4">
@@ -99,7 +75,23 @@ export default function TodayAttendancePage() {
           <p className="text-muted-foreground mt-1">{formattedDate}</p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {isAdmin && hiddenCount > 0 && (
+            <Link href="/settings">
+              <Button variant="outline" size="sm" className="text-amber-600 border-amber-200 hover:bg-amber-50">
+                <EyeOff className="h-4 w-4 mr-1.5" />
+                {hiddenCount} imefichwa
+              </Button>
+            </Link>
+          )}
+          {isAdmin && (
+            <Link href="/settings">
+              <Button variant="outline" size="sm">
+                <Settings className="h-4 w-4 mr-1.5" />
+                Mipangilio
+              </Button>
+            </Link>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -138,7 +130,7 @@ export default function TodayAttendancePage() {
                 : "bg-background border-border hover:bg-muted"
             }`}
           >
-            All Companies
+            Makampuni Yote
           </button>
           {companies.map((c) => (
             <button
@@ -155,93 +147,6 @@ export default function TodayAttendancePage() {
           ))}
         </div>
       )}
-
-      {/* Visibility panel */}
-      <div className="rounded-lg border bg-card">
-        <button
-          className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/40 transition-colors"
-          onClick={() => setVisibilityOpen((v) => !v)}
-        >
-          <span className="flex items-center gap-2">
-            {hiddenCount > 0 ? (
-              <EyeOff className="h-4 w-4 text-amber-500" />
-            ) : (
-              <Eye className="h-4 w-4 text-muted-foreground" />
-            )}
-            Hide from view
-            {hiddenCount > 0 && (
-              <Badge variant="warning" className="text-xs">{hiddenCount} hidden</Badge>
-            )}
-          </span>
-          {visibilityOpen ? (
-            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-          )}
-        </button>
-
-        {visibilityOpen && (
-          <div className="border-t px-4 py-4 space-y-5">
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                Hidden employees and sections are excluded from the table below. Changes persist across page refreshes.
-              </p>
-              {hiddenCount > 0 && (
-                <Button variant="ghost" size="sm" onClick={resetVisibility} className="text-xs h-7">
-                  <RotateCcw className="h-3 w-3 mr-1" />
-                  Reset all
-                </Button>
-              )}
-            </div>
-
-            {sections.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Sections</p>
-                <div className="flex flex-wrap gap-3">
-                  {sections.map((sec) => (
-                    <label key={sec.id} className="flex items-center gap-2 cursor-pointer">
-                      <Checkbox
-                        checked={hidden.sections.includes(sec.id)}
-                        onCheckedChange={() => toggleSection(sec.id)}
-                      />
-                      <span className="text-sm">{sec.name}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Employees</p>
-              <div className="relative mb-3">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="Search employees..."
-                  value={empSearch}
-                  onChange={(e) => setEmpSearch(e.target.value)}
-                  className="pl-8 h-8 text-sm"
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1">
-                {filteredEmployeesForPanel.map((r) => (
-                  <label key={r.employee_id} className="flex items-center gap-2 cursor-pointer">
-                    <Checkbox
-                      checked={hidden.employees.includes(r.employee_id)}
-                      onCheckedChange={() => toggleEmployee(r.employee_id)}
-                    />
-                    <div className="min-w-0">
-                      <p className="text-sm truncate">{r.employee_name}</p>
-                      {r.section_name && (
-                        <p className="text-xs text-muted-foreground truncate">{r.section_name}</p>
-                      )}
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* Attendance Table */}
       {isLoading ? (

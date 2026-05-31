@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Users, Calendar, CalendarDays, ClipboardList, ClipboardEdit,
   DollarSign, UserCircle, LogOut, Shield, Building2, Palmtree,
   Upload, UserCog, Megaphone, MessageSquareWarning, Clock, PanelLeftOpen,
-  PanelLeftClose, UserX,
+  PanelLeftClose, UserX, Settings, CalendarRange,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -47,11 +47,12 @@ const navGroups: NavGroup[] = [
     label: "Mahudhurio",
     icon: ClipboardList,
     items: [
-      { href: "/attendance/today",       label: "Leo",         icon: ClipboardList,        roles: ["supervisor", "hr", "admin"] },
-      { href: "/attendance/history",     label: "Historia",    icon: Calendar,             roles: ["supervisor", "hr", "admin"] },
-      { href: "/attendance/edit",        label: "Hariri",      icon: CalendarDays,         roles: ["admin"] },
-      { href: "/attendance/import",      label: "Ingiza",      icon: Upload,               roles: ["admin"] },
-      { href: "/attendance/corrections", label: "Marekebisho", icon: ClipboardEdit,        roles: ["supervisor", "hr", "admin"], badgeKey: "corrections" },
+      { href: "/attendance/today",       label: "Leo",           icon: ClipboardList,  roles: ["supervisor", "hr", "admin"] },
+      { href: "/attendance/history",     label: "Historia",      icon: Calendar,       roles: ["supervisor", "hr", "admin"] },
+      { href: "/attendance/bulk",        label: "Weka Wingi",    icon: CalendarRange,  roles: ["admin"] },
+      { href: "/attendance/edit",        label: "Hariri",        icon: CalendarDays,   roles: ["admin"] },
+      { href: "/attendance/import",      label: "Ingiza",        icon: Upload,         roles: ["admin"] },
+      { href: "/attendance/corrections", label: "Marekebisho",   icon: ClipboardEdit,  roles: ["supervisor", "hr", "admin"], badgeKey: "corrections" },
     ],
   },
   {
@@ -64,6 +65,7 @@ const navGroups: NavGroup[] = [
       { href: "/companies",        label: "Makampuni & Sehemu",    icon: Building2,    roles: ["admin"] },
       { href: "/holidays",         label: "Sikukuu",               icon: CalendarDays, roles: ["hr", "admin"] },
       { href: "/users",            label: "Watumiaji wa Mfumo",    icon: UserCog,      roles: ["admin"] },
+      { href: "/settings",         label: "Mipangilio",            icon: Settings,     roles: ["admin"] },
     ],
   },
   {
