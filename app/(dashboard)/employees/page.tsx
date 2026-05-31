@@ -245,6 +245,8 @@ export default function EmployeesPage() {
   const [showResetPw, setShowResetPw] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
   const [historyTarget, setHistoryTarget] = useState<Employee | null>(null);
+  const [permDeleteTarget, setPermDeleteTarget] = useState<Employee | null>(null);
+  const [permDeleteConfirm, setPermDeleteConfirm] = useState("");
 
   // CSV import state
   const [importOpen, setImportOpen] = useState(false);
@@ -404,6 +406,24 @@ export default function EmployeesPage() {
     },
     onError: (err: Error) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const permDeleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/employees/${id}/permanent-delete`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? "Failed");
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      setPermDeleteTarget(null);
+      setPermDeleteConfirm("");
+      toast({ title: "Mfanyakazi amefutwa kabisa", description: "Rekodi zote zimefutwa." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Hitilafu", description: err.message, variant: "destructive" });
     },
   });
 
@@ -807,6 +827,17 @@ export default function EmployeesPage() {
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
+                            {isAdmin && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => { setPermDeleteTarget(emp); setPermDeleteConfirm(""); }}
+                                title="Futa kabisa"
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </Button>
+                            )}
                           </>
                         )}
                       </div>
@@ -1072,6 +1103,40 @@ export default function EmployeesPage() {
               {deleteMutation.isPending ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Inahifadhi...</>
               ) : "Ndio, Weka Inactive"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Permanent delete confirmation dialog */}
+      <Dialog open={!!permDeleteTarget} onOpenChange={(open) => { if (!open) { setPermDeleteTarget(null); setPermDeleteConfirm(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Futa Kabisa Mfanyakazi</DialogTitle>
+            <DialogDescription>
+              Hatua hii <strong>haiwezi kurudishwa</strong>. Rekodi zote za <strong>{permDeleteTarget?.name}</strong> zitafutwa kabisa — mahudhurio, malipo, likizo, na historia yote.
+              <br /><br />
+              Andika jina la mfanyakazi hapa chini ili uthibitishe:
+              <br />
+              <span className="font-mono text-foreground font-semibold">{permDeleteTarget?.name}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            placeholder="Andika jina hapa..."
+            value={permDeleteConfirm}
+            onChange={(e) => setPermDeleteConfirm(e.target.value)}
+            className="mt-2"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setPermDeleteTarget(null); setPermDeleteConfirm(""); }}>Ghairi</Button>
+            <Button
+              variant="destructive"
+              disabled={permDeleteConfirm !== permDeleteTarget?.name || permDeleteMutation.isPending}
+              onClick={() => permDeleteTarget && permDeleteMutation.mutate(permDeleteTarget.id)}
+            >
+              {permDeleteMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Inafuta...</>
+              ) : "Futa Kabisa"}
             </Button>
           </DialogFooter>
         </DialogContent>

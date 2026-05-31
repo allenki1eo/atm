@@ -16,6 +16,10 @@ export interface AttendanceRecord {
   phone: string;
   type: string;
   department: string;
+  company_id: string | null;
+  section_id: string | null;
+  company_name: string | null;
+  section_name: string | null;
 }
 
 export interface AttendanceMarkPayload {
