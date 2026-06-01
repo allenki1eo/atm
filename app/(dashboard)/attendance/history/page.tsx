@@ -3,157 +3,198 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { AttendanceCalendar } from "@/components/attendance/attendance-calendar";
-import { Calendar, Building2 } from "lucide-react";
+import { Calendar, Building2, ArrowLeft, Users } from "lucide-react";
 
-interface Employee {
-  id: string;
-  name: string;
-  type: string;
+interface Company { id: string; name: string; }
+interface EmployeeSummary {
+  employee_id: string;
+  employee_name: string;
   department: string;
   company_id: string | null;
+  company_name: string | null;
+  present: number;
+  absent: number;
+  late: number;
+  half_day: number;
+  total: number;
 }
 
-interface Company {
-  id: string;
-  name: string;
-}
+const MONTHS = [
+  "Januari","Februari","Machi","Aprili","Mei","Juni",
+  "Julai","Agosti","Septemba","Oktoba","Novemba","Desemba",
+];
 
 export default function AttendanceHistoryPage() {
+  const now = new Date();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("all");
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("all");
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(now.getFullYear());
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeSummary | null>(null);
 
-  const { data: employees, isLoading: empLoading } = useQuery({
-    queryKey: ["employees"],
-    queryFn: async () => {
-      const res = await fetch("/api/employees");
-      if (!res.ok) throw new Error("Failed to fetch employees");
-      return res.json() as Promise<Employee[]>;
-    },
-  });
-
-  const { data: companies, isLoading: compLoading } = useQuery({
+  const { data: companies } = useQuery<Company[]>({
     queryKey: ["companies"],
     queryFn: async () => {
-      const res = await fetch("/api/companies");
-      if (!res.ok) throw new Error("Failed to fetch companies");
-      return res.json() as Promise<Company[]>;
+      const r = await fetch("/api/companies");
+      return r.json();
     },
   });
 
-  // Employees filtered by selected company
-  const companyEmployees = useMemo(() => {
-    if (!employees) return [];
-    if (selectedCompanyId === "all") return employees;
-    return employees.filter((e) => e.company_id === selectedCompanyId);
-  }, [employees, selectedCompanyId]);
+  const { data: summaries, isLoading } = useQuery<EmployeeSummary[]>({
+    queryKey: ["attendance-summary", selectedCompanyId, year, month],
+    queryFn: async () => {
+      const params = new URLSearchParams({ year: String(year), month: String(month) });
+      if (selectedCompanyId !== "all") params.set("company_id", selectedCompanyId);
+      const r = await fetch(`/api/attendance/summary?${params}`);
+      return r.json();
+    },
+  });
 
-  // Reset employee selection when company changes
-  const handleCompanyChange = (val: string) => {
-    setSelectedCompanyId(val);
-    setSelectedEmployeeId("all");
-  };
+  const years = useMemo(() => {
+    const y = now.getFullYear();
+    return [y - 1, y, y + 1];
+  }, []);
 
-  // Employees to show calendars for
-  const displayEmployees = useMemo(() => {
-    if (selectedEmployeeId === "all") return companyEmployees;
-    return companyEmployees.filter((e) => e.id === selectedEmployeeId);
-  }, [companyEmployees, selectedEmployeeId]);
+  // ── drill-down view ──────────────────────────────────────────────────────
+  if (selectedEmployee) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => setSelectedEmployee(null)}>
+            <ArrowLeft className="h-4 w-4 mr-1" /> Rudi
+          </Button>
+          <div>
+            <h1 className="text-xl font-bold">{selectedEmployee.employee_name}</h1>
+            <p className="text-sm text-muted-foreground">
+              {selectedEmployee.department}
+              {selectedEmployee.company_name && ` · ${selectedEmployee.company_name}`}
+            </p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="pt-4">
+            <AttendanceCalendar employeeId={selectedEmployee.employee_id} />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
-  const loading = empLoading || compLoading;
-
+  // ── list view ────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      <div>
-        <div className="flex items-center gap-2">
-          <Calendar className="h-5 w-5 text-muted-foreground" />
+      <div className="flex items-center gap-2">
+        <Calendar className="h-5 w-5 text-muted-foreground" />
+        <div>
           <h1 className="text-2xl font-bold">Historia ya Mahudhurio</h1>
+          <p className="text-muted-foreground text-sm">Bonyeza mfanyakazi kuona kalenda yake</p>
         </div>
-        <p className="text-muted-foreground mt-1">
-          Angalia rekodi za mahudhurio kwa kampuni au mfanyakazi mmoja mmoja
-        </p>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        {/* Company selector */}
-        <div className="flex-1">
-          <label className="text-sm font-medium mb-2 block flex items-center gap-1">
-            <Building2 className="h-3.5 w-3.5" /> Kampuni
+      <div className="flex flex-wrap gap-3">
+        <div className="min-w-[180px] flex-1">
+          <label className="text-xs font-medium mb-1 block flex items-center gap-1">
+            <Building2 className="h-3 w-3" /> Kampuni
           </label>
-          {loading ? (
-            <Skeleton className="h-10 w-full" />
-          ) : (
-            <Select value={selectedCompanyId} onValueChange={handleCompanyChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Chagua kampuni..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Kampuni Zote</SelectItem>
-                {companies?.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <Select value={selectedCompanyId} onValueChange={(v) => { setSelectedCompanyId(v); setSelectedEmployee(null); }}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Kampuni Zote</SelectItem>
+              {companies?.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
-
-        {/* Employee selector */}
-        <div className="flex-1">
-          <label className="text-sm font-medium mb-2 block">Mfanyakazi</label>
-          {loading ? (
-            <Skeleton className="h-10 w-full" />
-          ) : (
-            <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Chagua mfanyakazi..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">
-                  Wafanyakazi Wote {selectedCompanyId !== "all" ? `(${companyEmployees.length})` : ""}
-                </SelectItem>
-                {companyEmployees.map((emp) => (
-                  <SelectItem key={emp.id} value={emp.id}>
-                    {emp.name} — {emp.department}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+        <div className="min-w-[130px]">
+          <label className="text-xs font-medium mb-1 block">Mwezi</label>
+          <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {MONTHS.map((m, i) => <SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="min-w-[100px]">
+          <label className="text-xs font-medium mb-1 block">Mwaka</label>
+          <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      {/* Results */}
-      {loading ? (
-        <div className="grid gap-4">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-64 w-full rounded-2xl" />)}
-        </div>
-      ) : displayEmployees.length === 0 ? (
-        <div className="flex items-center justify-center h-48 rounded-lg border-2 border-dashed text-muted-foreground">
-          Hakuna wafanyakazi wa kuonyesha
-        </div>
-      ) : (
-        <div className="grid gap-6">
-          {displayEmployees.map((emp) => (
-            <Card key={emp.id}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">{emp.name}</CardTitle>
-                <CardDescription>
-                  {emp.department}
-                  {selectedCompanyId === "all" && emp.company_id && (
-                    <> · {companies?.find((c) => c.id === emp.company_id)?.name}</>
-                  )}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <AttendanceCalendar employeeId={emp.id} />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      {/* Employee list */}
+      <Card className="overflow-hidden">
+        <CardHeader className="py-3 px-4 border-b">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            {isLoading ? "Inapakia..." : `${summaries?.length ?? 0} wafanyakazi`}
+            <span className="font-normal text-muted-foreground">— {MONTHS[month - 1]} {year}</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="divide-y">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-3">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+              ))}
+            </div>
+          ) : !summaries?.length ? (
+            <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+              Hakuna wafanyakazi
+            </div>
+          ) : (
+            <div className="divide-y">
+              {summaries.map((emp) => (
+                <button
+                  key={emp.employee_id}
+                  onClick={() => setSelectedEmployee(emp)}
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors text-left group"
+                >
+                  <div>
+                    <p className="font-medium text-sm group-hover:text-primary transition-colors">
+                      {emp.employee_name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {emp.department}
+                      {selectedCompanyId === "all" && emp.company_name && ` · ${emp.company_name}`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 ml-4">
+                    {emp.present > 0 && (
+                      <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 text-xs">
+                        ✓ {emp.present}
+                      </Badge>
+                    )}
+                    {emp.late > 0 && (
+                      <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 dark:bg-amber-950/20 text-xs">
+                        ⏱ {emp.late}
+                      </Badge>
+                    )}
+                    {emp.absent > 0 && (
+                      <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50 dark:bg-red-950/20 text-xs">
+                        ✗ {emp.absent}
+                      </Badge>
+                    )}
+                    {emp.total === 0 && (
+                      <span className="text-xs text-muted-foreground italic">Hakuna rekodi</span>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
