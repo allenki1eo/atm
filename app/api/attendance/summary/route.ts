@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
             e.name      AS employee_name,
             e.department,
             e.company_id,
+            e.section_id,
             c.name      AS company_name,
             SUM(CASE WHEN a.status = 'present'  THEN 1 ELSE 0 END) AS present,
             SUM(CASE WHEN a.status = 'absent'   THEN 1 ELSE 0 END) AS absent,

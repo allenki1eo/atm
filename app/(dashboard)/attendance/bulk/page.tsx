@@ -99,6 +99,8 @@ export default function BulkAttendancePage() {
     },
   });
 
+  const visibleEmployees = useVisibleEmployees(employees);
+
   const sectionEmployeeMap = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const e of visibleEmployees) {
@@ -108,7 +110,7 @@ export default function BulkAttendancePage() {
       }
     }
     return map;
-  }, [employees]);
+  }, [visibleEmployees]);
 
   const dates = useMemo(() => {
     let raw: string[] = [];
@@ -126,8 +128,6 @@ export default function BulkAttendancePage() {
   }, [selectionMode, selectedSection, selectedEmployees, sectionEmployeeMap]);
 
   const totalRecords = dates.length * targetEmployeeIds.length;
-
-  const visibleEmployees = useVisibleEmployees(employees);
 
   const filteredEmployees = useMemo(
     () =>
