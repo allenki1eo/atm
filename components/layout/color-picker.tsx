@@ -1,11 +1,13 @@
 "use client";
 
-import { useThemeColor, type ThemeColor } from "@/hooks/use-theme-color";
+import { useUserTheme } from "@/hooks/use-user-theme";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
 
 export function ColorPicker() {
-  const { color, setColor, presets } = useThemeColor();
+  const { color, setColor, presets, mounted } = useUserTheme();
+
+  if (!mounted) return <div className="flex gap-3">{presets.map(p => <div key={p.id} className="h-9 w-9 rounded-xl bg-muted animate-pulse" />)}</div>;
 
   return (
     <div className="flex flex-wrap gap-3">
@@ -14,7 +16,7 @@ export function ColorPicker() {
         return (
           <button
             key={preset.id}
-            onClick={() => setColor(preset.id as ThemeColor)}
+            onClick={() => setColor(preset.id)}
             title={preset.label}
             aria-label={`Set ${preset.label} theme`}
             className={cn(
