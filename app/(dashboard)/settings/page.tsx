@@ -2,13 +2,15 @@
 
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Settings, Eye, EyeOff, RotateCcw, Search, Building2, Users } from "lucide-react";
+import { Settings, Eye, EyeOff, RotateCcw, Search, Building2, Users, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useAttendanceVisibility } from "@/hooks/use-attendance-visibility";
+import { ColorPicker } from "@/components/layout/color-picker";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 interface Employee {
   id: string;
@@ -96,6 +98,34 @@ export default function AdminSettingsPage() {
           <p className="text-sm text-muted-foreground">Mipangilio ya Admin — inaathiri jinsi mfumo unavyoonekana na kufanya kazi</p>
         </div>
       </div>
+
+      {/* Appearance */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <Palette className="h-5 w-5 text-muted-foreground shrink-0" />
+            <div>
+              <CardTitle className="text-base">Appearance</CardTitle>
+              <CardDescription>Customize the look and feel of TrustTrack</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <p className="text-sm font-medium mb-1">Color Theme</p>
+            <p className="text-xs text-muted-foreground mb-3">Choose an accent color for the interface</p>
+            <ColorPicker />
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Light / Dark Mode</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Toggle between light and dark appearance</p>
+            </div>
+            <ThemeToggle />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Attendance Visibility Section */}
       <Card>
