@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AttendanceCalendar } from "@/components/attendance/attendance-calendar";
 import { Calendar, Building2, ArrowLeft, Users } from "lucide-react";
+import { useVisibleEmployees } from "@/hooks/use-attendance-visibility";
 
 interface Company { id: string; name: string; }
 interface EmployeeSummary {
@@ -53,6 +54,13 @@ export default function AttendanceHistoryPage() {
       return r.json();
     },
   });
+
+  // summaries have employee_id not id — remap for the hook
+  const summariesAsEmployees = useMemo(
+    () => (summaries ?? []).map((s) => ({ ...s, id: s.employee_id })),
+    [summaries]
+  );
+  const visibleSummaries = useVisibleEmployees(summariesAsEmployees);
 
   const years = useMemo(() => {
     const y = now.getFullYear();
@@ -134,7 +142,7 @@ export default function AttendanceHistoryPage() {
         <CardHeader className="py-3 px-4 border-b">
           <CardTitle className="text-sm flex items-center gap-2">
             <Users className="h-4 w-4" />
-            {isLoading ? "Inapakia..." : `${summaries?.length ?? 0} wafanyakazi`}
+            {isLoading ? "Inapakia..." : `${visibleSummaries.length} wafanyakazi`}
             <span className="font-normal text-muted-foreground">— {MONTHS[month - 1]} {year}</span>
           </CardTitle>
         </CardHeader>
@@ -148,13 +156,13 @@ export default function AttendanceHistoryPage() {
                 </div>
               ))}
             </div>
-          ) : !summaries?.length ? (
+          ) : !visibleSummaries.length ? (
             <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
               Hakuna wafanyakazi
             </div>
           ) : (
             <div className="divide-y">
-              {summaries.map((emp) => (
+              {visibleSummaries.map((emp) => (
                 <button
                   key={emp.employee_id}
                   onClick={() => setSelectedEmployee(emp)}

@@ -12,6 +12,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
+import { useVisibleEmployees } from "@/hooks/use-attendance-visibility";
 
 interface EmployeeRow {
   employee_id: string;
@@ -81,9 +82,11 @@ export default function CasualPayrollPage() {
     },
   });
 
-  const allRows: EmployeeRow[] = data?.employees ?? [];
+  const rawRows: EmployeeRow[] = data?.employees ?? [];
+  // remap to satisfy useVisibleEmployees (needs `id` field)
+  const visibleRows = useVisibleEmployees(rawRows.map((r) => ({ ...r, id: r.employee_id })));
 
-  const filtered = allRows.filter((r) =>
+  const filtered = visibleRows.filter((r) =>
     r.employee_name.toLowerCase().includes(search.toLowerCase()) ||
     r.company_name.toLowerCase().includes(search.toLowerCase()) ||
     r.section_name.toLowerCase().includes(search.toLowerCase())
@@ -254,7 +257,7 @@ export default function CasualPayrollPage() {
       ) : filtered.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            {allRows.length === 0
+            {rawRows.length === 0
               ? "Hakuna wafanyakazi wa mkataba waliowekwa kwenye mfumo"
               : "Hakuna wafanyakazi wanaolingana na utafutaji"}
           </CardContent>

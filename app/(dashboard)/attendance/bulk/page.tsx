@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, parseISO, isWeekend } from "date-fns";
 import { CalendarRange, Users, Check, Loader2 } from "lucide-react";
+import { useVisibleEmployees } from "@/hooks/use-attendance-visibility";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -100,7 +101,7 @@ export default function BulkAttendancePage() {
 
   const sectionEmployeeMap = useMemo(() => {
     const map = new Map<string, string[]>();
-    for (const e of employees ?? []) {
+    for (const e of visibleEmployees) {
       if (e.section_id) {
         if (!map.has(e.section_id)) map.set(e.section_id, []);
         map.get(e.section_id)!.push(e.id);
@@ -126,14 +127,16 @@ export default function BulkAttendancePage() {
 
   const totalRecords = dates.length * targetEmployeeIds.length;
 
+  const visibleEmployees = useVisibleEmployees(employees);
+
   const filteredEmployees = useMemo(
     () =>
-      (employees ?? []).filter(
+      visibleEmployees.filter(
         (e) =>
           e.name.toLowerCase().includes(empSearch.toLowerCase()) ||
           e.department?.toLowerCase().includes(empSearch.toLowerCase())
       ),
-    [employees, empSearch]
+    [visibleEmployees, empSearch]
   );
 
   const toggleEmployee = (id: string) => {
