@@ -2,10 +2,11 @@
  * Generate SQL INSERT statements for bulk employee import.
  *
  * Usage (run from project root):
- *   node scripts/generate-import-sql.mjs > scripts/import-employees.sql
+ *   node scripts/generate-import-sql.mjs
  *
- * Then paste the SQL into the Turso dashboard or run:
- *   turso db shell <your-db-name> < scripts/import-employees.sql
+ * Writes two files:
+ *   scripts/import-employees.sql  — paste into Turso dashboard or run via CLI
+ *   scripts/pin-sheet.txt         — save this! employee names + PINs
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * EDIT THE DATA BELOW — add as many companies/employees as you like.
@@ -15,6 +16,11 @@
 
 import bcrypt from "bcryptjs";
 import { nanoid } from "nanoid";
+import { writeFileSync } from "fs";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  EMPLOYEE DATA  —  edit this section only
@@ -210,15 +216,22 @@ for (const emp of EMPLOYEES) {
   pinSheet.push({ name: emp.name, phone, pin });
 }
 
-// Output SQL to stdout
-console.log(lines.join("\n"));
+// Write SQL file
+const sqlPath = resolve(__dirname, "import-employees.sql");
+writeFileSync(sqlPath, lines.join("\n") + "\n", "utf8");
 
-// Print PIN sheet to stderr so it doesn't mix with the SQL
-process.stderr.write("\n\n📋 PIN SHEET — save this before distributing phones/credentials\n");
-process.stderr.write("─".repeat(72) + "\n");
-process.stderr.write(`${"Name".padEnd(38)} ${"Phone".padEnd(14)} PIN\n`);
-process.stderr.write("─".repeat(72) + "\n");
+// Write PIN sheet
+let pinText = "PIN SHEET — save this before distributing phones/credentials\n";
+pinText += "-".repeat(72) + "\n";
+pinText += `${"Name".padEnd(38)} ${"Phone".padEnd(14)} PIN\n`;
+pinText += "-".repeat(72) + "\n";
 for (const r of pinSheet) {
-  process.stderr.write(`${r.name.padEnd(38)} ${r.phone.padEnd(14)} ${r.pin}\n`);
+  pinText += `${r.name.padEnd(38)} ${r.phone.padEnd(14)} ${r.pin}\n`;
 }
-process.stderr.write("─".repeat(72) + "\n");
+pinText += "-".repeat(72) + "\n";
+const pinPath = resolve(__dirname, "pin-sheet.txt");
+writeFileSync(pinPath, pinText, "utf8");
+
+console.log(`Done!`);
+console.log(`  SQL  -> ${sqlPath}`);
+console.log(`  PINs -> ${pinPath}`);
