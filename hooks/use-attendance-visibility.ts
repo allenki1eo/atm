@@ -50,3 +50,16 @@ export function useAttendanceVisibility() {
 
   return { hidden, toggleEmployee, toggleSection, reset };
 }
+
+/** Filter any employee array by the current visibility state. */
+export function useVisibleEmployees<T extends { id: string; section_id?: string | null }>(
+  employees: T[] | undefined
+): T[] {
+  const { hidden } = useAttendanceVisibility();
+  if (!employees) return [];
+  return employees.filter(
+    (e) =>
+      !hidden.employees.includes(e.id) &&
+      (!e.section_id || !hidden.sections.includes(e.section_id))
+  );
+}

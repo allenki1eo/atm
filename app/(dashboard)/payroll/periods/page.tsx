@@ -17,6 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
+import { useVisibleEmployees } from "@/hooks/use-attendance-visibility";
 import { formatDate } from "@/lib/utils";
 
 function formatCurrency(n: number) {
@@ -169,6 +170,11 @@ export default function PayrollPeriodsPage() {
       return res.json() as Promise<PayrollWarningsResponse>;
     },
   });
+
+  // Filter preview employees by visibility
+  const visiblePreviewEmployees = useVisibleEmployees(
+    (previewData?.employees ?? []).map((e) => ({ ...e, id: e.employee_id }))
+  );
 
   // ─── Mutations ────────────────────────────────────────────────────────────
   const lockMutation = useMutation({
@@ -515,7 +521,7 @@ export default function PayrollPeriodsPage() {
             <div className="flex items-center justify-center h-40">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : !previewData?.employees?.length ? (
+          ) : !visiblePreviewEmployees.length ? (
             <p className="text-center text-muted-foreground mt-10">Hakuna wafanyakazi waliopo.</p>
           ) : (
             <div className="mt-4 space-y-4">
@@ -524,14 +530,14 @@ export default function PayrollPeriodsPage() {
                 <Card>
                   <CardContent className="pt-4 pb-3">
                     <p className="text-xs text-muted-foreground">Wafanyakazi</p>
-                    <p className="text-2xl font-bold">{previewData.employees.length}</p>
+                    <p className="text-2xl font-bold">{visiblePreviewEmployees.length}</p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="pt-4 pb-3">
                     <p className="text-xs text-muted-foreground">Jumla Gross</p>
                     <p className="text-lg font-bold text-blue-600">
-                      {formatCurrency(previewData.employees.reduce((s, r) => s + r.gross_amount, 0))}
+                      {formatCurrency(visiblePreviewEmployees.reduce((s, r) => s + r.gross_amount, 0))}
                     </p>
                   </CardContent>
                 </Card>
@@ -539,7 +545,7 @@ export default function PayrollPeriodsPage() {
                   <CardContent className="pt-4 pb-3">
                     <p className="text-xs text-muted-foreground">Jumla Net</p>
                     <p className="text-lg font-bold text-green-600">
-                      {formatCurrency(previewData.employees.reduce((s, r) => s + r.net_amount, 0))}
+                      {formatCurrency(visiblePreviewEmployees.reduce((s, r) => s + r.net_amount, 0))}
                     </p>
                   </CardContent>
                 </Card>
@@ -558,7 +564,7 @@ export default function PayrollPeriodsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {previewData.employees.map((row) => (
+                    {visiblePreviewEmployees.map((row) => (
                       <TableRow key={row.employee_id}>
                         <TableCell className="font-medium">{row.employee_name}</TableCell>
                         <TableCell>
