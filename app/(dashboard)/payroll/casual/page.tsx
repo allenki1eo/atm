@@ -257,7 +257,7 @@ export default function CasualPayrollPage() {
       ) : filtered.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            {allRows.length === 0
+            {rawRows.length === 0
               ? "Hakuna wafanyakazi wa mkataba waliowekwa kwenye mfumo"
               : "Hakuna wafanyakazi wanaolingana na utafutaji"}
           </CardContent>
