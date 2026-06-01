@@ -8,62 +8,74 @@ function generatePIN(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
+async function getEmployeeUser(id: string) {
+  const res = await db.execute({
+    sql: `SELECT e.id, e.name, e.phone, u.id as user_id, u.plain_pin
+          FROM employees e
+          LEFT JOIN users u ON u.employee_id = e.id
+          WHERE e.id = ?`,
+    args: [id],
+  });
+  if (res.rows.length === 0) return null;
+  return res.rows[0] as unknown as {
+    id: string; name: string; phone: string;
+    user_id: string | null; plain_pin: string | null;
+  };
+}
+
+// GET — return current stored PIN (if available)
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if ((session.user as { role: string }).role !== "admin")
+    return NextResponse.json({ error: "Admin only" }, { status: 403 });
+
+  await ensureDatabase();
+  const { id } = await params;
+  const emp = await getEmployeeUser(id);
+  if (!emp) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  return NextResponse.json({
+    name: emp.name,
+    phone: emp.phone,
+    pin: emp.plain_pin ?? null,
+  });
+}
+
+// POST — generate a new PIN, store it, optionally resend SMS
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const role = (session.user as { role: string }).role;
-  if (role !== "admin") {
+  if ((session.user as { role: string }).role !== "admin")
     return NextResponse.json({ error: "Admin only" }, { status: 403 });
-  }
 
   await ensureDatabase();
   const { id } = await params;
-
-  // Get employee + linked user
-  const empRes = await db.execute({
-    sql: `SELECT e.id, e.name, e.phone, u.id as user_id
-          FROM employees e
-          LEFT JOIN users u ON u.employee_id = e.id
-          WHERE e.id = ?`,
-    args: [id],
-  });
-
-  if (empRes.rows.length === 0) {
-    return NextResponse.json({ error: "Employee not found" }, { status: 404 });
-  }
-
-  const emp = empRes.rows[0] as unknown as {
-    id: string;
-    name: string;
-    phone: string;
-    user_id: string | null;
-  };
-
-  if (!emp.user_id) {
-    return NextResponse.json({ error: "No user account linked to this employee" }, { status: 400 });
-  }
+  const emp = await getEmployeeUser(id);
+  if (!emp) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!emp.user_id) return NextResponse.json({ error: "No user account linked" }, { status: 400 });
 
   const pin = generatePIN();
   const hash = await bcrypt.hash(pin, 10);
 
   await db.execute({
-    sql: "UPDATE users SET password_hash = ? WHERE id = ?",
-    args: [hash, emp.user_id],
+    sql: "UPDATE users SET password_hash = ?, plain_pin = ? WHERE id = ?",
+    args: [hash, pin, emp.user_id],
   });
 
-  // Optionally resend SMS
   const body = await request.json().catch(() => ({})) as { sendSms?: boolean };
   let smsSent = false;
 
   if (body.sendSms) {
     const message =
       `TrustTrack: Hujambo ${emp.name}! PIN yako mpya: ${pin}. ` +
-      `Ingia kwa nambari: ${emp.phone}. ` +
-      `Usishiriki PIN hii. ` +
+      `Ingia kwa nambari: ${emp.phone}. Usishiriki PIN hii. ` +
       `Ingia: https://atwork.eastafricanspirit.co.tz/login`;
     const result = await sendSMS(emp.phone, message, {
       sentBy: session.user.id ?? null,

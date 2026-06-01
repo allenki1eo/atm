@@ -17,6 +17,7 @@ export async function ensureDatabase() {
   await initializeDatabase();
   // Schema migrations — safe to run repeatedly (errors mean column already exists)
   try { await db.execute("ALTER TABLE companies ADD COLUMN logo TEXT"); } catch {}
+  try { await db.execute("ALTER TABLE users ADD COLUMN plain_pin TEXT"); } catch {}
   // Migrate announcements to support 'employee' audience_type if needed
   try {
     const schemaRes = await db.execute(
