@@ -17,6 +17,7 @@ interface EmployeeSummary {
   employee_name: string;
   department: string;
   company_id: string | null;
+  section_id: string | null;
   company_name: string | null;
   present: number;
   absent: number;
