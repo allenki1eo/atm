@@ -449,14 +449,18 @@ export default function MePage() {
   const activeAdvanceSchedules = advanceSchedules?.filter((s) => s.status === "active") ?? [];
   const advanceRemaining = activeAdvanceSchedules.reduce((sum, s) => sum + s.remaining_debt, 0);
 
-  const tabs: { id: DashboardPanel; label: string; icon: ElementType; badge?: number }[] = [
-    { id: "attendance", label: "Mahudhurio", icon: CalendarIcon },
-    { id: "financial",  label: "Fedha",       icon: Receipt },
-    { id: "payslips",   label: "Payslips",    icon: FileText },
-    { id: "leave",      label: "Likizo",      icon: Palmtree },
-    { id: "salary",     label: "Advance",     icon: DollarSign },
-    { id: "messages",   label: "Ujumbe",      icon: Inbox, badge: unreadCount },
-  ];
+  const tabs: { id: DashboardPanel; label: string; icon: ElementType; badge?: number }[] = isAdmin
+    ? [
+        { id: "messages", label: "Ujumbe", icon: Inbox, badge: unreadCount },
+      ]
+    : [
+        { id: "attendance", label: "Mahudhurio", icon: CalendarIcon },
+        { id: "financial",  label: "Fedha",       icon: Receipt },
+        { id: "payslips",   label: "Payslips",    icon: FileText },
+        { id: "leave",      label: "Likizo",      icon: Palmtree },
+        { id: "salary",     label: "Advance",     icon: DollarSign },
+        { id: "messages",   label: "Ujumbe",      icon: Inbox, badge: unreadCount },
+      ];
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -473,32 +477,34 @@ export default function MePage() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              accountForm.reset({
-                email: accountData?.user?.email ?? "",
-                phone: accountData?.user?.phone ?? accountData?.employee?.phone ?? "",
-                emergency_contact_name: accountData?.employee?.emergency_contact_name ?? "",
-                emergency_contact_phone: accountData?.employee?.emergency_contact_phone ?? "",
-                current_password: "",
-                new_password: "",
-              });
-              setSettingsOpen(true);
-            }}
-          >
-            <Settings className="h-4 w-4 mr-2" />
-            Akaunti
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => setActivePanel(presentToday ? "leave" : "attendance")}
-          >
-            {presentToday ? "Omba Likizo" : "Omba Marekebisho"}
-          </Button>
-        </div>
+        {!isAdmin && (
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                accountForm.reset({
+                  email: accountData?.user?.email ?? "",
+                  phone: accountData?.user?.phone ?? accountData?.employee?.phone ?? "",
+                  emergency_contact_name: accountData?.employee?.emergency_contact_name ?? "",
+                  emergency_contact_phone: accountData?.employee?.emergency_contact_phone ?? "",
+                  current_password: "",
+                  new_password: "",
+                });
+                setSettingsOpen(true);
+              }}
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Akaunti
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setActivePanel(presentToday ? "leave" : "attendance")}
+            >
+              {presentToday ? "Omba Likizo" : "Omba Marekebisho"}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* ── Tab navigation ─────────────────────────────────────────────────── */}
