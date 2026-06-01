@@ -37,6 +37,11 @@ const standaloneBottom: NavItem = {
   roles: ["supervisor", "hr", "admin", "employee"],
 };
 
+const standaloneSettings: NavItem = {
+  href: "/settings", label: "Mipangilio", icon: Settings,
+  roles: ["supervisor", "hr", "admin", "employee"],
+};
+
 const navGroups: NavGroup[] = [
   {
     id: "attendance",
@@ -59,7 +64,6 @@ const navGroups: NavGroup[] = [
       { href: "/companies",        label: "Makampuni & Sehemu",    icon: Building2,    roles: ["admin"] },
       { href: "/holidays",         label: "Sikukuu",               icon: CalendarDays, roles: ["hr", "admin"] },
       { href: "/users",            label: "Watumiaji wa Mfumo",    icon: UserCog,      roles: ["admin"] },
-      { href: "/settings",         label: "Mipangilio",            icon: Settings,     roles: ["admin"] },
     ],
   },
   {
@@ -264,7 +268,7 @@ export function Sidebar({ user, collapsed = false, onToggleCollapsed }: SidebarP
 
           {navGroups.map(renderGroup)}
 
-          {standaloneBottom.roles.includes(user.role) && (
+          {(standaloneSettings.roles.includes(user.role) || standaloneBottom.roles.includes(user.role)) && (
             <li className="mt-5">
               {!collapsed && (
                 <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground/70 select-none">
@@ -272,7 +276,10 @@ export function Sidebar({ user, collapsed = false, onToggleCollapsed }: SidebarP
                 </p>
               )}
               {collapsed && <div className="mx-auto mb-1 h-px w-5 bg-border" />}
-              {renderItem(standaloneBottom)}
+              <ul className="space-y-0.5">
+                {renderItem(standaloneSettings)}
+                {renderItem(standaloneBottom)}
+              </ul>
             </li>
           )}
         </ul>
