@@ -519,18 +519,20 @@ export default function EmployeesPage() {
     setDialogOpen(true);
   };
 
-  const filtered = (employees ?? []).filter(
+  const visibleEmployees = (employees ?? []).filter(
     (e) =>
       !hidden.employees.includes(e.id) &&
-      (!e.section_id || !hidden.sections.includes(e.section_id)) &&
-      (
-        e.name.toLowerCase().includes(search.toLowerCase()) ||
-        e.department?.toLowerCase().includes(search.toLowerCase()) ||
-        e.phone.includes(search)
-      )
+      (!e.section_id || !hidden.sections.includes(e.section_id))
   );
-  const activeEmployees = (employees ?? []).filter((e) => e.active !== 0);
-  const inactiveEmployees = (employees ?? []).filter((e) => e.active === 0);
+
+  const filtered = visibleEmployees.filter(
+    (e) =>
+      e.name.toLowerCase().includes(search.toLowerCase()) ||
+      e.department?.toLowerCase().includes(search.toLowerCase()) ||
+      e.phone.includes(search)
+  );
+  const activeEmployees = visibleEmployees.filter((e) => e.active !== 0);
+  const inactiveEmployees = visibleEmployees.filter((e) => e.active === 0);
 
   const onSubmit = (data: EmployeeForm) => {
     const payload = {
@@ -654,7 +656,7 @@ export default function EmployeesPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <Card><CardContent className="p-3">
-          <p className="text-xl font-bold">{employees?.length ?? 0}</p>
+          <p className="text-xl font-bold">{visibleEmployees.length}</p>
           <p className="text-xs text-muted-foreground">Jumla</p>
         </CardContent></Card>
         <Card><CardContent className="p-3">
@@ -673,7 +675,7 @@ export default function EmployeesPage() {
         </Link>
         <Card><CardContent className="p-3">
           <p className="text-xl font-bold text-blue-600">
-            {employees?.filter((e) => e.type === "casual").length ?? 0}
+            {visibleEmployees.filter((e) => e.type === "casual").length}
           </p>
           <p className="text-xs text-muted-foreground">Mkataba</p>
         </CardContent></Card>
