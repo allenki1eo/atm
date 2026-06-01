@@ -3,16 +3,8 @@
 import { SessionProvider } from "next-auth/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
-
-function ColorInitializer() {
-  useEffect(() => {
-    const stored = localStorage.getItem("theme-color") ?? "purple";
-    document.documentElement.setAttribute("data-color", stored);
-  }, []);
-  return null;
-}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -28,10 +20,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange={false}>
+    // storageKey set to unused key so next-themes doesn't override our per-user storage
+    <ThemeProvider attribute="class" defaultTheme="light" storageKey="__nt_unused" disableTransitionOnChange={false}>
       <SessionProvider>
         <QueryClientProvider client={queryClient}>
-          <ColorInitializer />
           {children}
           <Toaster />
         </QueryClientProvider>
