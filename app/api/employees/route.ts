@@ -166,9 +166,9 @@ export async function POST(request: NextRequest) {
 
     try {
       await db.execute({
-        sql: `INSERT INTO users (id, name, role, phone, password_hash, employee_id)
-              VALUES (?, ?, 'employee', ?, ?, ?)`,
-        args: [userId, name, phone, passwordHash, employeeId],
+        sql: `INSERT INTO users (id, name, role, phone, password_hash, plain_pin, employee_id)
+              VALUES (?, ?, 'employee', ?, ?, ?, ?)`,
+        args: [userId, name, phone, passwordHash, pin, employeeId],
       });
 
       // 3. Send SMS with login credentials

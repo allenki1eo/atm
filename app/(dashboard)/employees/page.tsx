@@ -247,6 +247,8 @@ export default function EmployeesPage() {
 
   // Reset PIN state
   const [pinResetTarget, setPinResetTarget] = useState<Employee | null>(null);
+  const [pinCurrentData, setPinCurrentData] = useState<{ pin: string | null } | null>(null);
+  const [pinCurrentLoading, setPinCurrentLoading] = useState(false);
   const [pinResetResult, setPinResetResult] = useState<{ pin: string; smsSent: boolean } | null>(null);
   const [pinResetSendSms, setPinResetSendSms] = useState(true);
   const [pinResetLoading, setPinResetLoading] = useState(false);
@@ -840,7 +842,16 @@ export default function EmployeesPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="text-violet-600 hover:text-violet-700"
-                                onClick={() => { setPinResetTarget(emp); setPinResetResult(null); setPinResetSendSms(true); }}
+                                onClick={async () => {
+                                  setPinResetTarget(emp); setPinResetResult(null); setPinResetSendSms(true);
+                                  setPinCurrentData(null); setPinCurrentLoading(true);
+                                  try {
+                                    const r = await fetch(`/api/employees/${emp.id}/reset-pin`);
+                                    const d = await r.json() as { pin?: string | null };
+                                    setPinCurrentData({ pin: d.pin ?? null });
+                                  } catch { setPinCurrentData({ pin: null }); }
+                                  finally { setPinCurrentLoading(false); }
+                                }}
                                 title="Ona / Weka upya PIN"
                               >
                                 <KeyRound className="h-4 w-4" />
@@ -1164,49 +1175,67 @@ export default function EmployeesPage() {
       {/* Reset PIN dialog */}
       <Dialog
         open={!!pinResetTarget}
-        onOpenChange={(open) => { if (!open) { setPinResetTarget(null); setPinResetResult(null); } }}
+        onOpenChange={(open) => { if (!open) { setPinResetTarget(null); setPinResetResult(null); setPinCurrentData(null); } }}
       >
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <KeyRound className="h-5 w-5 text-violet-600" />
-              {pinResetResult ? "PIN Mpya" : `Weka upya PIN — ${pinResetTarget?.name}`}
+              PIN — {pinResetTarget?.name}
             </DialogTitle>
             <DialogDescription>
-              {pinResetResult
-                ? "Hifadhi PIN hii sasa — haitaonyeshwa tena."
-                : "PIN mpya ya nambari 6 itatengenezwa na kuhifadhiwa. PIN ya zamani itabatilishwa."}
+              {pinResetResult ? "PIN mpya imehifadhiwa." : "PIN ya sasa ya kuingia kwa mfanyakazi."}
             </DialogDescription>
           </DialogHeader>
 
-          {pinResetResult ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between rounded-xl border bg-muted/40 px-4 py-3">
-                <span className="font-mono text-2xl font-bold tracking-widest text-foreground">
-                  {pinResetResult.pin}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(pinResetResult.pin);
-                    toast({ title: "PIN imenakiliwa" });
-                  }}
-                >
-                  Nakili
-                </Button>
+          <div className="space-y-4">
+            {/* Current PIN section */}
+            {!pinResetResult && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">PIN ya sasa</p>
+                <div className="flex items-center justify-between rounded-xl border bg-muted/40 px-4 py-3 min-h-[52px]">
+                  {pinCurrentLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  ) : pinCurrentData?.pin ? (
+                    <>
+                      <span className="font-mono text-2xl font-bold tracking-widest text-foreground">
+                        {pinCurrentData.pin}
+                      </span>
+                      <Button variant="ghost" size="sm" onClick={() => {
+                        navigator.clipboard.writeText(pinCurrentData!.pin!);
+                        toast({ title: "PIN imenakiliwa" });
+                      }}>Nakili</Button>
+                    </>
+                  ) : (
+                    <span className="text-sm text-muted-foreground italic">Haijahifadhiwa — tengeneza mpya</span>
+                  )}
+                </div>
               </div>
-              {pinResetResult.smsSent ? (
-                <p className="text-xs text-emerald-600">SMS imetumwa kwa {pinResetTarget?.phone}</p>
-              ) : (
-                <p className="text-xs text-muted-foreground">SMS haikutumwa — toa PIN hii kwa mkono.</p>
-              )}
-              <DialogFooter>
-                <Button onClick={() => { setPinResetTarget(null); setPinResetResult(null); }}>Funga</Button>
-              </DialogFooter>
-            </div>
-          ) : (
-            <div className="space-y-4">
+            )}
+
+            {/* New PIN result */}
+            {pinResetResult && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">PIN mpya</p>
+                <div className="flex items-center justify-between rounded-xl border bg-muted/40 px-4 py-3">
+                  <span className="font-mono text-2xl font-bold tracking-widest text-foreground">
+                    {pinResetResult.pin}
+                  </span>
+                  <Button variant="ghost" size="sm" onClick={() => {
+                    navigator.clipboard.writeText(pinResetResult!.pin);
+                    toast({ title: "PIN imenakiliwa" });
+                  }}>Nakili</Button>
+                </div>
+                {pinResetResult.smsSent ? (
+                  <p className="text-xs text-emerald-600 mt-2">SMS imetumwa kwa {pinResetTarget?.phone}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground mt-2">SMS haikutumwa — toa PIN hii kwa mkono.</p>
+                )}
+              </div>
+            )}
+
+            {/* Generate new PIN controls */}
+            {!pinResetResult && (
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -1216,8 +1245,13 @@ export default function EmployeesPage() {
                 />
                 <span className="text-sm">Tuma SMS kwa {pinResetTarget?.phone}</span>
               </label>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setPinResetTarget(null)}>Ghairi</Button>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setPinResetTarget(null); setPinResetResult(null); setPinCurrentData(null); }}>
+                {pinResetResult ? "Funga" : "Ghairi"}
+              </Button>
+              {!pinResetResult && (
                 <Button
                   disabled={pinResetLoading}
                   onClick={async () => {
@@ -1242,9 +1276,9 @@ export default function EmployeesPage() {
                 >
                   {pinResetLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Inatengeneza...</> : "Tengeneza PIN Mpya"}
                 </Button>
-              </DialogFooter>
-            </div>
-          )}
+              )}
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 

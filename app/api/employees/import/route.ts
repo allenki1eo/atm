@@ -189,9 +189,9 @@ export async function POST(request: NextRequest) {
 
       // Insert user record with employee role
       await db.execute({
-        sql: `INSERT INTO users (id, name, role, phone, password_hash, employee_id)
-              VALUES (?, ?, 'employee', ?, ?, ?)`,
-        args: [userId, name, phone, passwordHash, employeeId],
+        sql: `INSERT INTO users (id, name, role, phone, password_hash, plain_pin, employee_id)
+              VALUES (?, ?, 'employee', ?, ?, ?, ?)`,
+        args: [userId, name, phone, passwordHash, pin, employeeId],
       });
       await db.execute({
         sql: `INSERT INTO employee_status_events
