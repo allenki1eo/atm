@@ -7,6 +7,7 @@ import { AttendanceChart } from "@/components/dashboard/attendance-chart";
 import { PayrollChart } from "@/components/dashboard/payroll-chart";
 import type { PayrollMonthData } from "@/components/dashboard/payroll-chart";
 import {
+  Users,
   ClipboardList,
   TrendingUp,
   AlertTriangle,
