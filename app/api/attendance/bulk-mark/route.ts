@@ -1,3 +1,4 @@
+import type { InStatement } from "@libsql/client";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Build batch statements
-    const statements: { sql: string; args: unknown[] }[] = [];
+    const statements: InStatement[] = [];
     let created = 0;
     let updated = 0;
     let skipped = 0;
