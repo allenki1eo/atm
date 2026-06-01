@@ -98,6 +98,35 @@ export async function POST(request: NextRequest) {
     const department = raw["department"]?.trim() || undefined;
     const supervisorId = raw["supervisor_id"]?.trim() || undefined;
 
+    // Resolve company_name → company_id
+    let companyId: string | null = raw["company_id"]?.trim() || null;
+    const companyName = raw["company_name"]?.trim();
+    if (!companyId && companyName) {
+      const cRes = await db.execute({ sql: "SELECT id FROM companies WHERE LOWER(name) = LOWER(?)", args: [companyName] });
+      companyId = cRes.rows.length > 0 ? (cRes.rows[0] as unknown as { id: string }).id : null;
+      if (!companyId) {
+        results.push({ row: rowNum, name: name ?? "(missing)", phone: phone ?? "", status: "error", error: `Company not found: "${companyName}"` });
+        continue;
+      }
+    }
+
+    // Resolve section_name → section_id (scoped to company if provided)
+    let sectionId: string | null = raw["section_id"]?.trim() || null;
+    const sectionName = raw["section_name"]?.trim();
+    if (!sectionId && sectionName) {
+      const sRes = await db.execute({
+        sql: companyId
+          ? "SELECT id FROM sections WHERE LOWER(name) = LOWER(?) AND company_id = ?"
+          : "SELECT id FROM sections WHERE LOWER(name) = LOWER(?)",
+        args: companyId ? [sectionName, companyId] : [sectionName],
+      });
+      sectionId = sRes.rows.length > 0 ? (sRes.rows[0] as unknown as { id: string }).id : null;
+      if (!sectionId) {
+        results.push({ row: rowNum, name: name ?? "(missing)", phone: phone ?? "", status: "error", error: `Section not found: "${sectionName}"` });
+        continue;
+      }
+    }
+
     // Validate required fields
     if (!name) {
       results.push({ row: rowNum, name: "(missing)", phone: phone ?? "", status: "error", error: "Name required" });
@@ -153,9 +182,9 @@ export async function POST(request: NextRequest) {
     try {
       // Insert employee record
       await db.execute({
-        sql: `INSERT INTO employees (id, name, phone, type, department, supervisor_id, daily_rate, monthly_salary, food_advance_amount, overtime_rule)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [employeeId, name, phone, type, department ?? null, supervisorId ?? null, dailyRate, monthlySalary, foodAdvanceAmount, overtimeRule],
+        sql: `INSERT INTO employees (id, name, phone, type, department, supervisor_id, company_id, section_id, daily_rate, monthly_salary, food_advance_amount, overtime_rule)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [employeeId, name, phone, type, department ?? null, supervisorId ?? null, companyId, sectionId, dailyRate, monthlySalary, foodAdvanceAmount, overtimeRule],
       });
 
       // Insert user record with employee role

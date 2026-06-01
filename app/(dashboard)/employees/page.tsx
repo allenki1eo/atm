@@ -168,18 +168,14 @@ type EmployeeForm = {
   wcf_amount?: number;
 };
 
-const CSV_TEMPLATE =
-  "name,phone,type,department,daily_rate,monthly_salary,food_advance_amount,overtime_rule\n" +
-  "Juma Salim,+255712345001,casual,Uendeshaji,15000,,20000,none\n" +
-  "Fatuma Hassan,+255712345002,casual,Uendeshaji,15000,,0,none\n" +
-  "Robert Mwangi,+255712345003,fulltime,Fedha,,800000,30000,all_days\n";
-
-function downloadTemplate() {
-  const blob = new Blob([CSV_TEMPLATE], { type: "text/csv" });
+async function downloadTemplate() {
+  const res = await fetch("/api/employees/import/template");
+  if (!res.ok) return;
+  const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "trusttrack_import_template.csv";
+  a.download = "trusttrack_employees_template.csv";
   a.click();
   URL.revokeObjectURL(url);
 }

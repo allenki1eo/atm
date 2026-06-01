@@ -2,15 +2,12 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getTodayDate, formatCurrency } from "@/lib/utils";
-import { StatsGrid } from "@/components/dashboard/stats-grid";
+import { LiveStatsGrid } from "@/components/dashboard/live-stats-grid";
 import { AttendanceChart } from "@/components/dashboard/attendance-chart";
 import { PayrollChart } from "@/components/dashboard/payroll-chart";
 import type { PayrollMonthData } from "@/components/dashboard/payroll-chart";
 import {
   Users,
-  CheckCircle,
-  Clock,
-  AlertCircle,
   ClipboardList,
   TrendingUp,
   AlertTriangle,
@@ -404,44 +401,12 @@ export default async function DashboardPage() {
   const isManagement =
     role === "admin" || role === "hr" || role === "supervisor";
 
-  const stats = [
-    {
-      label: "Total Employees",
-      value: totalEmployees,
-      icon: Users,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50",
-      sparklineData: attendanceTrend.map((d) => d.present + d.late + d.absent),
-    },
-    {
-      label: "Present Today",
-      value: presentToday,
-      icon: CheckCircle,
-      color: "text-green-600",
-      bgColor: "bg-green-50",
-      change:
-        totalEmployees > 0
-          ? `${Math.round(((presentToday + lateToday) / totalEmployees) * 100)}% attendance rate`
-          : undefined,
-      sparklineData: attendanceTrend.map((d) => d.present),
-    },
-    {
-      label: "Late Today",
-      value: lateToday,
-      icon: Clock,
-      color: "text-amber-600",
-      bgColor: "bg-amber-50",
-      sparklineData: attendanceTrend.map((d) => d.late),
-    },
-    {
-      label: "Absent Today",
-      value: absentToday,
-      icon: AlertCircle,
-      color: "text-red-600",
-      bgColor: "bg-red-50",
-      sparklineData: attendanceTrend.map((d) => d.absent),
-    },
-  ];
+  const sparklines = {
+    all:     attendanceTrend.map((d) => d.present + d.late + d.absent),
+    present: attendanceTrend.map((d) => d.present),
+    late:    attendanceTrend.map((d) => d.late),
+    absent:  attendanceTrend.map((d) => d.absent),
+  };
 
   return (
     <div className="space-y-6">
@@ -480,8 +445,8 @@ export default async function DashboardPage() {
       {/* ════════════════════════════════════════════════════════════════════ */}
       {isManagement && (
         <>
-          {/* Stats grid with sparklines */}
-          <StatsGrid stats={stats} />
+          {/* Stats grid — counts are computed client-side after applying visibility filters */}
+          <LiveStatsGrid sparklines={sparklines} />
 
           {/* Pending action alerts */}
           {totalPending > 0 && (
