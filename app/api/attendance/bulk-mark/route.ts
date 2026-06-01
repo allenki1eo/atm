@@ -12,13 +12,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Admin only" }, { status: 403 });
   }
 
-  const body = await request.json();
-  const { employee_ids, dates, status, force } = body as {
-    employee_ids: string[];
-    dates: string[];
-    status: string;
-    force?: boolean;
-  };
+  let body: { employee_ids: string[]; dates: string[]; status: string; force?: boolean };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const { employee_ids, dates, status, force } = body;
 
   if (!employee_ids?.length || !dates?.length || !status) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -29,37 +30,65 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
 
-  let created = 0;
-  let updated = 0;
-  let skipped = 0;
+  try {
+    // Fetch all existing records for the employee+date combinations in one query
+    const placeholders = dates.map(() => "?").join(", ");
+    const empPlaceholders = employee_ids.map(() => "?").join(", ");
+    const existing = await db.execute({
+      sql: `SELECT id, employee_id, date, is_locked FROM attendance
+            WHERE employee_id IN (${empPlaceholders}) AND date IN (${placeholders})`,
+      args: [...employee_ids, ...dates],
+    });
 
-  for (const date of dates) {
-    for (const employee_id of employee_ids) {
-      const existing = await db.execute({
-        sql: "SELECT id, is_locked FROM attendance WHERE employee_id = ? AND date = ?",
-        args: [employee_id, date],
-      });
+    type ExistingRow = { id: string; employee_id: string; date: string; is_locked: number };
+    const existingMap = new Map<string, ExistingRow>();
+    for (const row of existing.rows) {
+      const r = row as unknown as ExistingRow;
+      existingMap.set(`${r.employee_id}|${r.date}`, r);
+    }
 
-      if (existing.rows.length > 0) {
-        const row = existing.rows[0] as unknown as { id: string; is_locked: number };
-        if (row.is_locked && !force) {
-          skipped++;
-          continue;
+    // Build batch statements
+    const statements: { sql: string; args: unknown[] }[] = [];
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+
+    for (const date of dates) {
+      for (const employee_id of employee_ids) {
+        const key = `${employee_id}|${date}`;
+        const existing = existingMap.get(key);
+
+        if (existing) {
+          if (existing.is_locked && !force) {
+            skipped++;
+            continue;
+          }
+          statements.push({
+            sql: "UPDATE attendance SET status = ?, marked_by = ?, marked_at = CURRENT_TIMESTAMP WHERE id = ?",
+            args: [status, session.user.id!, existing.id],
+          });
+          updated++;
+        } else {
+          statements.push({
+            sql: "INSERT INTO attendance (id, employee_id, date, status, marked_by) VALUES (?, ?, ?, ?, ?)",
+            args: [nanoid(), employee_id, date, status, session.user.id!],
+          });
+          created++;
         }
-        await db.execute({
-          sql: "UPDATE attendance SET status = ?, marked_by = ?, marked_at = CURRENT_TIMESTAMP WHERE id = ?",
-          args: [status, session.user.id!, row.id],
-        });
-        updated++;
-      } else {
-        await db.execute({
-          sql: "INSERT INTO attendance (id, employee_id, date, status, marked_by) VALUES (?, ?, ?, ?, ?)",
-          args: [nanoid(), employee_id, date, status, session.user.id!],
-        });
-        created++;
       }
     }
-  }
 
-  return NextResponse.json({ success: true, created, updated, skipped });
+    // Execute all in one batch
+    if (statements.length > 0) {
+      await db.batch(statements, "write");
+    }
+
+    return NextResponse.json({ success: true, created, updated, skipped });
+  } catch (err) {
+    console.error("bulk-mark error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Database error" },
+      { status: 500 }
+    );
+  }
 }
