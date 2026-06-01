@@ -34,7 +34,8 @@ export default auth((req: NextRequest & { auth: { user?: { role?: string } } | n
     !nextUrl.pathname.startsWith("/me") &&
     !nextUrl.pathname.startsWith("/leave") &&
     !nextUrl.pathname.startsWith("/announcements") &&
-    !nextUrl.pathname.startsWith("/complaints")
+    !nextUrl.pathname.startsWith("/complaints") &&
+    !nextUrl.pathname.startsWith("/settings")
   ) {
     return NextResponse.redirect(new URL("/me", nextUrl));
   }
