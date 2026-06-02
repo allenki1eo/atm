@@ -33,13 +33,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const whereClauses: string[] = [];
+  const whereClauses: string[] = ["e.active = 1"];
   const args: (string | number)[] = [];
   if (statusFilter) {
     whereClauses.push("ar.status = ?");
     args.push(statusFilter);
   }
-  const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
+  const whereSql = `WHERE ${whereClauses.join(" AND ")}`;
 
   const rows = await db.execute({
     sql: `SELECT ar.*, e.name AS employee_name, e.phone AS employee_phone

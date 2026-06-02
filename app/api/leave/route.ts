@@ -80,9 +80,12 @@ export async function GET() {
       SELECT lr.*, e.name as employee_name
       FROM leave_requests lr
       JOIN employees e ON lr.employee_id = e.id
-      WHERE e.supervisor_id = ?
-        OR e.section_id IN (
-          SELECT section_id FROM supervisor_sections WHERE supervisor_id = ?
+      WHERE e.active = 1
+        AND (
+          e.supervisor_id = ?
+          OR e.section_id IN (
+            SELECT section_id FROM supervisor_sections WHERE supervisor_id = ?
+          )
         )
       ORDER BY lr.submitted_at DESC
     `;
@@ -94,6 +97,7 @@ export async function GET() {
       SELECT lr.*, e.name as employee_name
       FROM leave_requests lr
       JOIN employees e ON lr.employee_id = e.id
+      WHERE e.active = 1
       ORDER BY lr.submitted_at DESC
     `;
     const result = await db.execute({ sql: requestsSql, args: [] });

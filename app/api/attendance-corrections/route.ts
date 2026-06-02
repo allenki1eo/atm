@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
     args.push(employeeId);
   } else if (role === "supervisor") {
     // Supervisor sees corrections for employees in sections they manage.
+    where.push("e.active = 1");
     where.push(`(
       e.supervisor_id = ?
       OR e.section_id IN (SELECT section_id FROM supervisor_sections WHERE supervisor_id = ?)

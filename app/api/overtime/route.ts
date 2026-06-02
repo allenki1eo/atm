@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
              FROM overtime_entries oe
              JOIN employees e ON e.id = oe.employee_id
              LEFT JOIN attendance a ON a.employee_id = oe.employee_id AND a.date = oe.date
-             WHERE 1=1`;
+             WHERE e.active = 1`;
   const args: (string | number)[] = [];
 
   if (employeeId) { sql += " AND oe.employee_id = ?"; args.push(employeeId); }
