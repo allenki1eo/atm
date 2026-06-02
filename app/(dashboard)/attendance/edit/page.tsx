@@ -5,8 +5,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, Check, X, Clock, Minus, Search, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -27,9 +27,9 @@ interface AttendanceRecord {
 
 const statusConfig: Record<Status, { label: string; icon: React.ElementType; btn: string; badge: string }> = {
   present: { label: "Alikuwepo", icon: Check, btn: "bg-green-500 hover:bg-green-600 text-white", badge: "bg-green-100 text-green-800 border-green-200" },
-  absent:  { label: "Hakuwepo", icon: X,     btn: "bg-red-500 hover:bg-red-600 text-white",   badge: "bg-red-100 text-red-800 border-red-200" },
-  late:    { label: "Alichelewa", icon: Clock, btn: "bg-amber-500 hover:bg-amber-600 text-white", badge: "bg-amber-100 text-amber-800 border-amber-200" },
-  half_day:{ label: "Nusu Siku", icon: Minus, btn: "bg-blue-500 hover:bg-blue-600 text-white",  badge: "bg-blue-100 text-blue-800 border-blue-200" },
+  absent:  { label: "Hakuwepo",  icon: X,     btn: "bg-red-500 hover:bg-red-600 text-white",     badge: "bg-red-100 text-red-800 border-red-200" },
+  late:    { label: "Alichelewa",icon: Clock,  btn: "bg-amber-500 hover:bg-amber-600 text-white", badge: "bg-amber-100 text-amber-800 border-amber-200" },
+  half_day:{ label: "Nusu Siku", icon: Minus,  btn: "bg-blue-500 hover:bg-blue-600 text-white",  badge: "bg-blue-100 text-blue-800 border-blue-200" },
 };
 
 function todayString() {
@@ -41,6 +41,7 @@ export default function AttendanceEditPage() {
   const [date, setDate] = useState(todayString());
   const [search, setSearch] = useState("");
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const { data: records, isLoading } = useQuery<AttendanceRecord[]>({
     queryKey: ["attendance", "edit", date],
@@ -72,6 +73,37 @@ export default function AttendanceEditPage() {
     },
   });
 
+  const bulkMutation = useMutation({
+    mutationFn: async (status: Status) => {
+      const res = await fetch("/api/attendance/bulk-mark", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employee_ids: Array.from(selected),
+          dates: [date],
+          status,
+          force: true,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? "Imeshindwa");
+      }
+      return res.json() as Promise<{ created: number; updated: number; skipped: number }>;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["attendance", "edit", date] });
+      setSelected(new Set());
+      toast({
+        title: "Imehifadhiwa",
+        description: `Waliobadilishwa: ${data.updated + data.created}, Waliorukwa: ${data.skipped}`,
+      });
+    },
+    onError: (err) => {
+      toast({ title: "Hitilafu", description: err.message, variant: "destructive" });
+    },
+  });
+
   const handleMark = async (employee_id: string, status: Status) => {
     setSavingIds((p) => new Set([...p, employee_id]));
     try {
@@ -87,6 +119,30 @@ export default function AttendanceEditPage() {
   );
 
   const lockedCount = filtered.filter((r) => r.is_locked).length;
+  const allSelected = filtered.length > 0 && filtered.every((r) => selected.has(r.employee_id));
+  const someSelected = filtered.some((r) => selected.has(r.employee_id));
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelected((p) => {
+        const n = new Set(p);
+        filtered.forEach((r) => n.delete(r.employee_id));
+        return n;
+      });
+    } else {
+      setSelected((p) => new Set([...p, ...filtered.map((r) => r.employee_id)]));
+    }
+  };
+
+  const toggleOne = (id: string) => {
+    setSelected((p) => {
+      const n = new Set(p);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  };
+
+  const isBulkSaving = bulkMutation.isPending;
 
   return (
     <div className="space-y-6">
@@ -106,7 +162,7 @@ export default function AttendanceEditPage() {
         <Input
           type="date"
           value={date}
-          onChange={(e) => setDate(e.target.value)}
+          onChange={(e) => { setDate(e.target.value); setSelected(new Set()); }}
           className="w-full sm:w-48"
         />
         <div className="relative flex-1">
@@ -148,12 +204,53 @@ export default function AttendanceEditPage() {
         </div>
       )}
 
+      {/* Bulk action bar */}
+      {someSelected && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/50 px-4 py-2.5">
+          <span className="text-sm font-medium text-muted-foreground mr-1">
+            {selected.size} wamechaguliwa:
+          </span>
+          {(["present","absent","late","half_day"] as Status[]).map((s) => {
+            const cfg = statusConfig[s];
+            return (
+              <Button
+                key={s}
+                size="sm"
+                disabled={isBulkSaving}
+                onClick={() => bulkMutation.mutate(s)}
+                className={cn("h-8 gap-1.5 text-xs", cfg.btn)}
+              >
+                <cfg.icon className="h-3.5 w-3.5" />
+                {cfg.label}
+              </Button>
+            );
+          })}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 text-xs ml-auto"
+            onClick={() => setSelected(new Set())}
+            disabled={isBulkSaving}
+          >
+            Ghairi
+          </Button>
+        </div>
+      )}
+
       {/* Table */}
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={allSelected}
+                    onCheckedChange={toggleAll}
+                    aria-label="Chagua wote"
+                    disabled={filtered.length === 0}
+                  />
+                </TableHead>
                 <TableHead>Mfanyakazi</TableHead>
                 <TableHead className="hidden sm:table-cell">Idara</TableHead>
                 <TableHead>Hali ya Sasa</TableHead>
@@ -163,13 +260,13 @@ export default function AttendanceEditPage() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                     Inapakia...
                   </TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                     Hakuna wafanyakazi kwa tarehe hii
                   </TableCell>
                 </TableRow>
@@ -177,8 +274,22 @@ export default function AttendanceEditPage() {
                 filtered.map((rec) => {
                   const cfg = rec.status ? statusConfig[rec.status] : null;
                   const saving = savingIds.has(rec.employee_id);
+                  const isSelected = selected.has(rec.employee_id);
                   return (
-                    <TableRow key={rec.employee_id} className={cn(saving && "opacity-60")}>
+                    <TableRow
+                      key={rec.employee_id}
+                      className={cn(
+                        saving && "opacity-60",
+                        isSelected && "bg-muted/40"
+                      )}
+                    >
+                      <TableCell>
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleOne(rec.employee_id)}
+                          aria-label={`Chagua ${rec.employee_name}`}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div>
                           <p className="font-medium text-sm">{rec.employee_name}</p>
@@ -211,7 +322,7 @@ export default function AttendanceEditPage() {
                               <button
                                 key={s}
                                 onClick={() => handleMark(rec.employee_id, s)}
-                                disabled={saving}
+                                disabled={saving || isBulkSaving}
                                 title={c.label}
                                 className={cn(
                                   "h-7 w-7 rounded flex items-center justify-center text-xs font-medium transition-all",
