@@ -146,7 +146,7 @@ export default async function DashboardPage() {
         sql: `SELECT status, COUNT(*) as count
               FROM attendance a
               JOIN employees e ON e.id = a.employee_id
-              WHERE e.supervisor_id = ? AND a.date = ?
+              WHERE e.supervisor_id = ? AND a.date = ? AND e.active = 1
               GROUP BY status`,
         args: [userId, today],
       });
@@ -163,7 +163,7 @@ export default async function DashboardPage() {
         sql: `SELECT a.date, a.status, COUNT(*) as count
               FROM attendance a
               JOIN employees e ON e.id = a.employee_id
-              WHERE e.supervisor_id = ? AND a.date >= ? AND a.date <= ?
+              WHERE e.supervisor_id = ? AND a.date >= ? AND a.date <= ? AND e.active = 1
               GROUP BY a.date, a.status
               ORDER BY a.date`,
         args: [userId, trendStart, today],
@@ -223,7 +223,11 @@ export default async function DashboardPage() {
       totalEmployees = (empResult.rows[0] as unknown as { count: number }).count;
 
       const attResult = await db.execute({
-        sql: `SELECT status, COUNT(*) as count FROM attendance WHERE date = ? GROUP BY status`,
+        sql: `SELECT a.status, COUNT(*) as count
+              FROM attendance a
+              JOIN employees e ON e.id = a.employee_id
+              WHERE a.date = ? AND e.active = 1
+              GROUP BY a.status`,
         args: [today],
       });
       for (const row of attResult.rows as unknown as {
@@ -236,11 +240,12 @@ export default async function DashboardPage() {
       }
 
       const trendResult = await db.execute({
-        sql: `SELECT date, status, COUNT(*) as count
-              FROM attendance
-              WHERE date >= ? AND date <= ?
-              GROUP BY date, status
-              ORDER BY date`,
+        sql: `SELECT a.date, a.status, COUNT(*) as count
+              FROM attendance a
+              JOIN employees e ON e.id = a.employee_id
+              WHERE a.date >= ? AND a.date <= ? AND e.active = 1
+              GROUP BY a.date, a.status
+              ORDER BY a.date`,
         args: [trendStart, today],
       });
       attendanceTrend = buildTrend(
