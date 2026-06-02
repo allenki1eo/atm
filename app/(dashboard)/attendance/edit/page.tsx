@@ -50,7 +50,6 @@ export default function AttendanceEditPage() {
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
-    onSuccess: () => setSelected(new Set()),
   });
 
   const markMutation = useMutation({
