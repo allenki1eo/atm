@@ -72,7 +72,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/payroll/periods", label: "Vipindi vya Mshahara", icon: DollarSign, roles: ["hr", "admin"] },
       { href: "/payroll/casual",  label: "Mshahara wa Mkataba",  icon: DollarSign, roles: ["hr", "admin"] },
-      { href: "/overtime",        label: "Overtime / Ziada",     icon: Clock,      roles: ["hr", "admin"] },
+      { href: "/overtime",        label: "Overtime / Ziada",     icon: Clock,      roles: ["hr", "admin", "supervisor"] },
       { href: "/advances",        label: "Salary Advance",       icon: DollarSign, roles: ["hr", "admin"] },
     ],
   },
