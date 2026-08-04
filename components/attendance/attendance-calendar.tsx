@@ -24,6 +24,18 @@ const STATUS_LABELS = {
   half_day: "Nusu Siku",
 };
 
+const OVERTIME_COLOR = "bg-green-600";
+const OVERTIME_LABEL = "Overtime";
+
+interface OvertimeDay {
+  date: string;
+  hours: number;
+  amount: number;
+}
+
+const formatHours = (hours: number) =>
+  Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
+
 interface AttendanceCalendarProps {
   employeeId: string;
   /** When true, show a "Report issue" button for the selected day and
@@ -74,6 +86,10 @@ export function AttendanceCalendar({ employeeId, allowCorrection = false }: Atte
     (data?.records ?? []).map((r: { date: string; status: string }) => [r.date, r])
   );
 
+  const overtimeMap = new Map(
+    ((data?.overtime ?? []) as OvertimeDay[]).map((o) => [o.date, o])
+  );
+
   const prevMonth = () => {
     if (month === 1) { setYear(y => y - 1); setMonth(12); }
     else setMonth(m => m - 1);
@@ -85,6 +101,7 @@ export function AttendanceCalendar({ employeeId, allowCorrection = false }: Atte
   };
 
   const selectedRecord = selectedDate ? recordMap.get(selectedDate) : null;
+  const selectedOvertime = selectedDate ? overtimeMap.get(selectedDate) : null;
 
   if (isLoading) {
     return <Skeleton className="h-64 w-full" />;
@@ -105,7 +122,12 @@ export function AttendanceCalendar({ employeeId, allowCorrection = false }: Atte
 
       {/* Summary */}
       {data?.summary && (
-        <div className="grid grid-cols-4 gap-2 text-center">
+        <div
+          className={cn(
+            "grid gap-2 text-center",
+            data.summary.overtime_days > 0 ? "grid-cols-5" : "grid-cols-4"
+          )}
+        >
           <div className="rounded-lg bg-green-50 p-2">
             <p className="text-lg font-bold text-green-700">{data.summary.present}</p>
             <p className="text-xs text-green-600">Present</p>
@@ -122,6 +144,14 @@ export function AttendanceCalendar({ employeeId, allowCorrection = false }: Atte
             <p className="text-lg font-bold text-blue-700">{data.summary.half_day}</p>
             <p className="text-xs text-blue-600">Half Day</p>
           </div>
+          {data.summary.overtime_days > 0 && (
+            <div className="rounded-lg bg-emerald-50 p-2">
+              <p className="text-lg font-bold text-emerald-800">{data.summary.overtime_days}</p>
+              <p className="text-xs text-emerald-700">
+                OT ({formatHours(data.summary.overtime_hours)}h)
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -148,6 +178,7 @@ export function AttendanceCalendar({ employeeId, allowCorrection = false }: Atte
             const day = i + 1;
             const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
             const record = recordMap.get(dateStr) as { status: string; notes?: string } | undefined;
+            const overtimeDay = overtimeMap.get(dateStr);
             const isToday = dateStr === new Date().toISOString().split("T")[0];
             const isSelected = selectedDate === dateStr;
             const isFuture = new Date(dateStr) > new Date();
@@ -164,17 +195,29 @@ export function AttendanceCalendar({ employeeId, allowCorrection = false }: Atte
                   !isFuture && !isSelected && "hover:bg-muted/50",
                   isFuture && "opacity-30 cursor-default"
                 )}
+                title={
+                  overtimeDay
+                    ? `${OVERTIME_LABEL}: saa ${formatHours(overtimeDay.hours)}`
+                    : undefined
+                }
               >
                 <span className={cn("text-xs font-medium", isToday && "text-primary")}>
                   {day}
                 </span>
-                {record && (
-                  <span
-                    className={cn(
-                      "mt-0.5 h-1.5 w-1.5 rounded-full",
-                      STATUS_COLORS[record.status as keyof typeof STATUS_COLORS] ?? "bg-gray-400"
+                {(record || overtimeDay) && (
+                  <span className="mt-0.5 flex items-center gap-0.5">
+                    {record && (
+                      <span
+                        className={cn(
+                          "h-1.5 w-1.5 rounded-full",
+                          STATUS_COLORS[record.status as keyof typeof STATUS_COLORS] ?? "bg-gray-400"
+                        )}
+                      />
                     )}
-                  />
+                    {overtimeDay && (
+                      <span className={cn("h-1.5 w-1.5 rounded-full", OVERTIME_COLOR)} />
+                    )}
+                  </span>
                 )}
               </button>
             );
@@ -209,6 +252,15 @@ export function AttendanceCalendar({ employeeId, allowCorrection = false }: Atte
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">No record for this day</p>
+          )}
+
+          {selectedOvertime && (
+            <div className="flex items-center gap-2">
+              <span className={cn("h-2 w-2 rounded-full", OVERTIME_COLOR)} />
+              <span className="text-sm">
+                {OVERTIME_LABEL}: saa {formatHours(selectedOvertime.hours)}
+              </span>
+            </div>
           )}
 
           {allowCorrection && (() => {
@@ -263,6 +315,10 @@ export function AttendanceCalendar({ employeeId, allowCorrection = false }: Atte
             {label}
           </span>
         ))}
+        <span className="flex items-center gap-1">
+          <span className={cn("h-2 w-2 rounded-full", OVERTIME_COLOR)} />
+          {OVERTIME_LABEL}
+        </span>
       </div>
     </div>
   );
