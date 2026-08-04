@@ -35,13 +35,34 @@ export async function GET(request: NextRequest) {
     marked_at: string;
   }[];
 
+  // Overtime hours per day, so the calendar can flag days worked beyond schedule.
+  // Wrapped: older databases may predate the overtime_entries table.
+  let overtime: { date: string; hours: number; amount: number }[] = [];
+  try {
+    const overtimeResult = await db.execute({
+      sql: `SELECT date, SUM(hours) as hours, SUM(amount) as amount
+            FROM overtime_entries
+            WHERE employee_id = ? AND date >= ? AND date <= ?
+            GROUP BY date
+            ORDER BY date`,
+      args: [employeeId, startDate, endDate],
+    });
+    overtime = (overtimeResult.rows as unknown as { date: string; hours: number; amount: number }[]).map(
+      (r) => ({ date: r.date, hours: Number(r.hours), amount: Number(r.amount) })
+    );
+  } catch {
+    overtime = [];
+  }
+
   const summary = {
     present: records.filter((r) => r.status === "present").length,
     absent: records.filter((r) => r.status === "absent").length,
     late: records.filter((r) => r.status === "late").length,
     half_day: records.filter((r) => r.status === "half_day").length,
     total_days: records.length,
+    overtime_days: overtime.length,
+    overtime_hours: overtime.reduce((sum, o) => sum + o.hours, 0),
   };
 
-  return NextResponse.json({ records, summary, year, month });
+  return NextResponse.json({ records, overtime, summary, year, month });
 }
