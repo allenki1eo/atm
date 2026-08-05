@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { AttendanceCalendar } from "@/components/attendance/attendance-calendar";
 import { Calendar, Building2, ArrowLeft, Users, Layers } from "lucide-react";
 import { useVisibleEmployees } from "@/hooks/use-attendance-visibility";
+import { addDays, formatDays } from "@/lib/overtime";
 
 interface Company { id: string; name: string; }
 interface EmployeeSummary {
@@ -24,6 +25,10 @@ interface EmployeeSummary {
   late: number;
   half_day: number;
   total: number;
+  attendance_days: number;
+  overtime_hours: number;
+  overtime_days: number;
+  days_worked: number;
 }
 
 const MONTHS = [
@@ -249,7 +254,8 @@ export default function AttendanceHistoryPage() {
                       {departmentLabel(dept)}
                     </p>
                     <span className="text-xs text-muted-foreground">
-                      {members.length} wafanyakazi
+                      {members.length} wafanyakazi ·{" "}
+                      {formatDays(addDays(...members.map((m) => m.days_worked)))} siku
                     </span>
                   </div>
                   <div className="divide-y">
@@ -283,7 +289,21 @@ export default function AttendanceHistoryPage() {
                               ✗ {emp.absent}
                             </Badge>
                           )}
-                          {emp.total === 0 && (
+                          {emp.overtime_days > 0 && (
+                            <Badge
+                              variant="outline"
+                              className="text-green-700 border-green-300 bg-green-50 dark:bg-green-950/20 text-xs"
+                              title={`Overtime: saa ${formatDays(emp.overtime_hours)}`}
+                            >
+                              OT +{formatDays(emp.overtime_days)}
+                            </Badge>
+                          )}
+                          {emp.days_worked > 0 && (
+                            <span className="text-xs font-medium tabular-nums w-14 text-right">
+                              {formatDays(emp.days_worked)} siku
+                            </span>
+                          )}
+                          {emp.total === 0 && emp.overtime_days === 0 && (
                             <span className="text-xs text-muted-foreground italic">Hakuna rekodi</span>
                           )}
                         </div>

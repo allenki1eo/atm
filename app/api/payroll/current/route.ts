@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { addDays, overtimeDaysFromHours } from "@/lib/overtime";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -72,10 +73,13 @@ export async function GET(request: NextRequest) {
 
   // Add overtime
   const overtimeRes = await db.execute({
-    sql: `SELECT COALESCE(SUM(amount), 0) as total FROM overtime_entries WHERE employee_id = ? AND date >= ? AND date <= ?`,
+    sql: `SELECT COALESCE(SUM(amount), 0) as total, COALESCE(SUM(hours), 0) as total_hours
+          FROM overtime_entries WHERE employee_id = ? AND date >= ? AND date <= ?`,
     args: [employeeId!, startDate, endDate],
   });
-  const totalOvertime = Math.round((overtimeRes.rows[0] as unknown as { total: number }).total);
+  const overtimeRow = overtimeRes.rows[0] as unknown as { total: number; total_hours: number };
+  const totalOvertime = Math.round(overtimeRow.total);
+  const overtimeDays = overtimeDaysFromHours(overtimeRow.total_hours);
   // For full-time employees, overtime is paid separately — not rolled into payslip gross
   const grossAmount = emp.type === "casual" ? baseGross + totalOvertime : baseGross;
 
@@ -108,7 +112,12 @@ export async function GET(request: NextRequest) {
       late: lateDays,
       half_day: halfDays,
       absent: records.filter((r) => r.status === "absent").length,
+      // effective_days drives base pay (days × daily rate); days_worked is the
+      // headline count and includes overtime day equivalents (9h = 1 day).
       effective_days: effectiveDays,
+      overtime_hours: Number(overtimeRow.total_hours ?? 0),
+      overtime_days: overtimeDays,
+      days_worked: addDays(effectiveDays, overtimeDays),
       total_records: records.length,
     },
     financial: {

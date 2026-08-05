@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
 import { nanoid } from "nanoid";
+import { OVERTIME_HOURS_PER_DAY } from "@/lib/overtime";
 
 const isValidDateOnly = (value: string) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -169,12 +170,12 @@ export async function POST(request: NextRequest) {
   }
 
   // Casual: proportional of daily_rate (4.5h = half day, 9h = full day)
-  // Fulltime: (monthly_salary / 28 / 9) * hours
+  // Fulltime: (monthly_salary / 28 / OVERTIME_HOURS_PER_DAY) * hours
   let amount: number;
   if (emp.type === "casual") {
-    amount = Math.round((overtimeHours / 9) * emp.daily_rate);
+    amount = Math.round((overtimeHours / OVERTIME_HOURS_PER_DAY) * emp.daily_rate);
   } else {
-    amount = Math.round((emp.monthly_salary / 28 / 9) * overtimeHours);
+    amount = Math.round((emp.monthly_salary / 28 / OVERTIME_HOURS_PER_DAY) * overtimeHours);
   }
 
   if (amount <= 0) {

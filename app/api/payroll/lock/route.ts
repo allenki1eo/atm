@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { nanoid } from "nanoid";
 import { sendSMS, smsTemplates } from "@/lib/at";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { overtimeDaysFromHours } from "@/lib/overtime";
 
 const FADHILA_AMOUNT = 10000;
 const NSSF_RATE = 0.10;
@@ -113,12 +114,16 @@ export async function POST(request: NextRequest) {
       ? Math.round(effectiveDays * emp.daily_rate)
       : emp.monthly_salary;
 
-    // Overtime
+    // Overtime — the amount is paid on top of base, and the hours also count
+    // as day equivalents (9h = 1 day) in the days recorded on the payslip.
     const overtimeResult = await db.execute({
-      sql: `SELECT COALESCE(SUM(amount), 0) as total FROM overtime_entries WHERE employee_id = ? AND date >= ? AND date <= ?`,
+      sql: `SELECT COALESCE(SUM(amount), 0) as total, COALESCE(SUM(hours), 0) as total_hours
+            FROM overtime_entries WHERE employee_id = ? AND date >= ? AND date <= ?`,
       args: [emp.id, startDate, endDate],
     });
-    const totalOvertime = Math.round((overtimeResult.rows[0] as unknown as { total: number }).total);
+    const overtimeRow = overtimeResult.rows[0] as unknown as { total: number; total_hours: number };
+    const totalOvertime = Math.round(overtimeRow.total);
+    const overtimeDays = overtimeDaysFromHours(overtimeRow.total_hours);
     const grossAmount = baseGross + totalOvertime;
 
     // Advances
@@ -145,12 +150,13 @@ export async function POST(request: NextRequest) {
     // Upsert payslip with all deduction columns
     await db.execute({
       sql: `INSERT INTO payslips
-              (id, employee_id, period_id, days_worked, gross_amount, total_advances,
+              (id, employee_id, period_id, days_worked, overtime_days, gross_amount, total_advances,
                net_amount, nssf_amount, cotwu_amount, fadhila_amount,
                heslb_amount, wcf_amount, total_deductions)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(employee_id, period_id) DO UPDATE SET
               days_worked      = excluded.days_worked,
+              overtime_days    = excluded.overtime_days,
               gross_amount     = excluded.gross_amount,
               total_advances   = excluded.total_advances,
               net_amount       = excluded.net_amount,
@@ -162,7 +168,9 @@ export async function POST(request: NextRequest) {
               total_deductions = excluded.total_deductions,
               generated_at     = CURRENT_TIMESTAMP`,
       args: [
-        nanoid(), emp.id, periodId, Math.round(effectiveDays), grossAmount,
+        // days_worked stays attendance-only so it still reconciles with
+        // base pay (days × daily rate); overtime days are stored alongside.
+        nanoid(), emp.id, periodId, effectiveDays, overtimeDays, grossAmount,
         totalAdvanceDeductions, netAmount, nssfAmount, cotwuAmount, fadhilaAmount,
         heslbAmount, wcfAmount, totalDeductions,
       ],

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { addDays, overtimeDaysFromHours } from "@/lib/overtime";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -38,5 +39,45 @@ export async function GET(request: NextRequest) {
     args: companyId ? [startDate, endDate, companyId] : [startDate, endDate],
   });
 
-  return NextResponse.json(result.rows);
+  // Overtime hours per employee for the same window. Queried separately so a
+  // database predating overtime_entries still returns the attendance summary.
+  const overtimeHoursByEmployee = new Map<string, number>();
+  try {
+    const overtimeResult = await db.execute({
+      sql: `SELECT employee_id, COALESCE(SUM(hours), 0) AS hours
+            FROM overtime_entries
+            WHERE date >= ? AND date <= ?
+            GROUP BY employee_id`,
+      args: [startDate, endDate],
+    });
+    for (const row of overtimeResult.rows as unknown as { employee_id: string; hours: number }[]) {
+      overtimeHoursByEmployee.set(row.employee_id, Number(row.hours ?? 0));
+    }
+  } catch {
+    // table not present yet — every employee simply has no overtime
+  }
+
+  type SummaryRow = {
+    employee_id: string;
+    present: number;
+    late: number;
+    half_day: number;
+  };
+
+  // Days counted mirror casual payroll: present and late are full days, half
+  // days count 0.5, and overtime adds day equivalents (9h = 1 day) on top.
+  const rows = (result.rows as unknown as SummaryRow[]).map((row) => {
+    const overtimeHours = overtimeHoursByEmployee.get(row.employee_id) ?? 0;
+    const overtimeDays = overtimeDaysFromHours(overtimeHours);
+    const attendanceDays = addDays(row.present, row.late, (row.half_day ?? 0) * 0.5);
+    return {
+      ...row,
+      attendance_days: attendanceDays,
+      overtime_hours: overtimeHours,
+      overtime_days: overtimeDays,
+      days_worked: addDays(attendanceDays, overtimeDays),
+    };
+  });
+
+  return NextResponse.json(rows);
 }
