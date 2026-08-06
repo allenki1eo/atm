@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { addDays, overtimeDaysFromHours } from "@/lib/overtime";
 
 const FADHILA_AMOUNT = 10000;
 const NSSF_RATE = 0.10;
@@ -58,10 +59,13 @@ export async function GET(request: NextRequest) {
       : emp.monthly_salary;
 
     const overtimeRes = await db.execute({
-      sql: `SELECT COALESCE(SUM(amount), 0) as total FROM overtime_entries WHERE employee_id = ? AND date >= ? AND date <= ?`,
+      sql: `SELECT COALESCE(SUM(amount), 0) as total, COALESCE(SUM(hours), 0) as total_hours
+            FROM overtime_entries WHERE employee_id = ? AND date >= ? AND date <= ?`,
       args: [emp.id, startDate, endDate],
     });
-    const totalOvertime = Math.round((overtimeRes.rows[0] as unknown as { total: number }).total);
+    const overtimeRow = overtimeRes.rows[0] as unknown as { total: number; total_hours: number };
+    const totalOvertime = Math.round(overtimeRow.total);
+    const overtimeDays = overtimeDaysFromHours(overtimeRow.total_hours);
 
     const advRes = await db.execute({
       sql: `SELECT COALESCE(SUM(ABS(amount)), 0) as total FROM transactions
@@ -87,7 +91,9 @@ export async function GET(request: NextRequest) {
       employee_id: emp.id,
       employee_name: emp.name,
       employee_type: emp.type,
-      days_worked: Math.round(effectiveDays),
+      attendance_days: effectiveDays,
+      overtime_days: overtimeDays,
+      days_worked: addDays(effectiveDays, overtimeDays),
       base_gross: baseGross,
       total_overtime: totalOvertime,
       gross_amount: grossAmount,

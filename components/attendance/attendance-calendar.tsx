@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAttendanceCalendar } from "@/hooks/use-attendance";
 import { cn } from "@/lib/utils";
+import { formatDays } from "@/lib/overtime";
 import { CorrectionRequestDialog } from "./correction-request-dialog";
 
 const STATUS_COLORS = {
@@ -146,13 +147,29 @@ export function AttendanceCalendar({ employeeId, allowCorrection = false }: Atte
           </div>
           {data.summary.overtime_days > 0 && (
             <div className="rounded-lg bg-emerald-50 p-2">
-              <p className="text-lg font-bold text-emerald-800">{data.summary.overtime_days}</p>
+              <p className="text-lg font-bold text-emerald-800">
+                +{formatDays(data.summary.overtime_days)}
+              </p>
               <p className="text-xs text-emerald-700">
                 OT ({formatHours(data.summary.overtime_hours)}h)
               </p>
             </div>
           )}
         </div>
+      )}
+
+      {/* Days counted — attendance days plus overtime day equivalents */}
+      {data?.summary && (
+        <p className="text-center text-xs text-muted-foreground">
+          Siku zilizohesabiwa:{" "}
+          <span className="font-semibold text-foreground">
+            {formatDays(data.summary.days_worked)}
+          </span>
+          {data.summary.overtime_days > 0 &&
+            ` (kawaida ${formatDays(data.summary.attendance_days)} + OT ${formatDays(
+              data.summary.overtime_days
+            )})`}
+        </p>
       )}
 
       {/* Calendar grid */}

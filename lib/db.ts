@@ -260,6 +260,7 @@ export async function initializeDatabase() {
       employee_id TEXT NOT NULL,
       period_id TEXT NOT NULL,
       days_worked INTEGER DEFAULT 0,
+      overtime_days REAL DEFAULT 0,
       gross_amount INTEGER DEFAULT 0,
       total_advances INTEGER DEFAULT 0,
       net_amount INTEGER DEFAULT 0,
@@ -537,6 +538,7 @@ export async function migrateDatabase() {
     "ALTER TABLE payslips ADD COLUMN total_deductions INTEGER DEFAULT 0",
     "ALTER TABLE payslips ADD COLUMN leave_days INTEGER DEFAULT 0",
     "ALTER TABLE payslips ADD COLUMN wcf_amount INTEGER DEFAULT 0",
+    "ALTER TABLE payslips ADD COLUMN overtime_days REAL DEFAULT 0",
   ];
 
   const payrollPeriodColumns = [

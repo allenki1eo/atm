@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { addDays, formatDays, overtimeDaysFromHours } from "@/lib/overtime";
 import { PrintButton } from "@/components/print-button";
 
 const MONTHS = [
@@ -11,7 +12,8 @@ const MONTHS = [
 
 interface Payslip {
   id: string; employee_id: string; period_id: string;
-  days_worked: number; gross_amount: number; total_advances: number; net_amount: number;
+  days_worked: number; overtime_days: number | null;
+  gross_amount: number; total_advances: number; net_amount: number;
   nssf_amount: number; cotwu_amount: number; fadhila_amount: number;
   heslb_amount: number; wcf_amount: number; total_deductions: number; generated_at: string;
 }
@@ -106,13 +108,23 @@ export default async function PayslipPrintPage({ params }: { params: Promise<{ i
 
   // Fetch overtime for this period
   let totalOvertime = 0;
+  let overtimeHours = 0;
   if (period) {
     const otRes = await db.execute({
-      sql: `SELECT COALESCE(SUM(amount), 0) as total FROM overtime_entries WHERE employee_id = ? AND date >= ? AND date <= ?`,
+      sql: `SELECT COALESCE(SUM(amount), 0) as total, COALESCE(SUM(hours), 0) as total_hours
+            FROM overtime_entries WHERE employee_id = ? AND date >= ? AND date <= ?`,
       args: [payslip.employee_id, period.start_date, period.end_date],
     });
-    totalOvertime = Math.round((otRes.rows[0] as unknown as { total: number }).total);
+    const otRow = otRes.rows[0] as unknown as { total: number; total_hours: number };
+    totalOvertime = Math.round(otRow.total);
+    overtimeHours = Number(otRow.total_hours ?? 0);
   }
+
+  // Overtime counts toward days worked (9h = 1 day). Payslips locked before
+  // that column existed fall back to recomputing from this period's hours.
+  const attendanceDays = payslip.days_worked ?? 0;
+  const overtimeDays = payslip.overtime_days ?? overtimeDaysFromHours(overtimeHours);
+  const totalDaysWorked = addDays(attendanceDays, overtimeDays);
 
   const isFulltime = employee?.type === "fulltime";
   const nssfAmt = payslip.nssf_amount ?? 0;
@@ -174,16 +186,26 @@ export default async function PayslipPrintPage({ params }: { params: Promise<{ i
             <tr><td>Mshahara wa Mwezi</td><td>{formatCurrency(employee?.monthly_salary ?? 0)}</td></tr>
           ) : (
             <>
-              <tr><td>Siku Zilizofanywa Kazi</td><td>{payslip.days_worked}</td></tr>
+              <tr>
+                <td>
+                  Siku Zilizofanywa Kazi
+                  {overtimeDays > 0 &&
+                    ` (kawaida ${formatDays(attendanceDays)} + OT ${formatDays(overtimeDays)})`}
+                </td>
+                <td>{formatDays(totalDaysWorked)}</td>
+              </tr>
               <tr><td>Kiwango cha Siku</td><td>{formatCurrency(employee?.daily_rate ?? 0)}</td></tr>
               <tr>
-                <td>Mshahara wa Msingi ({payslip.days_worked} × {formatCurrency(employee?.daily_rate ?? 0)})</td>
+                <td>Mshahara wa Msingi ({formatDays(attendanceDays)} × {formatCurrency(employee?.daily_rate ?? 0)})</td>
                 <td>{formatCurrency(baseGross)}</td>
               </tr>
             </>
           )}
           {totalOvertime > 0 && (
-            <tr><td>Overtime</td><td>{formatCurrency(totalOvertime)}</td></tr>
+            <tr>
+              <td>Overtime{overtimeHours > 0 && ` (saa ${formatDays(overtimeHours)})`}</td>
+              <td>{formatCurrency(totalOvertime)}</td>
+            </tr>
           )}
           <tr className="subtotal"><td>Jumla ya Mapato (Gross)</td><td>{formatCurrency(payslip.gross_amount)}</td></tr>
         </tbody>

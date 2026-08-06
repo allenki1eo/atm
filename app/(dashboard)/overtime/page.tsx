@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { OVERTIME_HOURS_PER_DAY, formatDays, overtimeDaysFromHours } from "@/lib/overtime";
 
 const MONTHS = [
   "Januari","Februari","Machi","Aprili","Mei","Juni",
@@ -101,10 +102,10 @@ export default function OvertimePage() {
     : parseFloat(hours) || 0;
   const previewAmount = selectedEmployee
     ? isCasual
-      ? Math.round((previewHours / 9) * selectedEmployee.daily_rate)
-      : Math.round((selectedEmployee.monthly_salary / 28 / 9) * previewHours)
+      ? Math.round((previewHours / OVERTIME_HOURS_PER_DAY) * selectedEmployee.daily_rate)
+      : Math.round((selectedEmployee.monthly_salary / 28 / OVERTIME_HOURS_PER_DAY) * previewHours)
     : 0;
-  const previewDays = Math.round((previewHours / 9) * 100) / 100;
+  const previewDays = overtimeDaysFromHours(previewHours);
   const existingSelectedHours = (entries ?? [])
     .filter((entry) => entry.employee_id === selectedEmployeeId && entry.date === date)
     .reduce((sum, entry) => sum + entry.hours, 0);
@@ -170,7 +171,7 @@ export default function OvertimePage() {
 
   const totalAmount = filtered.reduce((s, e) => s + e.amount, 0);
   const totalHours = filtered.reduce((s, e) => s + e.hours, 0);
-  const totalDays = Math.round((totalHours / 9) * 100) / 100;
+  const totalDays = overtimeDaysFromHours(totalHours);
   const employeeCount = new Set(filtered.map((e) => e.employee_id)).size;
   const conflictCount = filtered.filter((e) => !e.attendance_status || e.attendance_status === "absent").length;
 
@@ -189,8 +190,6 @@ export default function OvertimePage() {
 
   const formatHours = (value: number) =>
     Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, "");
-  const formatDays = (value: number) =>
-    Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, "");
   const formatShift = (value: number) =>
     value === 4.5 ? "4.5 (nusu siku)" : value === 9 ? "9 (siku nzima)" : `${formatHours(value)} saa`;
   const attendanceLabel = (status: string | null) => {
@@ -344,7 +343,7 @@ export default function OvertimePage() {
                       {formatShift(entry.hours)}
                       {entry.employee_type === "casual" && (
                         <p className="text-[11px] text-muted-foreground">
-                          {formatDays(entry.hours / 9)} siku
+                          {formatDays(overtimeDaysFromHours(entry.hours))} siku
                         </p>
                       )}
                     </TableCell>

@@ -5,6 +5,7 @@ import { Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { addDays, formatDays } from "@/lib/overtime";
 
 const MONTHS = [
   "Januari", "Februari", "Machi", "Aprili", "Mei", "Juni",
@@ -16,6 +17,7 @@ interface Payslip {
   employee_id: string;
   period_id: string;
   days_worked: number;
+  overtime_days: number | null;
   gross_amount: number;
   total_advances: number;
   net_amount: number;
@@ -190,6 +192,15 @@ function PayslipContent({ detail }: { detail: PayslipDetail }) {
     payslip.total_deductions && payslip.total_deductions > 0
       ? payslip.total_deductions
       : nssfAmt + cotwuAmt + fadhilaAmt + heslbAmt + totalAdvances;
+
+  // days_worked holds attendance days (the base-pay multiplier); overtime days
+  // (9h = 1 day) are counted on top, and whatever gross exceeds base is the
+  // overtime payment.
+  const attendanceDays = payslip.days_worked ?? 0;
+  const overtimeDays = payslip.overtime_days ?? 0;
+  const totalDaysWorked = addDays(attendanceDays, overtimeDays);
+  const baseGross = Math.round(attendanceDays * (employee?.daily_rate ?? 0));
+  const overtimeAmount = Math.max(0, payslip.gross_amount - baseGross);
 
   const periodLabel = period ? `${MONTHS[period.month - 1]} ${period.year}` : "—";
 
@@ -399,8 +410,12 @@ function PayslipContent({ detail }: { detail: PayslipDetail }) {
           ) : (
             <>
               <tr>
-                <td style={styles.td}>Siku Zilizofanywa Kazi</td>
-                <td style={styles.tdRight}>{payslip.days_worked}</td>
+                <td style={styles.td}>
+                  Siku Zilizofanywa Kazi
+                  {overtimeDays > 0 &&
+                    ` (kawaida ${formatDays(attendanceDays)} + OT ${formatDays(overtimeDays)})`}
+                </td>
+                <td style={styles.tdRight}>{formatDays(totalDaysWorked)}</td>
               </tr>
               <tr>
                 <td style={styles.td}>Kiwango cha Siku</td>
@@ -410,10 +425,16 @@ function PayslipContent({ detail }: { detail: PayslipDetail }) {
               </tr>
               <tr>
                 <td style={styles.td}>
-                  Jumla ({payslip.days_worked} × {formatCurrency(employee?.daily_rate ?? 0)})
+                  Jumla ({formatDays(attendanceDays)} × {formatCurrency(employee?.daily_rate ?? 0)})
                 </td>
-                <td style={styles.tdRight}>{formatCurrency(payslip.gross_amount)}</td>
+                <td style={styles.tdRight}>{formatCurrency(baseGross)}</td>
               </tr>
+              {overtimeAmount > 0 && (
+                <tr>
+                  <td style={styles.td}>Overtime</td>
+                  <td style={styles.tdRight}>{formatCurrency(overtimeAmount)}</td>
+                </tr>
+              )}
             </>
           )}
           <tr>
