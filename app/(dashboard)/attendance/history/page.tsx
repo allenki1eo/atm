@@ -2,13 +2,29 @@
 
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AttendanceCalendar } from "@/components/attendance/attendance-calendar";
-import { Calendar, Building2, ArrowLeft, Users, Layers } from "lucide-react";
+import {
+  Calendar,
+  Building2,
+  ArrowLeft,
+  Users,
+  Layers,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { useVisibleEmployees } from "@/hooks/use-attendance-visibility";
 import { addDays, formatDays } from "@/lib/overtime";
 
@@ -126,20 +142,82 @@ export default function AttendanceHistoryPage() {
 
   // ── drill-down view ──────────────────────────────────────────────────────
   if (selectedEmployee) {
+    const currentIndex = filteredSummaries.findIndex(
+      (e) => e.employee_id === selectedEmployee.employee_id
+    );
+    const goToIndex = (index: number) => {
+      const next = filteredSummaries[index];
+      if (next) setSelectedEmployee(next);
+    };
+
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => setSelectedEmployee(null)}>
             <ArrowLeft className="h-4 w-4 mr-1" /> Rudi
           </Button>
-          <div>
-            <h1 className="text-xl font-bold">{selectedEmployee.employee_name}</h1>
-            <p className="text-sm text-muted-foreground">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold truncate">{selectedEmployee.employee_name}</h1>
+            <p className="text-sm text-muted-foreground truncate">
               {selectedEmployee.department}
               {selectedEmployee.company_name && ` · ${selectedEmployee.company_name}`}
             </p>
           </div>
         </div>
+
+        {/* Switch employee without going back to the list */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            className="shrink-0"
+            aria-label="Mfanyakazi aliyetangulia"
+            disabled={currentIndex <= 0}
+            onClick={() => goToIndex(currentIndex - 1)}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Select
+            value={currentIndex >= 0 ? selectedEmployee.employee_id : ""}
+            onValueChange={(id) => {
+              const next = filteredSummaries.find((e) => e.employee_id === id);
+              if (next) setSelectedEmployee(next);
+            }}
+          >
+            <SelectTrigger className="flex-1 min-w-0">
+              <SelectValue placeholder={selectedEmployee.employee_name} />
+            </SelectTrigger>
+            <SelectContent>
+              {departmentGroups.map(([dept, members]) => (
+                <SelectGroup key={dept}>
+                  <SelectLabel>{departmentLabel(dept)}</SelectLabel>
+                  {members.map((m) => (
+                    <SelectItem key={m.employee_id} value={m.employee_id}>
+                      {m.employee_name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="icon"
+            className="shrink-0"
+            aria-label="Mfanyakazi anayefuata"
+            disabled={currentIndex < 0 || currentIndex >= filteredSummaries.length - 1}
+            onClick={() => goToIndex(currentIndex + 1)}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+        {currentIndex >= 0 && filteredSummaries.length > 1 && (
+          <p className="text-xs text-muted-foreground text-center">
+            {currentIndex + 1} / {filteredSummaries.length}
+            {activeDepartment !== "all" && ` · ${departmentLabel(activeDepartment)}`}
+          </p>
+        )}
+
         <Card>
           <CardContent className="pt-4">
             <AttendanceCalendar employeeId={selectedEmployee.employee_id} />
