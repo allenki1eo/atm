@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { apiHandler } from "@/lib/api-handler";
 
-export async function GET(request: NextRequest) {
+async function _GET(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(result.rows);
 }
 
-export async function DELETE(request: NextRequest) {
+async function _DELETE(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -68,3 +69,6 @@ export async function DELETE(request: NextRequest) {
 
   return NextResponse.json({ success: true, deleted });
 }
+
+export const GET = apiHandler(_GET);
+export const DELETE = apiHandler(_DELETE);

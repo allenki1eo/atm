@@ -4,8 +4,9 @@ import { db } from "@/lib/db";
 import { nanoid } from "nanoid";
 import { sendSMS, smsTemplates } from "@/lib/at";
 import { formatCurrency, getTodayDate } from "@/lib/utils";
+import { apiHandler } from "@/lib/api-handler";
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
 }
 
 // Bulk mark attendance
-export async function PUT(request: NextRequest) {
+async function _PUT(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -132,3 +133,6 @@ export async function PUT(request: NextRequest) {
 
   return NextResponse.json({ success: true, updated: results.length });
 }
+
+export const POST = apiHandler(_POST);
+export const PUT = apiHandler(_PUT);

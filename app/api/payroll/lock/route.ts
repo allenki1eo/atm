@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { InStatement } from "@libsql/client";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { nanoid } from "nanoid";
 import { sendSMS, smsTemplates } from "@/lib/at";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { apiHandler } from "@/lib/api-handler";
 
 const FADHILA_AMOUNT = 10000;
 const NSSF_RATE = 0.10;
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -91,6 +93,58 @@ export async function POST(request: NextRequest) {
 
   let smsSent = 0;
 
+  // ── Aggregate all per-employee lookups up front (3 queries, not 3 per employee) ──
+  const [attendAgg, overtimeAgg, advanceAgg] = await Promise.all([
+    db.execute({
+      sql: `SELECT employee_id,
+              SUM(CASE WHEN status IN ('present','late') THEN 1 ELSE 0 END) AS present_days,
+              SUM(CASE WHEN status = 'half_day'          THEN 1 ELSE 0 END) AS half_days
+            FROM attendance
+            WHERE date >= ? AND date <= ?
+            GROUP BY employee_id`,
+      args: [startDate, endDate],
+    }),
+    db.execute({
+      sql: `SELECT employee_id, COALESCE(SUM(amount), 0) AS total
+            FROM overtime_entries
+            WHERE date >= ? AND date <= ?
+            GROUP BY employee_id`,
+      args: [startDate, endDate],
+    }),
+    db.execute({
+      sql: `SELECT employee_id, COALESCE(SUM(amount), 0) AS total
+            FROM transactions
+            WHERE type = 'advance_given' AND created_at >= ? AND created_at <= ?
+            GROUP BY employee_id`,
+      args: [startDate + " 00:00:00", endDate + " 23:59:59"],
+    }),
+  ]);
+
+  const attendMap = new Map<string, { present_days: number; half_days: number }>();
+  for (const r of attendAgg.rows as unknown as {
+    employee_id: string; present_days: number; half_days: number;
+  }[]) {
+    attendMap.set(r.employee_id, {
+      present_days: Number(r.present_days ?? 0),
+      half_days: Number(r.half_days ?? 0),
+    });
+  }
+
+  const overtimeMap = new Map<string, number>();
+  for (const r of overtimeAgg.rows as unknown as { employee_id: string; total: number }[]) {
+    overtimeMap.set(r.employee_id, Number(r.total ?? 0));
+  }
+
+  const advanceMap = new Map<string, number>();
+  for (const r of advanceAgg.rows as unknown as { employee_id: string; total: number }[]) {
+    advanceMap.set(r.employee_id, Number(r.total ?? 0));
+  }
+
+  // ── Compute every payslip in memory, then write them in one batch ──
+  const payslipStatements: InStatement[] = [];
+  const smsTargets: { phone: string; message: string; employeeId: string }[] = [];
+  const deadline = new Date(year, month, 5).toISOString().split("T")[0];
+
   for (const emp of employees.rows as unknown as {
     id: string; name: string; phone: string; type: string;
     daily_rate: number; monthly_salary: number;
@@ -99,36 +153,17 @@ export async function POST(request: NextRequest) {
     food_advance_amount: number;
     company_cotwu_rate: number;
   }[]) {
-    // Attendance
-    const attendResult = await db.execute({
-      sql: `SELECT status FROM attendance WHERE employee_id = ? AND date >= ? AND date <= ?`,
-      args: [emp.id, startDate, endDate],
-    });
-    const records = attendResult.rows as unknown as { status: string }[];
-    const presentDays = records.filter((r) => ["present", "late"].includes(r.status)).length;
-    const halfDays = records.filter((r) => r.status === "half_day").length;
-    const effectiveDays = presentDays + halfDays * 0.5;
+    const att = attendMap.get(emp.id) ?? { present_days: 0, half_days: 0 };
+    const effectiveDays = att.present_days + att.half_days * 0.5;
 
     const baseGross = emp.type === "casual"
       ? Math.round(effectiveDays * emp.daily_rate)
       : emp.monthly_salary;
 
-    // Overtime
-    const overtimeResult = await db.execute({
-      sql: `SELECT COALESCE(SUM(amount), 0) as total FROM overtime_entries WHERE employee_id = ? AND date >= ? AND date <= ?`,
-      args: [emp.id, startDate, endDate],
-    });
-    const totalOvertime = Math.round((overtimeResult.rows[0] as unknown as { total: number }).total);
+    const totalOvertime = Math.round(overtimeMap.get(emp.id) ?? 0);
     const grossAmount = baseGross + totalOvertime;
 
-    // Advances
-    const advResult = await db.execute({
-      sql: `SELECT SUM(amount) as total FROM transactions
-            WHERE employee_id = ? AND type = 'advance_given'
-            AND created_at >= ? AND created_at <= ?`,
-      args: [emp.id, startDate + " 00:00:00", endDate + " 23:59:59"],
-    });
-    const totalAdvances = Math.abs((advResult.rows[0] as unknown as { total: number }).total ?? 0);
+    const totalAdvances = Math.abs(advanceMap.get(emp.id) ?? 0);
     const foodAdvanceAmount = emp.food_advance_amount ?? 0;
     const totalAdvanceDeductions = totalAdvances + foodAdvanceAmount;
 
@@ -142,8 +177,7 @@ export async function POST(request: NextRequest) {
     const totalDeductions = nssfAmount + cotwuAmount + fadhilaAmount + heslbAmount + wcfAmount + totalAdvanceDeductions;
     const netAmount = grossAmount - totalDeductions;
 
-    // Upsert payslip with all deduction columns
-    await db.execute({
+    payslipStatements.push({
       sql: `INSERT INTO payslips
               (id, employee_id, period_id, days_worked, gross_amount, total_advances,
                net_amount, nssf_amount, cotwu_amount, fadhila_amount,
@@ -168,30 +202,43 @@ export async function POST(request: NextRequest) {
       ],
     });
 
-    // Send SMS
     if (send_sms && emp.phone) {
-      const deadline = new Date(year, month, 5).toISOString().split("T")[0];
-      let message: string;
+      const message = emp.type === "casual"
+        ? smsTemplates.payrollReady(
+            monthName, Math.round(effectiveDays),
+            formatCurrency(emp.daily_rate), formatCurrency(grossAmount), formatDate(deadline)
+          )
+        : smsTemplates.periodLocked(monthName);
+      smsTargets.push({ phone: emp.phone, message, employeeId: emp.id });
+    }
+  }
 
-      if (emp.type === "casual") {
-        message = smsTemplates.payrollReady(
-          monthName, Math.round(effectiveDays),
-          formatCurrency(emp.daily_rate), formatCurrency(grossAmount), formatDate(deadline)
-        );
-      } else {
-        message = smsTemplates.periodLocked(monthName);
-      }
+  // Write all payslips in chunked batches (libSQL caps batch size)
+  const CHUNK = 50;
+  for (let i = 0; i < payslipStatements.length; i += CHUNK) {
+    await db.batch(payslipStatements.slice(i, i + CHUNK), "write");
+  }
 
-      const result = await sendSMS(emp.phone, message, {
-        sentBy: session.user.id ?? null,
-        source: "payroll_lock",
-      });
-      if (result.success) smsSent++;
+  // SMS must go one at a time (external gateway); collect successes then flag in one batch
+  const smsSuccessIds: string[] = [];
+  for (const target of smsTargets) {
+    const result = await sendSMS(target.phone, target.message, {
+      sentBy: session.user.id ?? null,
+      source: "payroll_lock",
+    });
+    if (result.success) {
+      smsSent++;
+      smsSuccessIds.push(target.employeeId);
+    }
+  }
 
-      await db.execute({
-        sql: "UPDATE payslips SET sent_sms = 1 WHERE employee_id = ? AND period_id = ?",
-        args: [emp.id, periodId],
-      });
+  if (smsSuccessIds.length > 0) {
+    const flagStatements: InStatement[] = smsSuccessIds.map((employeeId) => ({
+      sql: "UPDATE payslips SET sent_sms = 1 WHERE employee_id = ? AND period_id = ?",
+      args: [employeeId, periodId],
+    }));
+    for (let i = 0; i < flagStatements.length; i += CHUNK) {
+      await db.batch(flagStatements.slice(i, i + CHUNK), "write");
     }
   }
 
@@ -205,7 +252,7 @@ export async function POST(request: NextRequest) {
   });
 }
 
-export async function PUT(request: NextRequest) {
+async function _PUT(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -248,3 +295,6 @@ export async function PUT(request: NextRequest) {
 
   return NextResponse.json({ success: true });
 }
+
+export const POST = apiHandler(_POST);
+export const PUT = apiHandler(_PUT);

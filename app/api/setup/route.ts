@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { initializeDatabase, seedDemoData } from "@/lib/db";
+import { apiHandler } from "@/lib/api-handler";
 
 // One-shot endpoint to create all tables and seed demo data.
 // Safe to call multiple times — all statements use CREATE TABLE IF NOT EXISTS
 // and seedDemoData() is a no-op if users already exist.
-export async function GET() {
+async function _GET() {
   try {
     await initializeDatabase();
     await seedDemoData();
@@ -17,3 +18,5 @@ export async function GET() {
     );
   }
 }
+
+export const GET = apiHandler(_GET);

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
 import { nanoid } from "nanoid";
 import { sendSMS, smsTemplates } from "@/lib/at";
+import { apiHandler } from "@/lib/api-handler";
 
 const STATUS_LABEL_SW: Record<string, string> = {
   present: "Alikuwepo",
@@ -11,7 +12,7 @@ const STATUS_LABEL_SW: Record<string, string> = {
   half_day: "Nusu siku",
 };
 
-export async function PUT(
+async function _PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -159,3 +160,5 @@ export async function PUT(
     applied_attendance_id: appliedAttendanceId,
   });
 }
+
+export const PUT = apiHandler(_PUT);

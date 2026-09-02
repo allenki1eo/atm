@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { apiHandler } from "@/lib/api-handler";
 
-export async function POST(
+async function _POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -70,3 +71,5 @@ export async function POST(
 
   return NextResponse.json({ success: true, role: "employee" });
 }
+
+export const POST = apiHandler(_POST);

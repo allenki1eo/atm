@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { apiHandler } from "@/lib/api-handler";
 
 const FADHILA_AMOUNT = 10000;
 const NSSF_RATE = 0.10;
 
-export async function GET(request: NextRequest) {
+async function _GET(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -35,6 +36,53 @@ export async function GET(request: NextRequest) {
     args: companyId ? [companyId] : [],
   });
 
+  // ── Aggregate all three lookups up front (3 queries total, not 3 per employee) ──
+  const [attendAgg, overtimeAgg, advanceAgg] = await Promise.all([
+    db.execute({
+      sql: `SELECT employee_id,
+              SUM(CASE WHEN status IN ('present','late') THEN 1 ELSE 0 END) AS present_days,
+              SUM(CASE WHEN status = 'half_day'          THEN 1 ELSE 0 END) AS half_days
+            FROM attendance
+            WHERE date >= ? AND date <= ?
+            GROUP BY employee_id`,
+      args: [startDate, endDate],
+    }),
+    db.execute({
+      sql: `SELECT employee_id, COALESCE(SUM(amount), 0) AS total
+            FROM overtime_entries
+            WHERE date >= ? AND date <= ?
+            GROUP BY employee_id`,
+      args: [startDate, endDate],
+    }),
+    db.execute({
+      sql: `SELECT employee_id, COALESCE(SUM(ABS(amount)), 0) AS total
+            FROM transactions
+            WHERE type = 'advance_given' AND created_at >= ? AND created_at <= ?
+            GROUP BY employee_id`,
+      args: [startDate + " 00:00:00", endDate + " 23:59:59"],
+    }),
+  ]);
+
+  const attendMap = new Map<string, { present_days: number; half_days: number }>();
+  for (const r of attendAgg.rows as unknown as {
+    employee_id: string; present_days: number; half_days: number;
+  }[]) {
+    attendMap.set(r.employee_id, {
+      present_days: Number(r.present_days ?? 0),
+      half_days: Number(r.half_days ?? 0),
+    });
+  }
+
+  const overtimeMap = new Map<string, number>();
+  for (const r of overtimeAgg.rows as unknown as { employee_id: string; total: number }[]) {
+    overtimeMap.set(r.employee_id, Number(r.total ?? 0));
+  }
+
+  const advanceMap = new Map<string, number>();
+  for (const r of advanceAgg.rows as unknown as { employee_id: string; total: number }[]) {
+    advanceMap.set(r.employee_id, Number(r.total ?? 0));
+  }
+
   const rows = [];
   for (const emp of employees.rows as unknown as {
     id: string; name: string; phone: string; type: string;
@@ -44,31 +92,18 @@ export async function GET(request: NextRequest) {
     food_advance_amount: number;
     company_cotwu_rate: number;
   }[]) {
-    const attendResult = await db.execute({
-      sql: `SELECT status FROM attendance WHERE employee_id = ? AND date >= ? AND date <= ?`,
-      args: [emp.id, startDate, endDate],
-    });
-    const records = attendResult.rows as unknown as { status: string }[];
-    const presentDays = records.filter((r) => ["present", "late"].includes(r.status)).length;
-    const halfDays = records.filter((r) => r.status === "half_day").length;
+    const att = attendMap.get(emp.id) ?? { present_days: 0, half_days: 0 };
+    const presentDays = att.present_days;
+    const halfDays = att.half_days;
     const effectiveDays = presentDays + halfDays * 0.5;
 
     const baseGross = emp.type === "casual"
       ? Math.round(effectiveDays * emp.daily_rate)
       : emp.monthly_salary;
 
-    const overtimeRes = await db.execute({
-      sql: `SELECT COALESCE(SUM(amount), 0) as total FROM overtime_entries WHERE employee_id = ? AND date >= ? AND date <= ?`,
-      args: [emp.id, startDate, endDate],
-    });
-    const totalOvertime = Math.round((overtimeRes.rows[0] as unknown as { total: number }).total);
+    const totalOvertime = Math.round(overtimeMap.get(emp.id) ?? 0);
 
-    const advRes = await db.execute({
-      sql: `SELECT COALESCE(SUM(ABS(amount)), 0) as total FROM transactions
-            WHERE employee_id = ? AND type = 'advance_given' AND created_at >= ? AND created_at <= ?`,
-      args: [emp.id, startDate + " 00:00:00", endDate + " 23:59:59"],
-    });
-    const totalAdvances = Math.round((advRes.rows[0] as unknown as { total: number }).total);
+    const totalAdvances = Math.round(advanceMap.get(emp.id) ?? 0);
     const foodAdvanceAmount = emp.food_advance_amount ?? 0;
     const totalAdvanceDeductions = totalAdvances + foodAdvanceAmount;
 
@@ -106,3 +141,5 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({ month, year, employees: rows });
 }
+
+export const GET = apiHandler(_GET);

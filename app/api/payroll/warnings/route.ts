@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
+import { apiHandler } from "@/lib/api-handler";
 
 type WarningSeverity = "high" | "medium" | "low";
 
@@ -23,7 +24,7 @@ const isValidPeriod = (month: number, year: number) =>
   year >= 2000 &&
   year <= 2100;
 
-export async function GET(request: NextRequest) {
+async function _GET(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -217,3 +218,5 @@ export async function GET(request: NextRequest) {
     warnings,
   });
 }
+
+export const GET = apiHandler(_GET);

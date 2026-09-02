@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
+import { apiHandler } from "@/lib/api-handler";
 
 // Returns the current user's employee record, or null if the user
 // isn't linked to one (admin/HR without an employee profile).
 // Always reads from the DB — session JWT may be stale.
-export async function GET() {
+async function _GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await ensureDatabase();
@@ -27,3 +28,5 @@ export async function GET() {
   });
   return NextResponse.json(empRes.rows[0] ?? null);
 }
+
+export const GET = apiHandler(_GET);

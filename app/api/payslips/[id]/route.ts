@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
+import { apiHandler } from "@/lib/api-handler";
 
-export async function GET(
+async function _GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -73,3 +74,5 @@ export async function GET(
 
   return NextResponse.json({ payslip, employee, section, period });
 }
+
+export const GET = apiHandler(_GET);

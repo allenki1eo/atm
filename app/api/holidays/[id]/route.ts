@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { apiHandler } from "@/lib/api-handler";
 
-export async function DELETE(
+async function _DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -22,3 +23,5 @@ export async function DELETE(
 
   return NextResponse.json({ success: true });
 }
+
+export const DELETE = apiHandler(_DELETE);

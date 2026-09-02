@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
+import { apiHandler } from "@/lib/api-handler";
 
-export async function GET() {
+async function _GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await ensureDatabase();
@@ -34,3 +35,5 @@ export async function GET() {
 
   return NextResponse.json(res.rows);
 }
+
+export const GET = apiHandler(_GET);

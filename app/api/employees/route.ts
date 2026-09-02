@@ -4,6 +4,7 @@ import { db, ensureDatabase } from "@/lib/db";
 import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
 import { sendSMS } from "@/lib/at";
+import { apiHandler } from "@/lib/api-handler";
 
 function generatePIN(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -31,7 +32,7 @@ function normalizeActive(value: unknown, fallback: number) {
   return value === undefined || value === null ? fallback : value ? 1 : 0;
 }
 
-export async function GET(request: NextRequest) {
+async function _GET(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await ensureDatabase();
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(result.rows);
 }
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await ensureDatabase();
@@ -197,7 +198,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ ...result.rows[0], pin, smsSent }, { status: 201 });
 }
 
-export async function PUT(request: NextRequest) {
+async function _PUT(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await ensureDatabase();
@@ -295,7 +296,7 @@ export async function PUT(request: NextRequest) {
   return NextResponse.json(result.rows[0]);
 }
 
-export async function DELETE(request: NextRequest) {
+async function _DELETE(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await ensureDatabase();
@@ -352,3 +353,8 @@ export async function DELETE(request: NextRequest) {
 
   return NextResponse.json({ ok: true });
 }
+
+export const GET = apiHandler(_GET);
+export const POST = apiHandler(_POST);
+export const PUT = apiHandler(_PUT);
+export const DELETE = apiHandler(_DELETE);

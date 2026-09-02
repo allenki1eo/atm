@@ -4,8 +4,9 @@ import { db, ensureDatabase } from "@/lib/db";
 import { nanoid } from "nanoid";
 import { sendSMS, smsTemplates } from "@/lib/at";
 import { formatCurrency } from "@/lib/utils";
+import { apiHandler } from "@/lib/api-handler";
 
-export async function GET(request: NextRequest) {
+async function _GET(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await ensureDatabase();
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(rows.rows);
 }
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await ensureDatabase();
@@ -128,3 +129,6 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ id, employee_id: employeeId, amount, status: "pending" }, { status: 201 });
 }
+
+export const GET = apiHandler(_GET);
+export const POST = apiHandler(_POST);

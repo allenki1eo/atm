@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
+import { apiHandler } from "@/lib/api-handler";
 
-export async function POST(
+async function _POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -18,3 +19,5 @@ export async function POST(
   });
   return NextResponse.json({ ok: true });
 }
+
+export const POST = apiHandler(_POST);

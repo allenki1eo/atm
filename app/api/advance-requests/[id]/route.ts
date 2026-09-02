@@ -4,8 +4,9 @@ import { db, ensureDatabase } from "@/lib/db";
 import { nanoid } from "nanoid";
 import { sendSMS, smsTemplates } from "@/lib/at";
 import { formatCurrency } from "@/lib/utils";
+import { apiHandler } from "@/lib/api-handler";
 
-export async function PUT(
+async function _PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -124,3 +125,5 @@ export async function PUT(
 
   return NextResponse.json({ success: true, id, status, transaction_id: transactionId });
 }
+
+export const PUT = apiHandler(_PUT);

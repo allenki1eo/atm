@@ -158,6 +158,61 @@ export async function ensureDatabase() {
       FOREIGN KEY (employee_id) REFERENCES employees(id)
     )`);
   } catch {}
+
+  // ── Performance indexes ──────────────────────────────────────────────────
+  // Every one of these backs a query path the app hits on page load.
+  // CREATE INDEX IF NOT EXISTS is idempotent, so this is safe to re-run.
+  try {
+    await db.execute(`
+      CREATE INDEX IF NOT EXISTS idx_attendance_employee_date
+        ON attendance(employee_id, date);
+    `);
+    await db.execute(`
+      CREATE INDEX IF NOT EXISTS idx_attendance_date
+        ON attendance(date);
+    `);
+    await db.execute(`
+      CREATE INDEX IF NOT EXISTS idx_employees_company
+        ON employees(company_id);
+    `);
+    await db.execute(`
+      CREATE INDEX IF NOT EXISTS idx_employees_section
+        ON employees(section_id);
+    `);
+    await db.execute(`
+      CREATE INDEX IF NOT EXISTS idx_employees_active
+        ON employees(active);
+    `);
+    await db.execute(`
+      CREATE INDEX IF NOT EXISTS idx_users_phone
+        ON users(phone);
+    `);
+    await db.execute(`
+      CREATE INDEX IF NOT EXISTS idx_users_employee
+        ON users(employee_id);
+    `);
+    await db.execute(`
+      CREATE INDEX IF NOT EXISTS idx_overtime_employee_date
+        ON overtime_entries(employee_id, date);
+    `);
+    await db.execute(`
+      CREATE INDEX IF NOT EXISTS idx_transactions_employee
+        ON transactions(employee_id);
+    `);
+    await db.execute(`
+      CREATE INDEX IF NOT EXISTS idx_payslips_period
+        ON payslips(period_id);
+    `);
+    await db.execute(`
+      CREATE INDEX IF NOT EXISTS idx_sections_company
+        ON sections(company_id);
+    `);
+    await db.execute(`
+      CREATE INDEX IF NOT EXISTS idx_leave_requests_employee
+        ON leave_requests(employee_id);
+    `);
+  } catch {}
+
   _initialized = true;
 }
 

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
 import { nanoid } from "nanoid";
+import { apiHandler } from "@/lib/api-handler";
 
-export async function GET(request: NextRequest) {
+async function _GET(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(result.rows);
 }
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await ensureDatabase();
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json(result.rows[0], { status: 201 });
 }
 
-export async function PUT(request: NextRequest) {
+async function _PUT(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -121,7 +122,7 @@ export async function PUT(request: NextRequest) {
   return NextResponse.json(result.rows[0]);
 }
 
-export async function DELETE(request: NextRequest) {
+async function _DELETE(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -149,3 +150,8 @@ export async function DELETE(request: NextRequest) {
 
   return NextResponse.json({ success: true });
 }
+
+export const GET = apiHandler(_GET);
+export const POST = apiHandler(_POST);
+export const PUT = apiHandler(_PUT);
+export const DELETE = apiHandler(_DELETE);

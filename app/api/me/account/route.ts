@@ -3,8 +3,9 @@ import bcrypt from "bcryptjs";
 import { auth } from "@/lib/auth";
 import { getLinkedEmployeeId } from "@/lib/authorization";
 import { db, ensureDatabase } from "@/lib/db";
+import { apiHandler } from "@/lib/api-handler";
 
-export async function GET() {
+async function _GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await ensureDatabase();
@@ -31,7 +32,7 @@ export async function GET() {
   });
 }
 
-export async function PUT(request: NextRequest) {
+async function _PUT(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await ensureDatabase();
@@ -135,3 +136,6 @@ export async function PUT(request: NextRequest) {
 
   return GET();
 }
+
+export const GET = apiHandler(_GET);
+export const PUT = apiHandler(_PUT);

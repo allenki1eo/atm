@@ -4,6 +4,7 @@ import { db, ensureDatabase } from "@/lib/db";
 import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
 import { sendSMS } from "@/lib/at";
+import { apiHandler } from "@/lib/api-handler";
 
 const FOOD_ADVANCE_AMOUNTS = new Set([0, 20000, 25000, 30000, 35000]);
 
@@ -57,7 +58,7 @@ function generatePIN(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await ensureDatabase();
@@ -237,3 +238,5 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ results, summary: { total: rows.length, succeeded, failed, smsSent } });
 }
+
+export const POST = apiHandler(_POST);

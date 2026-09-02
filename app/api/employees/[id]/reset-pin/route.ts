@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
 import { sendSMS } from "@/lib/at";
 import bcrypt from "bcryptjs";
+import { apiHandler } from "@/lib/api-handler";
 
 function generatePIN(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -24,7 +25,7 @@ async function getEmployeeUser(id: string) {
 }
 
 // GET — return current stored PIN (if available)
-export async function GET(
+async function _GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -46,7 +47,7 @@ export async function GET(
 }
 
 // POST — generate a new PIN, store it, optionally resend SMS
-export async function POST(
+async function _POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -86,3 +87,6 @@ export async function POST(
 
   return NextResponse.json({ pin, smsSent });
 }
+
+export const GET = apiHandler(_GET);
+export const POST = apiHandler(_POST);

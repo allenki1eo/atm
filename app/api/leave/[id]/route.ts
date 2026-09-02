@@ -5,8 +5,9 @@ import { supervisorCanAccessEmployee } from "@/lib/authorization";
 import { nanoid } from "nanoid";
 import { sendSMS } from "@/lib/at";
 import { formatDate } from "@/lib/utils";
+import { apiHandler } from "@/lib/api-handler";
 
-export async function PUT(
+async function _PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -155,3 +156,5 @@ export async function PUT(
 
   return NextResponse.json(result.rows[0]);
 }
+
+export const PUT = apiHandler(_PUT);

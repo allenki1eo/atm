@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
 import { sendSMS } from "@/lib/at";
+import { apiHandler } from "@/lib/api-handler";
 
 const VALID_STATUSES = ["received", "in_review", "awaiting_employee", "closed"] as const;
 
-export async function PUT(
+async function _PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -71,3 +72,5 @@ export async function PUT(
   });
   return NextResponse.json(result.rows[0]);
 }
+
+export const PUT = apiHandler(_PUT);
