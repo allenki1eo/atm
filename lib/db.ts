@@ -159,6 +159,24 @@ export async function ensureDatabase() {
     )`);
   } catch {}
 
+  // Per-user hidden employees/sections. Previously localStorage-only, which
+  // meant the list was per-browser and lost on cache clear.
+  try {
+    await db.execute(`CREATE TABLE IF NOT EXISTS user_hidden_items (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      kind TEXT NOT NULL CHECK(kind IN ('employee','section')),
+      ref_id TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, kind, ref_id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )`);
+    await db.execute(`
+      CREATE INDEX IF NOT EXISTS idx_user_hidden_items_user
+        ON user_hidden_items(user_id);
+    `);
+  } catch {}
+
   // ── Performance indexes ──────────────────────────────────────────────────
   // Every one of these backs a query path the app hits on page load.
   // CREATE INDEX IF NOT EXISTS is idempotent, so this is safe to re-run.

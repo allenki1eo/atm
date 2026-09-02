@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { InStatement } from "@libsql/client";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { apiHandler } from "@/lib/api-handler";
@@ -23,19 +24,34 @@ async function _DELETE(
     return NextResponse.json({ error: "Employee not found" }, { status: 404 });
   }
 
+  // Every table carrying an employee_id FK. Children first, then the employee
+  // row itself. NOTE: this list previously said "overtime_records", a table
+  // that does not exist — which made every permanent delete fail.
   const tables = [
     "attendance",
+    "attendance_corrections",
     "leave_requests",
+    "leave_balances",
     "transactions",
+    "advance_requests",
+    "advance_schedules",
+    "complaints",
+    "payslips",
+    "service_certificates",
+    "overtime_entries",
     "employee_status_events",
     "employee_transfer_history",
-    "overtime_records",
+    "users",
   ];
 
-  for (const table of tables) {
-    await db.execute({ sql: `DELETE FROM ${table} WHERE employee_id = ?`, args: [id] });
-  }
-  await db.execute({ sql: "DELETE FROM employees WHERE id = ?", args: [id] });
+  const statements: InStatement[] = tables.map((table) => ({
+    sql: `DELETE FROM ${table} WHERE employee_id = ?`,
+    args: [id],
+  }));
+  statements.push({ sql: "DELETE FROM employees WHERE id = ?", args: [id] });
+
+  // One atomic transaction — a partial delete would leave orphaned rows.
+  await db.batch(statements, "write");
 
   return NextResponse.json({ success: true });
 }
