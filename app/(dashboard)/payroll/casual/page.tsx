@@ -12,6 +12,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
+import { formatDays } from "@/lib/overtime";
 import { useVisibleEmployees } from "@/hooks/use-attendance-visibility";
 
 interface EmployeeRow {
@@ -37,8 +38,6 @@ const MONTHS = [
   "Januari","Februari","Machi","Aprili","Mei","Juni",
   "Julai","Agosti","Septemba","Oktoba","Novemba","Desemba",
 ];
-
-const formatDays = (days: number) => Number.isInteger(days) ? String(days) : days.toFixed(2).replace(/\.?0+$/, "");
 
 interface CompanyOpt { id: string; name: string }
 interface SectionOpt { id: string; name: string; company_id: string }

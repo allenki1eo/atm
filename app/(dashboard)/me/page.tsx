@@ -52,6 +52,7 @@ import { PayslipPdfButton } from "@/components/payroll/payslip-pdf-button";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { addDays, formatDays } from "@/lib/overtime";
 import { useAttendanceVisibility } from "@/hooks/use-attendance-visibility";
 
 const advanceSchema = z.object({
@@ -65,6 +66,7 @@ interface Payslip {
   month: number;
   year: number;
   days_worked: number;
+  overtime_days: number | null;
   gross_amount: number;
   net_amount: number;
   total_deductions: number;
@@ -143,6 +145,8 @@ interface PayrollSummary {
     late: number;
     absent: number;
     effective_days: number;
+    overtime_days: number;
+    days_worked: number;
   };
   financial: {
     base_gross: number;
@@ -617,7 +621,9 @@ export default function MePage() {
                       {formatCurrency(previousMonthSummary.financial.gross_amount)}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {previousMonthSummary.attendance.effective_days} siku
+                      {formatDays(previousMonthSummary.attendance.days_worked)} siku
+                      {previousMonthSummary.attendance.overtime_days > 0 &&
+                        ` (pamoja na OT ${formatDays(previousMonthSummary.attendance.overtime_days)})`}
                     </p>
                   </div>
                   <div className="rounded-lg border p-3">
@@ -712,7 +718,8 @@ export default function MePage() {
                           {monthNames[ps.month - 1]} {ps.year}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {ps.days_worked} siku · Gross {formatCurrency(ps.gross_amount)} ·
+                          {formatDays(addDays(ps.days_worked, ps.overtime_days))} siku · Gross{" "}
+                          {formatCurrency(ps.gross_amount)} ·
                           Makato {formatCurrency(ps.total_deductions ?? 0)}
                         </p>
                         <p className="text-xs text-muted-foreground">

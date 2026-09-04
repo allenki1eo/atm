@@ -20,7 +20,7 @@ async function _GET() {
   const res = await db.execute({
     sql: `
       SELECT
-        p.id, p.employee_id, p.period_id, p.days_worked,
+        p.id, p.employee_id, p.period_id, p.days_worked, p.overtime_days,
         p.gross_amount, p.total_advances, p.net_amount,
         p.nssf_amount, p.cotwu_amount, p.fadhila_amount, p.heslb_amount,
         p.total_deductions, p.generated_at,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { apiHandler } from "@/lib/api-handler";
+import { overtimeDaysFromHours } from "@/lib/overtime";
 
 async function _GET(request: NextRequest) {
   const session = await auth();
@@ -103,7 +104,7 @@ async function _GET(request: NextRequest) {
   const overtimeDaysMap = new Map<string, number>();
   for (const row of overtimeResult.rows as unknown as OvertimeRow[]) {
     overtimeMap.set(row.employee_id, Math.round(row.total ?? 0));
-    overtimeDaysMap.set(row.employee_id, Math.round(((row.total_hours ?? 0) / 9) * 100) / 100);
+    overtimeDaysMap.set(row.employee_id, overtimeDaysFromHours(row.total_hours));
   }
 
   type EmpRow = {

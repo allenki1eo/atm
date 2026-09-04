@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { apiHandler } from "@/lib/api-handler";
+import { addDays, overtimeDaysFromHours } from "@/lib/overtime";
 
 const FADHILA_AMOUNT = 10000;
 const NSSF_RATE = 0.10;
@@ -48,7 +49,11 @@ async function _GET(request: NextRequest) {
       args: [startDate, endDate],
     }),
     db.execute({
-      sql: `SELECT employee_id, COALESCE(SUM(amount), 0) AS total
+      // hours as well as amount: overtime is paid on top of base pay AND
+      // counts as day equivalents (9h = 1 day) in days_worked.
+      sql: `SELECT employee_id,
+              COALESCE(SUM(amount), 0) AS total,
+              COALESCE(SUM(hours),  0) AS total_hours
             FROM overtime_entries
             WHERE date >= ? AND date <= ?
             GROUP BY employee_id`,
@@ -73,9 +78,14 @@ async function _GET(request: NextRequest) {
     });
   }
 
-  const overtimeMap = new Map<string, number>();
-  for (const r of overtimeAgg.rows as unknown as { employee_id: string; total: number }[]) {
-    overtimeMap.set(r.employee_id, Number(r.total ?? 0));
+  const overtimeMap = new Map<string, { total: number; total_hours: number }>();
+  for (const r of overtimeAgg.rows as unknown as {
+    employee_id: string; total: number; total_hours: number;
+  }[]) {
+    overtimeMap.set(r.employee_id, {
+      total: Number(r.total ?? 0),
+      total_hours: Number(r.total_hours ?? 0),
+    });
   }
 
   const advanceMap = new Map<string, number>();
@@ -101,7 +111,9 @@ async function _GET(request: NextRequest) {
       ? Math.round(effectiveDays * emp.daily_rate)
       : emp.monthly_salary;
 
-    const totalOvertime = Math.round(overtimeMap.get(emp.id) ?? 0);
+    const ot = overtimeMap.get(emp.id) ?? { total: 0, total_hours: 0 };
+    const totalOvertime = Math.round(ot.total);
+    const overtimeDays = overtimeDaysFromHours(ot.total_hours);
 
     const totalAdvances = Math.round(advanceMap.get(emp.id) ?? 0);
     const foodAdvanceAmount = emp.food_advance_amount ?? 0;
@@ -122,7 +134,9 @@ async function _GET(request: NextRequest) {
       employee_id: emp.id,
       employee_name: emp.name,
       employee_type: emp.type,
-      days_worked: Math.round(effectiveDays),
+      attendance_days: effectiveDays,
+      overtime_days: overtimeDays,
+      days_worked: addDays(effectiveDays, overtimeDays),
       base_gross: baseGross,
       total_overtime: totalOvertime,
       gross_amount: grossAmount,

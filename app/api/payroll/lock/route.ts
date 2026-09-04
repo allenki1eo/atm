@@ -6,6 +6,7 @@ import { nanoid } from "nanoid";
 import { sendSMS, smsTemplates } from "@/lib/at";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { apiHandler } from "@/lib/api-handler";
+import { overtimeDaysFromHours } from "@/lib/overtime";
 
 const FADHILA_AMOUNT = 10000;
 const NSSF_RATE = 0.10;
@@ -105,7 +106,11 @@ async function _POST(request: NextRequest) {
       args: [startDate, endDate],
     }),
     db.execute({
-      sql: `SELECT employee_id, COALESCE(SUM(amount), 0) AS total
+      // hours as well as amount: overtime is paid on top of base pay AND
+      // counts as day equivalents (9h = 1 day) in days_worked on the payslip.
+      sql: `SELECT employee_id,
+              COALESCE(SUM(amount), 0) AS total,
+              COALESCE(SUM(hours),  0) AS total_hours
             FROM overtime_entries
             WHERE date >= ? AND date <= ?
             GROUP BY employee_id`,
@@ -130,9 +135,14 @@ async function _POST(request: NextRequest) {
     });
   }
 
-  const overtimeMap = new Map<string, number>();
-  for (const r of overtimeAgg.rows as unknown as { employee_id: string; total: number }[]) {
-    overtimeMap.set(r.employee_id, Number(r.total ?? 0));
+  const overtimeMap = new Map<string, { total: number; total_hours: number }>();
+  for (const r of overtimeAgg.rows as unknown as {
+    employee_id: string; total: number; total_hours: number;
+  }[]) {
+    overtimeMap.set(r.employee_id, {
+      total: Number(r.total ?? 0),
+      total_hours: Number(r.total_hours ?? 0),
+    });
   }
 
   const advanceMap = new Map<string, number>();
@@ -160,7 +170,11 @@ async function _POST(request: NextRequest) {
       ? Math.round(effectiveDays * emp.daily_rate)
       : emp.monthly_salary;
 
-    const totalOvertime = Math.round(overtimeMap.get(emp.id) ?? 0);
+    // Overtime — the amount is paid on top of base, and the hours also count
+    // as day equivalents (9h = 1 day) in the days recorded on the payslip.
+    const ot = overtimeMap.get(emp.id) ?? { total: 0, total_hours: 0 };
+    const totalOvertime = Math.round(ot.total);
+    const overtimeDays = overtimeDaysFromHours(ot.total_hours);
     const grossAmount = baseGross + totalOvertime;
 
     const totalAdvances = Math.abs(advanceMap.get(emp.id) ?? 0);
@@ -179,12 +193,13 @@ async function _POST(request: NextRequest) {
 
     payslipStatements.push({
       sql: `INSERT INTO payslips
-              (id, employee_id, period_id, days_worked, gross_amount, total_advances,
+              (id, employee_id, period_id, days_worked, overtime_days, gross_amount, total_advances,
                net_amount, nssf_amount, cotwu_amount, fadhila_amount,
                heslb_amount, wcf_amount, total_deductions)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(employee_id, period_id) DO UPDATE SET
               days_worked      = excluded.days_worked,
+              overtime_days    = excluded.overtime_days,
               gross_amount     = excluded.gross_amount,
               total_advances   = excluded.total_advances,
               net_amount       = excluded.net_amount,
@@ -196,7 +211,9 @@ async function _POST(request: NextRequest) {
               total_deductions = excluded.total_deductions,
               generated_at     = CURRENT_TIMESTAMP`,
       args: [
-        nanoid(), emp.id, periodId, Math.round(effectiveDays), grossAmount,
+        // days_worked stays attendance-only so it still reconciles with
+        // base pay (days × daily rate); overtime days are stored alongside.
+        nanoid(), emp.id, periodId, effectiveDays, overtimeDays, grossAmount,
         totalAdvanceDeductions, netAmount, nssfAmount, cotwuAmount, fadhilaAmount,
         heslbAmount, wcfAmount, totalDeductions,
       ],

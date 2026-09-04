@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
 import { nanoid } from "nanoid";
 import { apiHandler } from "@/lib/api-handler";
+import { OVERTIME_HOURS_PER_DAY } from "@/lib/overtime";
 
 const isValidDateOnly = (value: string) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -56,7 +57,7 @@ async function _GET(request: NextRequest) {
              FROM overtime_entries oe
              JOIN employees e ON e.id = oe.employee_id
              LEFT JOIN attendance a ON a.employee_id = oe.employee_id AND a.date = oe.date
-             WHERE 1=1`;
+             WHERE e.active = 1`;
   const args: (string | number)[] = [];
 
   if (employeeId) { sql += " AND oe.employee_id = ?"; args.push(employeeId); }
@@ -170,12 +171,12 @@ async function _POST(request: NextRequest) {
   }
 
   // Casual: proportional of daily_rate (4.5h = half day, 9h = full day)
-  // Fulltime: (monthly_salary / 28 / 9) * hours
+  // Fulltime: (monthly_salary / 28 / OVERTIME_HOURS_PER_DAY) * hours
   let amount: number;
   if (emp.type === "casual") {
-    amount = Math.round((overtimeHours / 9) * emp.daily_rate);
+    amount = Math.round((overtimeHours / OVERTIME_HOURS_PER_DAY) * emp.daily_rate);
   } else {
-    amount = Math.round((emp.monthly_salary / 28 / 9) * overtimeHours);
+    amount = Math.round((emp.monthly_salary / 28 / OVERTIME_HOURS_PER_DAY) * overtimeHours);
   }
 
   if (amount <= 0) {
