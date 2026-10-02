@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["bcryptjs", "@libsql/client"],
+  // Dev request logs include the query string. The SSO handoff token must not be written there.
+  logging: {
+    incomingRequests: {
+      ignore: [/\/api\/sso\/callback/],
+    },
+  },
 };
 
 // Only apply Serwist PWA in production or when explicitly enabled
