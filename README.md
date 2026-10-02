@@ -82,6 +82,17 @@ Optional or deployment-specific:
 - `AT_SENDER_ID`
 - `NEXT_PUBLIC_APP_URL`
 - `ENABLE_PWA`
+- `SSO_SHARED_SECRET` when IMS should sign users in directly
+
+## IMS single sign-on
+
+IMS can open TrustTrack without a second password. Set `SSO_SHARED_SECRET` to the same value IMS uses to sign its HS256 tokens, then redirect the browser to:
+
+```text
+{HR_APP_URL}/api/sso/callback?token=...
+```
+
+The token must use `aud=hr` and include `sub`, `email`, `username`, `name`, `jti`, `iat`, and `exp` (about 60–120 seconds). TrustTrack checks the signature, finds an existing user with that email, and opens a normal NextAuth session for that user's role. It does not create accounts. If the email is unknown, the person is asked to have an HR administrator create the TrustTrack user first. Password login is unchanged. Tokens are not written to logs.
 
 ## Useful Scripts
 
@@ -105,6 +116,7 @@ npm run lint
 - Set a persistent Turso database in production with `TURSO_DATABASE_URL` and
   `TURSO_AUTH_TOKEN`.
 - Set `AUTH_SECRET` in the deployment environment.
+- Set `SSO_SHARED_SECRET` to the IMS shared secret when enabling single sign-on.
 - Enable PWA generation with `ENABLE_PWA=true` when you want service worker
   output outside the default production behavior.
 - Configure Africa's Talking credentials before enabling live SMS workflows.
