@@ -4,6 +4,13 @@ import type { NextRequest } from "next/server";
 
 export default auth((req: NextRequest & { auth: { user?: { role?: string } } | null }) => {
   const { nextUrl, auth: session } = req;
+
+  // IMS redirects an unauthenticated browser here with a one-time handoff token.
+  // The route creates the TrustTrack session; the proxy must not send it to /login.
+  if (nextUrl.pathname === "/api/sso/callback") {
+    return NextResponse.next();
+  }
+
   const isLoggedIn = !!session?.user;
 
   const isAuthPage = nextUrl.pathname.startsWith("/login");

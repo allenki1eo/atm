@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:sso": "tsx --test --test-concurrency=1 lib/sso.test.ts",
     "db:delete-payslips": "node scripts/delete-generated-payslips.mjs"
   },
   "dependencies": {
@@ -32,6 +33,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "html2canvas": "^1.4.1",
+    "jose": "^6.2.2",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.8.0",
     "nanoid": "^5.1.9",
@@ -55,6 +57,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
     "tailwindcss": "^4",
+    "tsx": "^4.20.6",
     "typescript": "^5"
   }
 }
