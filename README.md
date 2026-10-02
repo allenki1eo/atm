@@ -73,6 +73,16 @@ Required for authentication:
 - `AUTH_SECRET`
 - `NEXTAUTH_URL` for local development
 
+IMS can sign an HR user into this app without a second password. IMS redirects
+the browser to `GET /api/sso/callback?token=...` with a 90-second HS256 JWT.
+The callback checks `SSO_SHARED_SECRET` (at least 32 characters, and not the
+same value as `AUTH_SECRET`), requires `aud` of `hr`, and stores `jti` in
+Turso (`sso_redeemed_jtis`) so the token cannot be reused. It then opens a
+normal NextAuth session for an existing TrustTrack user with the same email
+(or, if the email does not match, the same username on email or phone). It
+does not create users. Set `SSO_SHARED_SECRET` on the AtWork Vercel project
+to the same value as IMS.
+
 Optional or deployment-specific:
 
 - `TURSO_DATABASE_URL`
@@ -105,6 +115,8 @@ npm run lint
 - Set a persistent Turso database in production with `TURSO_DATABASE_URL` and
   `TURSO_AUTH_TOKEN`.
 - Set `AUTH_SECRET` in the deployment environment.
+- Set `SSO_SHARED_SECRET` to the same value configured on IMS. It must be at
+  least 32 characters and must not reuse `AUTH_SECRET`.
 - Enable PWA generation with `ENABLE_PWA=true` when you want service worker
   output outside the default production behavior.
 - Configure Africa's Talking credentials before enabling live SMS workflows.

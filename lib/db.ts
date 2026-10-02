@@ -446,6 +446,14 @@ export async function initializeDatabase() {
       FOREIGN KEY (employee_id) REFERENCES employees(id),
       FOREIGN KEY (reviewed_by) REFERENCES users(id)
     );
+
+    CREATE TABLE IF NOT EXISTS sso_redeemed_jtis (
+      jti TEXT PRIMARY KEY,
+      expires_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sso_redeemed_jtis_expires_at
+      ON sso_redeemed_jtis(expires_at);
   `);
 
   await migrateDatabase();
@@ -453,6 +461,14 @@ export async function initializeDatabase() {
 
 export async function migrateDatabase() {
   await db.executeMultiple(`
+    CREATE TABLE IF NOT EXISTS sso_redeemed_jtis (
+      jti TEXT PRIMARY KEY,
+      expires_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sso_redeemed_jtis_expires_at
+      ON sso_redeemed_jtis(expires_at);
+
     CREATE TABLE IF NOT EXISTS employee_status_events (
       id TEXT PRIMARY KEY,
       employee_id TEXT NOT NULL,
