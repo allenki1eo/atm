@@ -2,10 +2,12 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db, initializeDatabase, seedDemoData } from "@/lib/db";
+import { authenticateSsoToken } from "@/lib/sso";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Credentials({
+      id: "credentials",
       name: "credentials",
       credentials: {
         email: { label: "Email / Simu", type: "text" },
@@ -65,6 +67,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           };
         } catch (error) {
           console.error("Auth error:", error);
+          return null;
+        }
+      },
+    }),
+    // IMS launches TrustTrack at /api/sso/callback. This provider accepts only
+    // that short-lived HS256 token — never a password — and returns the same
+    // user shape as password login so the JWT session callbacks stay shared.
+    Credentials({
+      id: "ims",
+      name: "IMS SSO",
+      credentials: {
+        token: { label: "SSO Token", type: "text" },
+      },
+      async authorize(credentials) {
+        const token = credentials?.token;
+        if (typeof token !== "string" || !token) return null;
+
+        try {
+          const result = await authenticateSsoToken(token);
+          if (!result.ok) return null;
+          return result.user;
+        } catch {
+          console.error("SSO sign-in failed");
           return null;
         }
       },
