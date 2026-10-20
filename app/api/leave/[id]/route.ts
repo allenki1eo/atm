@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
 import { supervisorCanAccessEmployee } from "@/lib/authorization";
 import { nanoid } from "nanoid";
-import { sendSMS } from "@/lib/at";
+import { sendSMS } from "@/lib/sms";
 import { formatDate } from "@/lib/utils";
 
 export async function PUT(

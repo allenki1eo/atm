@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:sso": "tsx --test --test-concurrency=1 lib/sso.test.ts",
+    "test:sms": "tsx --test --test-concurrency=1 lib/sms.test.ts",
     "db:delete-payslips": "node scripts/delete-generated-payslips.mjs"
   },
   "dependencies": {
@@ -27,7 +28,6 @@
     "@radix-ui/react-toast": "^1.2.15",
     "@serwist/next": "^9.5.7",
     "@tanstack/react-query": "^5.99.0",
-    "africastalking": "^0.7.9",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

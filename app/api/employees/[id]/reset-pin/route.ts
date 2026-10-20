@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
-import { sendSMS } from "@/lib/at";
+import { sendSMS } from "@/lib/sms";
 import bcrypt from "bcryptjs";
 
 function generatePIN(): string {

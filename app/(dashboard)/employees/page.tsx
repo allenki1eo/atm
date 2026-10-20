@@ -583,7 +583,7 @@ export default function EmployeesPage() {
         title: `Import done: ${data.summary.succeeded}/${data.summary.total} succeeded`,
         description: data.summary.smsSent > 0
           ? `SMS imetumwa kwa wafanyakazi ${data.summary.smsSent}`
-          : "SMS hazikutumwa — angalia muunganiko wa Africa's Talking",
+          : "SMS hazikutumwa — angalia muunganiko wa Swala SMS",
       });
     } catch {
       toast({ title: "Network error", variant: "destructive" });
