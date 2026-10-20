@@ -407,7 +407,7 @@ export default function AnnouncementsPage() {
 
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" {...form.register("send_sms")} className="accent-primary" />
-              Tuma pia kupitia SMS (kupitia Africa&apos;s Talking)
+              Tuma pia kupitia SMS (kupitia Swala SMS)
             </label>
 
             <DialogFooter>

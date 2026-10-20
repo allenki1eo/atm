@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
 import { nanoid } from "nanoid";
 import { calcWorkingDays } from "@/lib/utils";
-import { sendSMS } from "@/lib/at";
+import { sendSMS } from "@/lib/sms";
 
 export async function GET() {
   const session = await auth();

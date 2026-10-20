@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
 import { nanoid } from "nanoid";
-import { sendSMS } from "@/lib/at";
+import { sendSMS } from "@/lib/sms";
 
 /**
  * GET — Returns announcements visible to the current user, with a

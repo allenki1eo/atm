@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { sendSMS } from "@/lib/at";
+import { SWALA_SMS_URL, getSwalaConfig, sendSMS, swalaKeyMode } from "@/lib/sms";
 
 /**
- * Admin-only test endpoint to verify Africa's Talking SMS is working.
+ * Admin-only test endpoint to verify Swala SMS is working.
  *
  * POST /api/test-sms
- * Body (optional): { "phone": "+255750731364", "message": "custom message" }
+ * Body (optional): { "phone": "+255712345678", "message": "custom message" }
  *
- * Returns full diagnostics including env var status and AT raw response.
+ * Returns diagnostics (never the API key) and the Swala send result.
  */
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -20,34 +20,37 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const phone: string = body.phone ?? "+255750731364";
+  const phone: string = body.phone ?? "+255712345678";
   const message: string =
     body.message ??
     "TrustTrack majaribio ya SMS: Ujumbe huu ni wa kujaribu mfumo. Kama umepokea, SMS inafanya kazi vizuri!";
 
-  // Show env config in response (mask the API key)
-  const apiKey = process.env.AT_API_KEY?.trim() ?? "";
-  const username = process.env.AT_USERNAME?.trim() ?? "(not set)";
-  const senderId = process.env.AT_SENDER_ID?.trim() ?? "(not set)";
-  const isSandbox = username.toLowerCase() === "sandbox";
+  const { apiKey, senderId } = getSwalaConfig();
+  const mode = apiKey ? swalaKeyMode(apiKey) : "missing";
 
   const config = {
+    provider: "Swala SMS",
     hasApiKey: apiKey.length > 0,
-    apiKeyPreview: apiKey.length > 4 ? `${apiKey.slice(0, 4)}...${apiKey.slice(-4)}` : "(empty)",
-    username,
-    senderId,
-    mode: isSandbox ? "SANDBOX (messages NOT delivered to real phones)" : "LIVE",
-    endpoint: isSandbox
-      ? "https://api.sandbox.africastalking.com/version1/messaging"
-      : "https://api.africastalking.com/version1/messaging",
+    keyMode: mode,
+    senderId: senderId || "(not set)",
+    endpoint: SWALA_SMS_URL,
   };
 
   if (!apiKey) {
     return NextResponse.json({
       success: false,
-      error: "AT_API_KEY is not set in environment variables",
+      error: "SWALA_API_KEY is not set in environment variables",
       config,
-      fix: "Add AT_API_KEY to your Vercel environment variables and redeploy",
+      fix: "Add SWALA_API_KEY and SWALA_SENDER_ID to your Vercel environment variables and redeploy",
+    }, { status: 400 });
+  }
+
+  if (!senderId) {
+    return NextResponse.json({
+      success: false,
+      error: "SWALA_SENDER_ID is not set in environment variables",
+      config,
+      fix: "Set SWALA_SENDER_ID to an approved Swala sender ID (for example POSTSMS) and redeploy",
     }, { status: 400 });
   }
 
@@ -61,8 +64,8 @@ export async function POST(request: NextRequest) {
     phone,
     message,
     config,
-    tip: isSandbox
-      ? "You are in SANDBOX mode. Messages will not reach real phones. Change AT_USERNAME to 'GAKISMS' and use your live API key."
+    tip: mode === "sandbox"
+      ? "This key is a Swala sandbox key (swl_test_). Messages are not delivered to real phones. Use a live key (swl_live_) to send."
       : null,
   });
 }

@@ -19,7 +19,7 @@ The app supports four roles:
 - Tailwind CSS 4
 - Radix UI primitives
 - Serwist PWA support
-- Africa's Talking SMS integration
+- Swala SMS integration
 
 ## Getting Started
 
@@ -87,9 +87,8 @@ Optional or deployment-specific:
 
 - `TURSO_DATABASE_URL`
 - `TURSO_AUTH_TOKEN`
-- `AT_API_KEY`
-- `AT_USERNAME`
-- `AT_SENDER_ID`
+- `SWALA_API_KEY`
+- `SWALA_SENDER_ID`
 - `NEXT_PUBLIC_APP_URL`
 - `ENABLE_PWA`
 
@@ -119,4 +118,4 @@ npm run lint
   least 32 characters and must not reuse `AUTH_SECRET`.
 - Enable PWA generation with `ENABLE_PWA=true` when you want service worker
   output outside the default production behavior.
-- Configure Africa's Talking credentials before enabling live SMS workflows.
+- Set `SWALA_API_KEY` and `SWALA_SENDER_ID` before enabling live SMS. The key comes from the SwalaSMS dashboard and must not be committed. `SWALA_SENDER_ID` must be an approved sender ID on that account (`POSTSMS` is the sender ID used on other apps). Messages are sent with `POST https://api.swalasms.com/v1/sms/messages` and `Authorization: Bearer <SWALA_API_KEY>`. If the key is missing, sends are logged and skipped instead of crashing the request.

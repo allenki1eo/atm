@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
 import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
-import { sendSMS } from "@/lib/at";
+import { sendSMS } from "@/lib/sms";
 
 const FOOD_ADVANCE_AMOUNTS = new Set([0, 20000, 25000, 30000, 35000]);
 

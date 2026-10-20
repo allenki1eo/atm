@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { nanoid } from "nanoid";
-import { sendSMS, smsTemplates } from "@/lib/at";
+import { sendSMS, smsTemplates } from "@/lib/sms";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { overtimeDaysFromHours } from "@/lib/overtime";
 

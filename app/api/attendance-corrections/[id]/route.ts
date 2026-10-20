@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
 import { nanoid } from "nanoid";
-import { sendSMS, smsTemplates } from "@/lib/at";
+import { sendSMS, smsTemplates } from "@/lib/sms";
 
 const STATUS_LABEL_SW: Record<string, string> = {
   present: "Alikuwepo",
