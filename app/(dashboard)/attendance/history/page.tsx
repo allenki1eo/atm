@@ -26,6 +26,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useVisibleEmployees } from "@/hooks/use-attendance-visibility";
+import { MasterRollFilter } from "@/components/attendance/master-roll-filter";
 import { addDays, formatDays } from "@/lib/overtime";
 
 interface Company { id: string; name: string; }
@@ -36,6 +37,7 @@ interface EmployeeSummary {
   company_id: string | null;
   section_id: string | null;
   company_name: string | null;
+  deduct_nssf?: number | boolean;
   present: number;
   absent: number;
   late: number;
@@ -69,6 +71,7 @@ export default function AttendanceHistoryPage() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeSummary | null>(null);
+  const [masterRollOnly, setMasterRollOnly] = useState(true);
 
   const { data: companies } = useQuery<Company[]>({
     queryKey: ["companies"],
@@ -94,17 +97,24 @@ export default function AttendanceHistoryPage() {
     [summaries]
   );
   const visibleSummaries = useVisibleEmployees(summariesAsEmployees);
+  const scopedSummaries = useMemo(
+    () =>
+      masterRollOnly
+        ? visibleSummaries.filter((e) => Boolean(e.deduct_nssf))
+        : visibleSummaries,
+    [visibleSummaries, masterRollOnly]
+  );
 
   // Department options come from the employees currently in scope (company +
   // visibility), so the dropdown never offers a department with nobody in it.
   const departments = useMemo(() => {
-    const keys = new Set(visibleSummaries.map((e) => departmentKey(e.department)));
+    const keys = new Set(scopedSummaries.map((e) => departmentKey(e.department)));
     return Array.from(keys).sort((a, b) => {
       if (a === NO_DEPARTMENT) return 1;
       if (b === NO_DEPARTMENT) return -1;
       return a.localeCompare(b);
     });
-  }, [visibleSummaries]);
+  }, [scopedSummaries]);
 
   // A department selected before the company changed may no longer exist.
   const activeDepartment =
@@ -115,9 +125,9 @@ export default function AttendanceHistoryPage() {
   const filteredSummaries = useMemo(
     () =>
       activeDepartment === "all"
-        ? visibleSummaries
-        : visibleSummaries.filter((e) => departmentKey(e.department) === activeDepartment),
-    [visibleSummaries, activeDepartment]
+        ? scopedSummaries
+        : scopedSummaries.filter((e) => departmentKey(e.department) === activeDepartment),
+    [scopedSummaries, activeDepartment]
   );
 
   const departmentGroups = useMemo(() => {
@@ -293,6 +303,15 @@ export default function AttendanceHistoryPage() {
               {years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
             </SelectContent>
           </Select>
+        </div>
+        <div className="flex items-end pb-1">
+          <MasterRollFilter
+            onlyMasterRoll={masterRollOnly}
+            onChange={(value) => {
+              setMasterRollOnly(value);
+              setSelectedEmployee(null);
+            }}
+          />
         </div>
       </div>
 

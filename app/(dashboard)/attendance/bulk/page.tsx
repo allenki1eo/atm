@@ -5,6 +5,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, parseISO, isWeekend } from "date-fns";
 import { CalendarRange, Users, Check, Loader2 } from "lucide-react";
 import { useVisibleEmployees } from "@/hooks/use-attendance-visibility";
+import { MasterRollFilter } from "@/components/attendance/master-roll-filter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ interface Employee {
   section_name: string | null;
   company_id: string | null;
   company_name: string | null;
+  deduct_nssf?: number | boolean;
 }
 
 interface Section {
@@ -69,6 +71,7 @@ export default function BulkAttendancePage() {
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
   const [selectedSection, setSelectedSection] = useState<string>("");
   const [empSearch, setEmpSearch] = useState("");
+  const [masterRollOnly, setMasterRollOnly] = useState(true);
 
   const [status, setStatus] = useState<AttendanceStatus>("present");
   const [forceOverride, setForceOverride] = useState(false);
@@ -104,13 +107,14 @@ export default function BulkAttendancePage() {
   const sectionEmployeeMap = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const e of visibleEmployees) {
+      if (masterRollOnly && !e.deduct_nssf) continue;
       if (e.section_id) {
         if (!map.has(e.section_id)) map.set(e.section_id, []);
         map.get(e.section_id)!.push(e.id);
       }
     }
     return map;
-  }, [visibleEmployees]);
+  }, [visibleEmployees, masterRollOnly]);
 
   const dates = useMemo(() => {
     let raw: string[] = [];
@@ -131,12 +135,14 @@ export default function BulkAttendancePage() {
 
   const filteredEmployees = useMemo(
     () =>
-      visibleEmployees.filter(
-        (e) =>
+      visibleEmployees.filter((e) => {
+        if (masterRollOnly && !e.deduct_nssf) return false;
+        return (
           e.name.toLowerCase().includes(empSearch.toLowerCase()) ||
           e.department?.toLowerCase().includes(empSearch.toLowerCase())
-      ),
-    [visibleEmployees, empSearch]
+        );
+      }),
+    [visibleEmployees, empSearch, masterRollOnly]
   );
 
   const toggleEmployee = (id: string) => {
@@ -323,6 +329,7 @@ export default function BulkAttendancePage() {
 
           {selectionMode === "employees" ? (
             <div className="space-y-3">
+              <MasterRollFilter onlyMasterRoll={masterRollOnly} onChange={setMasterRollOnly} />
               <div className="flex items-center gap-3">
                 <div className="relative flex-1">
                   <Input

@@ -12,6 +12,7 @@ import { LockDayDialog } from "@/components/attendance/lock-day-dialog";
 import { UnlockDayDialog } from "@/components/attendance/unlock-day-dialog";
 import { useTodayAttendance } from "@/hooks/use-attendance";
 import { useAttendanceVisibility } from "@/hooks/use-attendance-visibility";
+import { MasterRollFilter } from "@/components/attendance/master-roll-filter";
 import { getTodayDate } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -24,7 +25,7 @@ export default function TodayAttendancePage() {
   const { data: records, isLoading, refetch } = useTodayAttendance();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
-  const [nssfOnly, setNssfOnly] = useState(false);
+  const [masterRollOnly, setMasterRollOnly] = useState(true);
   const { hidden } = useAttendanceVisibility();
 
   const handleRefresh = async () => {
@@ -48,8 +49,8 @@ export default function TodayAttendancePage() {
       .filter((r) => !selectedCompany || r.company_id === selectedCompany)
       .filter((r) => !r.section_id || !hidden.sections.includes(r.section_id))
       .filter((r) => !hidden.employees.includes(r.employee_id))
-      .filter((r) => !nssfOnly || Boolean(r.deduct_nssf));
-  }, [records, selectedCompany, hidden, nssfOnly]);
+      .filter((r) => !masterRollOnly || Boolean(r.deduct_nssf));
+  }, [records, selectedCompany, hidden, masterRollOnly]);
 
   const unmarkedCount = visibleRecords.filter((r) => !r.status).length;
   const isAnyLocked = records?.some((r) => r.is_locked) ?? false;
@@ -132,15 +133,7 @@ export default function TodayAttendancePage() {
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input
-            type="checkbox"
-            className="accent-primary"
-            checked={nssfOnly}
-            onChange={(e) => setNssfOnly(e.target.checked)}
-          />
-          <span>Onyesha wafanyakazi wa Master Roll tu</span>
-        </label>
+        <MasterRollFilter onlyMasterRoll={masterRollOnly} onChange={setMasterRollOnly} />
       </div>
 
       {/* Attendance Table */}
