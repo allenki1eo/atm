@@ -139,7 +139,7 @@ export default function TodayAttendancePage() {
             checked={nssfOnly}
             onChange={(e) => setNssfOnly(e.target.checked)}
           />
-          <span>Onyesha wafanyakazi wa NSSF tu</span>
+          <span>Onyesha wafanyakazi wa Master Roll tu</span>
         </label>
       </div>
 

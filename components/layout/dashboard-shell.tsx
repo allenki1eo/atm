@@ -19,6 +19,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/attendance/bulk": "Weka Mahudhurio ya Wingi",
   "/attendance/edit": "Hariri Mahudhurio",
   "/attendance/import": "Ingiza Mahudhurio",
+  "/attendance/master-roll": "Mahudhurio ya Master Roll",
   "/attendance/corrections": "Marekebisho",
   "/employees": "Wafanyakazi",
   "/former-employees": "Wafanyakazi wa Zamani",

@@ -1,5 +1,5 @@
 /**
- * Dry-run (default) or apply NSSF employee list matching.
+ * Dry-run (default) or apply Master Roll employee list matching.
  *
  *   node --env-file=.env.local scripts/nssf-import.ts
  *   node --env-file=.env.local scripts/nssf-import.ts --apply
@@ -60,8 +60,8 @@ async function main() {
   console.log(apply ? "MODE: APPLY (local only)" : "MODE: DRY-RUN (no writes)");
   console.log(`Database: ${isRemote ? "remote Turso (read-only in this script)" : "local file"}`);
   console.log(`Listed from PDFs: ${plan.rows.length}`);
-  console.log(`Already on NSSF:  ${plan.alreadyNssf.length}`);
-  console.log(`Will set NSSF:    ${plan.setNssf.length}`);
+  console.log(`Already on Master Roll:  ${plan.alreadyNssf.length}`);
+  console.log(`Will set Master Roll:    ${plan.setNssf.length}`);
   console.log(`Will create:      ${plan.toCreate.length}`);
   console.log(`Unassigned:       ${plan.unassigned.length}`);
   console.log(`Move company:     ${plan.moveCompany.length}`);
@@ -72,11 +72,11 @@ async function main() {
   console.log(`Company missing:  ${plan.companyMissing.length}`);
   console.log(`Override missing: ${plan.overrideMissing.length}`);
 
-  printSection("Will set NSSF flag", plan.setNssf, (r) => `${r.source_name}  →  ${r.employee_name} (${r.company_name ?? ""}${r.note ? "; " + r.note : ""})`);
-  printSection("Already on NSSF", plan.alreadyNssf, (r) => `${r.source_name}  →  ${r.employee_name}`);
+  printSection("Will set Master Roll flag", plan.setNssf, (r) => `${r.source_name}  →  ${r.employee_name} (${r.company_name ?? ""}${r.note ? "; " + r.note : ""})`);
+  printSection("Already on Master Roll", plan.alreadyNssf, (r) => `${r.source_name}  →  ${r.employee_name}`);
   printSection("Will create", plan.toCreate, (r) => `${r.source_name}  @  ${r.company_name ?? r.source_company}`);
-  printSection("Unassigned in AtWork — will set NSSF and attach to company", plan.unassigned, (r) => `${r.source_name}  →  ${r.employee_name} (${r.company_name ?? r.source_company})`);
-  printSection("Move to the PDF company and set NSSF", plan.moveCompany, (r) => `${r.employee_name}  from  ${r.from_company_name ?? "?"}  →  ${r.company_name ?? r.source_company}${r.from_section_id ? " (section will be cleared)" : ""}`);
+  printSection("Unassigned in AtWork — will set Master Roll and attach to company", plan.unassigned, (r) => `${r.source_name}  →  ${r.employee_name} (${r.company_name ?? r.source_company})`);
+  printSection("Move to the PDF company and set Master Roll", plan.moveCompany, (r) => `${r.employee_name}  from  ${r.from_company_name ?? "?"}  →  ${r.company_name ?? r.source_company}${r.from_section_id ? " (section will be cleared)" : ""}`);
   printSection("Companies to create", plan.companiesToCreate, (r) => r.name);
   printSection("Fuzzy match — needs a decision", plan.fuzzyReview, (r) => `${r.source_name}  →  ${r.employee_name ?? "?"} (${Math.round((r.score ?? 0) * 100)}%) ${r.note ?? ""}`);
   printSection("Confirmed override target not found", plan.overrideMissing, (r) => `${r.source_name}  @  ${r.source_company}: ${r.note ?? ""}`);
@@ -91,7 +91,7 @@ async function main() {
       await db.execute({ sql: "UPDATE employees SET deduct_nssf = 1 WHERE id = ?", args: [row.employee_id] });
       flagged++;
     }
-    console.log(`\nApplied NSSF flag to ${flagged} existing employee(s).`);
+    console.log(`\nApplied Master Roll flag to ${flagged} existing employee(s).`);
     console.log("Creating missing employees is only done from the admin UI, so placeholder phones stay consistent.");
   }
 

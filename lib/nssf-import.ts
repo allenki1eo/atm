@@ -313,7 +313,7 @@ export function planNssfImport(
           score: global.score,
           note: Boolean(emp.deduct_nssf)
             ? "Yupo AtWork bila kampuni; atahusishwa na kampuni ya orodha"
-            : "Yupo AtWork bila kampuni — atawekwa NSSF na kuhusishwa na kampuni ya orodha",
+            : "Yupo AtWork bila kampuni — atawekwa kwenye Master Roll na kuhusishwa na kampuni ya orodha",
         });
         continue;
       }
@@ -363,7 +363,7 @@ export function planNssfImport(
       pending_company: pendingCompany,
       note: pendingCompany
         ? "Kampuni itaundwa, kisha mfanyakazi ataongezwa"
-        : "Hipo kwenye orodha ya NSSF lakini hayupo kwenye AtWork",
+        : "Hipo kwenye orodha ya Master Roll lakini hayupo kwenye AtWork",
     });
   }
 

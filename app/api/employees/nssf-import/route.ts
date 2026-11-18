@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
         companyId,
         null,
         session.user.id ?? null,
-        row.note ?? "NSSF import: company reassigned",
+        row.note ?? "Master Roll import: company reassigned",
       ],
     });
     flagged++;
@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
   const created: { name: string; company_name?: string; phone: string }[] = [];
   let createIndex = 1;
   const existingTemps = await db.execute(
-    "SELECT phone FROM employees WHERE phone LIKE 'TEMP-NSSF-%'"
+    "SELECT phone FROM employees WHERE phone LIKE 'TEMP-NSSF-%' OR phone LIKE 'TEMP-MR-%'"
   );
   const usedPhones = new Set(
     (existingTemps.rows as unknown as { phone: string }[]).map((r) => r.phone)
@@ -210,10 +210,10 @@ export async function POST(request: NextRequest) {
   for (const row of plan.toCreate) {
     const companyId = resolveCompanyId(row.company_id);
     if (!companyId || isPendingCompanyId(companyId)) continue;
-    let phone = `TEMP-NSSF-${String(createIndex).padStart(4, "0")}`;
+    let phone = `TEMP-MR-${String(createIndex).padStart(4, "0")}`;
     while (usedPhones.has(phone)) {
       createIndex += 1;
-      phone = `TEMP-NSSF-${String(createIndex).padStart(4, "0")}`;
+      phone = `TEMP-MR-${String(createIndex).padStart(4, "0")}`;
     }
     usedPhones.add(phone);
     createIndex += 1;
@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
     await db.execute({
       sql: `INSERT INTO employee_status_events
               (id, employee_id, action, from_active, to_active, note, changed_by)
-            VALUES (?, ?, 'created', NULL, 1, 'Imported from NSSF list', ?)`,
+            VALUES (?, ?, 'created', NULL, 1, 'Imported from Master Roll list', ?)`,
       args: [nanoid(), employeeId, session.user.id ?? null],
     });
     created.push({ name: row.source_name, company_name: row.company_name, phone });

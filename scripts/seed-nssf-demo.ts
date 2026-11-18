@@ -1,5 +1,5 @@
 /**
- * Local demo data for the NSSF attendance screen.
+ * Local demo data for the Master Roll attendance screen.
  * Uses TURSO_DATABASE_URL (defaults to file:local.db). Do not point this at production.
  */
 import { createClient } from "@libsql/client";
@@ -97,7 +97,7 @@ async function main() {
   const nssf = await db.execute("SELECT COUNT(*) as n FROM employees WHERE deduct_nssf = 1");
   const hol = await db.execute("SELECT COUNT(*) as n FROM holidays");
   console.log(
-    `Seeded local demo: ${counts.rows[0].n} employees, ${nssf.rows[0].n} already on NSSF, ${hol.rows[0].n} holidays`
+    `Seeded local demo: ${counts.rows[0].n} employees, ${nssf.rows[0].n} already on Master Roll, ${hol.rows[0].n} holidays`
   );
 }
 
