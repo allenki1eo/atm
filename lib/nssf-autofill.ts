@@ -79,7 +79,7 @@ export interface AutofillOptions {
   overwrite?: boolean;
   /** When false (default), do not write dates after `today`. */
   includeFuture?: boolean;
-  /** When true, also plan rows for employees who are not on NSSF. Default false. */
+  /** When true, also plan rows for employees who are not on the Master Roll. Default false. */
   includeNonNssf?: boolean;
 }
 
@@ -137,7 +137,7 @@ export function planNssfAutofill(options: AutofillOptions): AutofillPlan {
 
       const onLeave = leaveCovers(options.leaves, emp.id, date);
       const desired: AttendanceStatus = onLeave ? "leave" : "present";
-      const reason = onLeave ? "Likizo iliyoidhinishwa" : "Siku ya kazi (NSSF)";
+      const reason = onLeave ? "Likizo iliyoidhinishwa" : "Siku ya kazi (Master Roll)";
       const existing = existingMap.get(`${emp.id}|${date}`);
 
       if (!existing) {

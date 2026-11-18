@@ -145,7 +145,7 @@ export const NSSF_IMPORT_OVERRIDES: NssfImportOverride[] = [
     sourceName: "Emmanuel Titto Bundala",
     sourceCompany: NSSF_COMPANY_GAKI,
     existingName: "EMMANUEL TITO BUNDALA",
-    reason: "Allen confirmed: move the existing record to Gaki Investment Co. Ltd and set NSSF",
+    reason: "Allen confirmed: move the existing record to Gaki Investment Co. Ltd and set Master Roll",
   },
 ];
 
