@@ -119,3 +119,19 @@ npm run lint
 - Enable PWA generation with `ENABLE_PWA=true` when you want service worker
   output outside the default production behavior.
 - Set `SWALA_API_KEY` and `SWALA_SENDER_ID` before enabling live SMS. The key comes from the SwalaSMS dashboard and must not be committed. `SWALA_SENDER_ID` must be an approved sender ID on that account (`POSTSMS` is the sender ID used on other apps). Messages are sent with `POST https://api.swalasms.com/v1/sms/messages` and `Authorization: Bearer <SWALA_API_KEY>`. If the key is missing, sends are logged and skipped instead of crashing the request.
+
+## NSSF attendance
+
+HR and admin can open `/attendance/nssf` to:
+
+- See only employees with the existing `deduct_nssf` flag (toggle to show everyone)
+- Auto-fill working-day attendance as **present**, or **leave** when AtWork has an approved leave request covering that day
+- Skip Sundays and Tanzania public holidays (built-in calendar for 2025–2026+, plus any dates in the Sikukuu table)
+- Dry-run the CRDB NSSF name lists against current employees, then apply (admin only) to set the NSSF flag and create missing people
+
+```bash
+npm run test:nssf
+npm run nssf:import
+```
+
+`nssf:import` is a dry-run against `TURSO_DATABASE_URL`. It will not write to a remote database.

@@ -9,6 +9,7 @@ const STATUS_LABEL_SW: Record<string, string> = {
   absent: "Hakuwepo",
   late: "Alichelewa",
   half_day: "Nusu siku",
+  leave: "Likizo",
 };
 
 export async function PUT(

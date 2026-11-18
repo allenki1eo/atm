@@ -49,6 +49,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/attendance/today",       label: "Leo",           icon: ClipboardList,  roles: ["supervisor", "hr", "admin"] },
       { href: "/attendance/history",     label: "Historia",      icon: Calendar,       roles: ["supervisor", "hr", "admin"] },
+      { href: "/attendance/nssf",        label: "NSSF",          icon: Shield,         roles: ["hr", "admin"] },
       { href: "/attendance/bulk",        label: "Weka Wingi",    icon: CalendarRange,  roles: ["admin"] },
       { href: "/attendance/edit",        label: "Hariri",        icon: CalendarDays,   roles: ["admin"] },
       { href: "/attendance/import",      label: "Ingiza",        icon: Upload,         roles: ["admin"] },

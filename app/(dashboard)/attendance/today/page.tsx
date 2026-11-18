@@ -24,6 +24,7 @@ export default function TodayAttendancePage() {
   const { data: records, isLoading, refetch } = useTodayAttendance();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+  const [nssfOnly, setNssfOnly] = useState(false);
   const { hidden } = useAttendanceVisibility();
 
   const handleRefresh = async () => {
@@ -46,8 +47,9 @@ export default function TodayAttendancePage() {
     return records
       .filter((r) => !selectedCompany || r.company_id === selectedCompany)
       .filter((r) => !r.section_id || !hidden.sections.includes(r.section_id))
-      .filter((r) => !hidden.employees.includes(r.employee_id));
-  }, [records, selectedCompany, hidden]);
+      .filter((r) => !hidden.employees.includes(r.employee_id))
+      .filter((r) => !nssfOnly || Boolean(r.deduct_nssf));
+  }, [records, selectedCompany, hidden, nssfOnly]);
 
   const unmarkedCount = visibleRecords.filter((r) => !r.status).length;
   const isAnyLocked = records?.some((r) => r.is_locked) ?? false;
@@ -129,7 +131,20 @@ export default function TodayAttendancePage() {
         </div>
       )}
 
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            className="accent-primary"
+            checked={nssfOnly}
+            onChange={(e) => setNssfOnly(e.target.checked)}
+          />
+          <span>Onyesha wafanyakazi wa NSSF tu</span>
+        </label>
+      </div>
+
       {/* Attendance Table */}
+
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (

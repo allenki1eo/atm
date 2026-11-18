@@ -131,6 +131,29 @@ export default function HolidaysPage() {
     },
   });
 
+  const seedMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/holidays/seed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from_year: 2025, to_year: 2027 }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Failed");
+      return json as { inserted: number; skipped: number };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["holidays"] });
+      toast({
+        title: "Sikukuu za Tanzania",
+        description: `Zimeongezwa ${result.inserted}, zilizoruka ${result.skipped} (tayari zipo).`,
+      });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Hitilafu", description: e.message, variant: "destructive" });
+    },
+  });
+
   const today = new Date().toISOString().split("T")[0];
   const upcoming = (holidays ?? []).filter((h) => h.date >= today);
   const past = (holidays ?? []).filter((h) => h.date < today);
@@ -147,10 +170,20 @@ export default function HolidaysPage() {
             Sikukuu za kazi zinazotumika kwenye hesabu ya likizo na overtime
           </p>
         </div>
-        <Button onClick={() => { reset({ company_id: "__all__", date: "", name: "" }); setDialogOpen(true); }}>
-          <Plus className="h-4 w-4 mr-2" />
-          Ongeza Sikukuu
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => seedMutation.mutate()}
+            disabled={seedMutation.isPending}
+          >
+            {seedMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CalendarDays className="h-4 w-4 mr-2" />}
+            Ongeza sikukuu za Tanzania
+          </Button>
+          <Button onClick={() => { reset({ company_id: "__all__", date: "", name: "" }); setDialogOpen(true); }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Ongeza Sikukuu
+          </Button>
+        </div>
       </div>
 
       <Card>

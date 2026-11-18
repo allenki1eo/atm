@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
     const records = attendResult.rows as unknown as { status: string }[];
     const presentDays = records.filter((r) => ["present", "late"].includes(r.status)).length;
     const halfDays = records.filter((r) => r.status === "half_day").length;
+    const leaveDays = records.filter((r) => r.status === "leave").length;
     const effectiveDays = presentDays + halfDays * 0.5;
 
     const baseGross = emp.type === "casual"
@@ -150,13 +151,14 @@ export async function POST(request: NextRequest) {
     // Upsert payslip with all deduction columns
     await db.execute({
       sql: `INSERT INTO payslips
-              (id, employee_id, period_id, days_worked, overtime_days, gross_amount, total_advances,
+              (id, employee_id, period_id, days_worked, overtime_days, leave_days, gross_amount, total_advances,
                net_amount, nssf_amount, cotwu_amount, fadhila_amount,
                heslb_amount, wcf_amount, total_deductions)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(employee_id, period_id) DO UPDATE SET
               days_worked      = excluded.days_worked,
               overtime_days    = excluded.overtime_days,
+              leave_days       = excluded.leave_days,
               gross_amount     = excluded.gross_amount,
               total_advances   = excluded.total_advances,
               net_amount       = excluded.net_amount,
@@ -170,7 +172,7 @@ export async function POST(request: NextRequest) {
       args: [
         // days_worked stays attendance-only so it still reconciles with
         // base pay (days × daily rate); overtime days are stored alongside.
-        nanoid(), emp.id, periodId, effectiveDays, overtimeDays, grossAmount,
+        nanoid(), emp.id, periodId, effectiveDays, overtimeDays, leaveDays, grossAmount,
         totalAdvanceDeductions, netAmount, nssfAmount, cotwuAmount, fadhilaAmount,
         heslbAmount, wcfAmount, totalDeductions,
       ],
