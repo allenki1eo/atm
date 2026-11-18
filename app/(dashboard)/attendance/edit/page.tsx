@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { MasterRollFilter } from "@/components/attendance/master-roll-filter";
 
 type Status = "present" | "absent" | "late" | "half_day";
 
@@ -23,6 +24,7 @@ interface AttendanceRecord {
   status: Status | null;
   is_locked: number;
   notes: string | null;
+  deduct_nssf?: number | boolean;
 }
 
 const statusConfig: Record<Status, { label: string; icon: React.ElementType; btn: string; badge: string }> = {
@@ -42,6 +44,7 @@ export default function AttendanceEditPage() {
   const [search, setSearch] = useState("");
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [masterRollOnly, setMasterRollOnly] = useState(true);
 
   const { data: records, isLoading } = useQuery<AttendanceRecord[]>({
     queryKey: ["attendance", "edit", date],
@@ -113,10 +116,14 @@ export default function AttendanceEditPage() {
     }
   };
 
-  const filtered = (records ?? []).filter((r) =>
-    r.employee_name.toLowerCase().includes(search.toLowerCase()) ||
-    (r.department ?? "").toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = (records ?? []).filter((r) => {
+    if (masterRollOnly && !r.deduct_nssf) return false;
+    const q = search.toLowerCase();
+    return (
+      r.employee_name.toLowerCase().includes(q) ||
+      (r.department ?? "").toLowerCase().includes(q)
+    );
+  });
 
   const lockedCount = filtered.filter((r) => r.is_locked).length;
   const allSelected = filtered.length > 0 && filtered.every((r) => selected.has(r.employee_id));
@@ -175,6 +182,8 @@ export default function AttendanceEditPage() {
           />
         </div>
       </div>
+
+      <MasterRollFilter onlyMasterRoll={masterRollOnly} onChange={setMasterRollOnly} />
 
       {/* Locked warning */}
       {lockedCount > 0 && (
