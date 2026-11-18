@@ -54,12 +54,12 @@ test("proposes creating people who are not in AtWork", () => {
 
 test("flags a same name found in a different company", () => {
   const plan = planNssfImport(
-    [{ name: "Emmanuel Titto Bundala", company: "GAKI INVESTMENT CO LTD" }],
+    [{ name: "Hamisi Shija Hamisi", company: "GAKI INVESTMENT CO LTD" }],
     companies,
     [
       {
         id: "x",
-        name: "EMMANUEL TITO BUNDALA",
+        name: "HAMISI SHIJA HAMISI",
         company_id: "eastl",
         company_name: "East African Spirit (T) Ltd",
         deduct_nssf: 0,
@@ -104,6 +104,46 @@ test("exact names with no company are unassigned, not other-company", () => {
 
 test("low-confidence fuzzy matches need review and are not auto-applied", () => {
   const plan = planNssfImport(
+    [{ name: "John Musa Malale", company: "GAKI INVESTMENT CO LTD" }],
+    companies,
+    [
+      {
+        id: "a1",
+        name: "JOHN MUSSA MASELE",
+        company_id: "gaki",
+        company_name: "Gaki Investment Co Ltd",
+        deduct_nssf: 0,
+        active: 1,
+      },
+    ]
+  );
+  assert.equal(plan.fuzzyReview.length, 1);
+  assert.equal(plan.setNssf.length, 0);
+});
+
+test("Allen override: Zaitun matches ZAITUNI RAMADHANI RASHIDI even below 90%", () => {
+  const plan = planNssfImport(
+    [{ name: "Zaitun Ramadhan Rashia", company: "EAST AFRICAN SPIRIT (T) LTD" }],
+    companies,
+    [
+      {
+        id: "z1",
+        name: "ZAITUNI RAMADHANI RASHIDI",
+        company_id: "eastl",
+        company_name: "East African Spirit (T) Ltd",
+        deduct_nssf: 0,
+        active: 1,
+      },
+    ]
+  );
+  assert.equal(plan.fuzzyReview.length, 0);
+  assert.equal(plan.setNssf.length, 1);
+  assert.equal(plan.setNssf[0].employee_id, "z1");
+  assert.equal(plan.setNssf[0].override, true);
+});
+
+test("Allen override: Ally Musa Malale matches ALLY MUSSA MASELE", () => {
+  const plan = planNssfImport(
     [{ name: "Ally Musa Malale", company: "GAKI INVESTMENT CO LTD" }],
     companies,
     [
@@ -117,7 +157,64 @@ test("low-confidence fuzzy matches need review and are not auto-applied", () => 
       },
     ]
   );
-  assert.equal(plan.fuzzyReview.length, 1);
-  assert.equal(plan.setNssf.length, 0);
+  assert.equal(plan.fuzzyReview.length, 0);
+  assert.equal(plan.setNssf.length, 1);
+  assert.equal(plan.setNssf[0].employee_id, "a1");
+  assert.equal(plan.setNssf[0].override, true);
+});
+
+test("Allen override: Emmanuel moves from East African Spirit to GAKI and sets NSSF", () => {
+  const plan = planNssfImport(
+    [{ name: "Emmanuel Titto Bundala", company: "GAKI INVESTMENT CO LTD" }],
+    companies,
+    [
+      {
+        id: "x",
+        name: "EMMANUEL TITO BUNDALA",
+        company_id: "eastl",
+        company_name: "East African Spirit (T) Ltd",
+        section_id: "sec-eastl",
+        deduct_nssf: 0,
+        active: 1,
+      },
+    ]
+  );
+  assert.equal(plan.otherCompany.length, 0);
+  assert.equal(plan.moveCompany.length, 1);
+  const row = plan.moveCompany[0];
+  assert.equal(row.employee_id, "x");
+  assert.equal(row.company_id, "gaki");
+  assert.equal(row.from_company_id, "eastl");
+  assert.equal(row.from_section_id, "sec-eastl");
+  assert.equal(row.override, true);
+  assert.equal(row.previous_deduct_nssf, false);
+});
+
+test("creates GK Packaging when missing and plans its three people", () => {
+  const plan = planNssfImport(
+    flattenNssfLists().filter((p) => p.company.includes("PACKAGING")),
+    companies.filter((c) => c.id !== "gk"),
+    []
+  );
+  assert.equal(plan.companiesToCreate.length, 1);
+  assert.equal(plan.companiesToCreate[0].name, "GK Packaging Co. Ltd");
+  assert.equal(plan.companyMissing.length, 0);
+  assert.equal(plan.toCreate.length, 3);
+  assert.ok(plan.toCreate.every((r) => r.pending_company && r.company_name === "GK Packaging Co. Ltd"));
+  assert.ok(plan.toCreate.some((r) => r.source_name === "Manfred Frank Mushi"));
+  assert.ok(plan.toCreate.some((r) => r.source_name === "Marco Masunga Mwandu"));
+  assert.ok(plan.toCreate.some((r) => r.source_name === "Maria Stephano Andrew"));
+});
+
+test("does not re-create GK Packaging when it already exists", () => {
+  const plan = planNssfImport(
+    [{ name: "Marco Masunga Mwandu", company: "GK PACKAGING CO LTD" }],
+    companies,
+    []
+  );
+  assert.equal(plan.companiesToCreate.length, 0);
+  assert.equal(plan.toCreate.length, 1);
+  assert.equal(plan.toCreate[0].company_id, "gk");
+  assert.equal(plan.toCreate[0].pending_company, false);
 });
 

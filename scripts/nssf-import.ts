@@ -28,7 +28,7 @@ async function main() {
 
   const companies = await db.execute("SELECT id, name FROM companies ORDER BY name");
   const employees = await db.execute(`
-    SELECT e.id, e.name, e.company_id, e.deduct_nssf, e.active, c.name AS company_name
+    SELECT e.id, e.name, e.company_id, e.section_id, e.deduct_nssf, e.active, c.name AS company_name
     FROM employees e
     LEFT JOIN companies c ON c.id = e.company_id
     ORDER BY e.name
@@ -42,6 +42,7 @@ async function main() {
       name: String(r.name),
       company_id: r.company_id ? String(r.company_id) : null,
       company_name: r.company_name ? String(r.company_name) : null,
+      section_id: r.section_id ? String(r.section_id) : null,
       deduct_nssf: Number(r.deduct_nssf ?? 0),
       active: Number(r.active ?? 1),
     }))
@@ -63,16 +64,22 @@ async function main() {
   console.log(`Will set NSSF:    ${plan.setNssf.length}`);
   console.log(`Will create:      ${plan.toCreate.length}`);
   console.log(`Unassigned:       ${plan.unassigned.length}`);
+  console.log(`Move company:     ${plan.moveCompany.length}`);
+  console.log(`Companies to add: ${plan.companiesToCreate.length}`);
   console.log(`Fuzzy review:     ${plan.fuzzyReview.length}`);
   console.log(`Ambiguous:        ${plan.ambiguous.length}`);
   console.log(`Other company:    ${plan.otherCompany.length}`);
   console.log(`Company missing:  ${plan.companyMissing.length}`);
+  console.log(`Override missing: ${plan.overrideMissing.length}`);
 
   printSection("Will set NSSF flag", plan.setNssf, (r) => `${r.source_name}  →  ${r.employee_name} (${r.company_name ?? ""}${r.note ? "; " + r.note : ""})`);
   printSection("Already on NSSF", plan.alreadyNssf, (r) => `${r.source_name}  →  ${r.employee_name}`);
   printSection("Will create", plan.toCreate, (r) => `${r.source_name}  @  ${r.company_name ?? r.source_company}`);
   printSection("Unassigned in AtWork — will set NSSF and attach to company", plan.unassigned, (r) => `${r.source_name}  →  ${r.employee_name} (${r.company_name ?? r.source_company})`);
+  printSection("Move to the PDF company and set NSSF", plan.moveCompany, (r) => `${r.employee_name}  from  ${r.from_company_name ?? "?"}  →  ${r.company_name ?? r.source_company}${r.from_section_id ? " (section will be cleared)" : ""}`);
+  printSection("Companies to create", plan.companiesToCreate, (r) => r.name);
   printSection("Fuzzy match — needs a decision", plan.fuzzyReview, (r) => `${r.source_name}  →  ${r.employee_name ?? "?"} (${Math.round((r.score ?? 0) * 100)}%) ${r.note ?? ""}`);
+  printSection("Confirmed override target not found", plan.overrideMissing, (r) => `${r.source_name}  @  ${r.source_company}: ${r.note ?? ""}`);
   printSection("Ambiguous — needs a decision", plan.ambiguous, (r) => `${r.source_name}  @  ${r.source_company}: ${r.note ?? ""}`);
   printSection("Name found in another company — needs a decision", plan.otherCompany, (r) => `${r.source_name} (${r.source_company})  looks like  ${r.employee_name} (${r.company_name ?? "?"})`);
   printSection("Company not found in AtWork", plan.companyMissing, (r) => `${r.source_name}  @  ${r.source_company}`);

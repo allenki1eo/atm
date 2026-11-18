@@ -4,7 +4,32 @@ import bcrypt from "bcryptjs";
 import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
 import { flattenNssfLists, type NssfListPerson } from "@/lib/nssf-lists";
-import { planNssfImport, type ImportEmployee } from "@/lib/nssf-import";
+import { isPendingCompanyId, pendingCompanyId, planNssfImport, type ImportEmployee, type ImportPlan } from "@/lib/nssf-import";
+import { matchCompany } from "@/lib/name-match";
+
+
+async function ensurePlannedCompanies(plan: ImportPlan): Promise<{ map: Map<string, string>; created: string[] }> {
+  const map = new Map<string, string>();
+  const created: string[] = [];
+  const existing = await db.execute("SELECT id, name FROM companies");
+  const companies = existing.rows as unknown as { id: string; name: string }[];
+  for (const planned of plan.companiesToCreate) {
+    const match = matchCompany(planned.name, companies);
+    if (match.kind === "exact" || match.kind === "fuzzy") {
+      map.set(pendingCompanyId(planned.name), match.match.value.id);
+      continue;
+    }
+    const id = nanoid();
+    await db.execute({
+      sql: "INSERT INTO companies (id, name, address) VALUES (?, ?, ?)",
+      args: [id, planned.name, null],
+    });
+    companies.push({ id, name: planned.name });
+    map.set(pendingCompanyId(planned.name), id);
+    created.push(planned.name);
+  }
+  return { map, created };
+}
 
 function generatePIN(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -13,7 +38,7 @@ function generatePIN(): string {
 async function loadEmployeesAndCompanies() {
   const companies = await db.execute("SELECT id, name FROM companies ORDER BY name");
   const employees = await db.execute(`
-    SELECT e.id, e.name, e.company_id, e.deduct_nssf, e.active, c.name AS company_name
+    SELECT e.id, e.name, e.company_id, e.section_id, e.deduct_nssf, e.active, c.name AS company_name
     FROM employees e
     LEFT JOIN companies c ON c.id = e.company_id
     ORDER BY e.name
@@ -44,19 +69,25 @@ export async function GET() {
       already_nssf: plan.alreadyNssf.length,
       to_create: plan.toCreate.length,
       unassigned: plan.unassigned.length,
+      move_company: plan.moveCompany.length,
+      companies_to_create: plan.companiesToCreate.length,
       fuzzy_review: plan.fuzzyReview.length,
       ambiguous: plan.ambiguous.length,
       other_company: plan.otherCompany.length,
       company_missing: plan.companyMissing.length,
+      override_missing: plan.overrideMissing.length,
     },
     set_nssf: plan.setNssf,
     already_nssf: plan.alreadyNssf,
     unassigned: plan.unassigned,
     fuzzy_review: plan.fuzzyReview,
     to_create: plan.toCreate,
+    move_company: plan.moveCompany,
+    companies_to_create: plan.companiesToCreate,
     ambiguous: plan.ambiguous,
     other_company: plan.otherCompany,
     company_missing: plan.companyMissing,
+    override_missing: plan.overrideMissing,
     companies,
   });
 }
@@ -87,10 +118,13 @@ export async function POST(request: NextRequest) {
     already_nssf: plan.alreadyNssf.length,
     to_create: plan.toCreate.length,
     unassigned: plan.unassigned.length,
+    move_company: plan.moveCompany.length,
+    companies_to_create: plan.companiesToCreate.length,
     fuzzy_review: plan.fuzzyReview.length,
     ambiguous: plan.ambiguous.length,
     other_company: plan.otherCompany.length,
     company_missing: plan.companyMissing.length,
+    override_missing: plan.overrideMissing.length,
   };
 
   if (body.apply !== true) {
@@ -99,17 +133,27 @@ export async function POST(request: NextRequest) {
       totals,
       set_nssf: plan.setNssf,
       already_nssf: plan.alreadyNssf,
-    unassigned: plan.unassigned,
-    fuzzy_review: plan.fuzzyReview,
+      unassigned: plan.unassigned,
+      fuzzy_review: plan.fuzzyReview,
       to_create: plan.toCreate,
+      move_company: plan.moveCompany,
+      companies_to_create: plan.companiesToCreate,
       ambiguous: plan.ambiguous,
       other_company: plan.otherCompany,
       company_missing: plan.companyMissing,
+      override_missing: plan.overrideMissing,
     });
   }
 
+  const ensured = await ensurePlannedCompanies(plan);
+  const companyIds = ensured.map;
+  const createdCompanies = ensured.created;
+  const resolveCompanyId = (id?: string) => (id && companyIds.get(id)) || id;
+
   let flagged = 0;
   let assigned = 0;
+  let moved = 0;
+
   for (const row of plan.setNssf) {
     if (!row.employee_id) continue;
     await db.execute({
@@ -119,13 +163,39 @@ export async function POST(request: NextRequest) {
     flagged++;
   }
   for (const row of plan.unassigned) {
-    if (!row.employee_id || !row.company_id) continue;
+    const companyId = resolveCompanyId(row.company_id);
+    if (!row.employee_id || !companyId || isPendingCompanyId(companyId)) continue;
     await db.execute({
       sql: "UPDATE employees SET deduct_nssf = 1, company_id = ? WHERE id = ?",
-      args: [row.company_id, row.employee_id],
+      args: [companyId, row.employee_id],
     });
     flagged++;
     assigned++;
+  }
+  for (const row of plan.moveCompany) {
+    const companyId = resolveCompanyId(row.company_id);
+    if (!row.employee_id || !companyId || isPendingCompanyId(companyId)) continue;
+    await db.execute({
+      sql: "UPDATE employees SET deduct_nssf = 1, company_id = ?, section_id = NULL WHERE id = ?",
+      args: [companyId, row.employee_id],
+    });
+    await db.execute({
+      sql: `INSERT INTO employee_transfer_history
+              (id, employee_id, from_company_id, from_section_id, to_company_id, to_section_id, changed_by, note)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        nanoid(),
+        row.employee_id,
+        row.from_company_id ?? null,
+        row.from_section_id ?? null,
+        companyId,
+        null,
+        session.user.id ?? null,
+        row.note ?? "NSSF import: company reassigned",
+      ],
+    });
+    flagged++;
+    moved++;
   }
 
   const created: { name: string; company_name?: string; phone: string }[] = [];
@@ -138,7 +208,8 @@ export async function POST(request: NextRequest) {
   );
 
   for (const row of plan.toCreate) {
-    if (!row.company_id) continue;
+    const companyId = resolveCompanyId(row.company_id);
+    if (!companyId || isPendingCompanyId(companyId)) continue;
     let phone = `TEMP-NSSF-${String(createIndex).padStart(4, "0")}`;
     while (usedPhones.has(phone)) {
       createIndex += 1;
@@ -157,7 +228,7 @@ export async function POST(request: NextRequest) {
               (id, name, phone, type, department, company_id, daily_rate, monthly_salary,
                overtime_rule, deduct_nssf, active)
             VALUES (?, ?, ?, 'fulltime', NULL, ?, 0, 0, 'none', 1, 1)`,
-      args: [employeeId, row.source_name, phone, row.company_id],
+      args: [employeeId, row.source_name, phone, companyId],
     });
     await db.execute({
       sql: `INSERT INTO users (id, name, role, phone, password_hash, plain_pin, employee_id)
@@ -178,6 +249,8 @@ export async function POST(request: NextRequest) {
     totals,
     flagged,
     assigned,
+    moved,
+    created_companies: createdCompanies,
     created: created.length,
     created_people: created,
     skipped: {
@@ -185,6 +258,7 @@ export async function POST(request: NextRequest) {
       ambiguous: plan.ambiguous,
       other_company: plan.otherCompany,
       company_missing: plan.companyMissing,
+      override_missing: plan.overrideMissing,
     },
   });
 }

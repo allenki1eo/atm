@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { format, parseISO } from "date-fns";
@@ -101,19 +101,25 @@ interface ImportResponse {
     already_nssf: number;
     to_create: number;
     unassigned: number;
+    move_company: number;
+    companies_to_create: number;
     fuzzy_review: number;
     ambiguous: number;
     other_company: number;
     company_missing: number;
+    override_missing?: number;
   };
   set_nssf: ImportRow[];
   already_nssf: ImportRow[];
   to_create: ImportRow[];
   unassigned: ImportRow[];
   fuzzy_review: ImportRow[];
+  move_company: ImportRow[];
+  companies_to_create: { name: string }[];
   ambiguous: ImportRow[];
   other_company: ImportRow[];
   company_missing: ImportRow[];
+  override_missing?: ImportRow[];
   flagged?: number;
   created?: number;
 }
@@ -164,8 +170,7 @@ export default function NssfAttendancePage() {
   const isAdmin = role === "admin";
   const queryClient = useQueryClient();
 
-  const [yearMonth, setYearMonth] = useState("");
-  useEffect(() => { setYearMonth(currentYearMonth()); }, []);
+  const [yearMonth, setYearMonth] = useState(currentYearMonth());
   const [companyId, setCompanyId] = useState<string>("all");
   const [showAll, setShowAll] = useState(false);
   const [overwrite, setOverwrite] = useState(false);
@@ -176,7 +181,6 @@ export default function NssfAttendancePage() {
 
   const { data, isLoading, error } = useQuery({
     queryKey,
-    enabled: Boolean(yearMonth),
     queryFn: async () => {
       const params = new URLSearchParams({
         year: String(year),
@@ -482,10 +486,10 @@ export default function NssfAttendancePage() {
               <Button
                 variant="secondary"
                 onClick={() => applyImport.mutate()}
-                disabled={applyImport.isPending || ((importQuery.data.totals.set_nssf + importQuery.data.totals.to_create + importQuery.data.totals.unassigned) === 0)}
+                disabled={applyImport.isPending || ((importQuery.data.totals.set_nssf + importQuery.data.totals.to_create + importQuery.data.totals.unassigned + importQuery.data.totals.move_company + importQuery.data.totals.companies_to_create) === 0)}
               >
                 {applyImport.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Tumia: alama {importQuery.data.totals.set_nssf}, husisha {importQuery.data.totals.unassigned}, ongeza {importQuery.data.totals.to_create}
+                Tumia: alama {importQuery.data.totals.set_nssf}, husisha {importQuery.data.totals.unassigned}, hamisha {importQuery.data.totals.move_company}, ongeza {importQuery.data.totals.to_create}, kampuni {importQuery.data.totals.companies_to_create}
               </Button>
             )}
             {!isAdmin && (
@@ -499,6 +503,8 @@ export default function NssfAttendancePage() {
                 <Badge>Tayari NSSF: {importQuery.data.totals.already_nssf}</Badge>
                 <Badge variant="secondary">Watawekwa NSSF: {importQuery.data.totals.set_nssf}</Badge>
                 <Badge variant="secondary">Bila kampuni: {importQuery.data.totals.unassigned}</Badge>
+                <Badge variant="secondary">Hamisho: {importQuery.data.totals.move_company}</Badge>
+                <Badge variant="secondary">Kampuni mpya: {importQuery.data.totals.companies_to_create}</Badge>
                 <Badge variant="secondary">Wataongezwa: {importQuery.data.totals.to_create}</Badge>
                 <Badge variant="destructive">Thibitisha: {importQuery.data.totals.fuzzy_review}</Badge>
                 <Badge variant="destructive">Ambiguous: {importQuery.data.totals.ambiguous}</Badge>
@@ -520,6 +526,16 @@ export default function NssfAttendancePage() {
                 rows={importQuery.data.unassigned}
                 empty="Hakuna walio bila kampuni."
               />
+              <ImportTable
+                title="Watahamishwa kampuni"
+                rows={importQuery.data.move_company}
+                empty="Hakuna wa kuhamisha."
+              />
+              {(importQuery.data.companies_to_create ?? []).length > 0 && (
+                <p className="text-sm">
+                  Kampuni zitakazoundwa: {importQuery.data.companies_to_create.map((c) => c.name).join(", ")}
+                </p>
+              )}
               <ImportTable
                 title="Yanahitaji uamuzi (haijaguswa)"
                 rows={[

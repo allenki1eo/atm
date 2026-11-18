@@ -101,3 +101,51 @@ export function flattenNssfLists(): NssfListPerson[] {
   }
   return people;
 }
+
+/** Companies the import will create if they are missing (idempotent). */
+export const NSSF_COMPANIES_TO_ENSURE = ["GK Packaging Co. Ltd"] as const;
+
+export type NssfImportOverride =
+  | {
+      kind: "match";
+      sourceName: string;
+      sourceCompany: string;
+      existingName: string;
+      reason: string;
+    }
+  | {
+      kind: "move";
+      sourceName: string;
+      sourceCompany: string;
+      existingName: string;
+      reason: string;
+    };
+
+/**
+ * Decisions Allen confirmed on 18 Nov 2026 for the four dry-run questions.
+ * These bypass the low-confidence / other-company review gates.
+ */
+export const NSSF_IMPORT_OVERRIDES: NssfImportOverride[] = [
+  {
+    kind: "match",
+    sourceName: "Zaitun Ramadhan Rashia",
+    sourceCompany: NSSF_COMPANY_EASTL,
+    existingName: "ZAITUNI RAMADHANI RASHIDI",
+    reason: "Allen confirmed this is the same person",
+  },
+  {
+    kind: "match",
+    sourceName: "Ally Musa Malale",
+    sourceCompany: NSSF_COMPANY_GAKI,
+    existingName: "ALLY MUSSA MASELE",
+    reason: "Allen confirmed this is the same person",
+  },
+  {
+    kind: "move",
+    sourceName: "Emmanuel Titto Bundala",
+    sourceCompany: NSSF_COMPANY_GAKI,
+    existingName: "EMMANUEL TITO BUNDALA",
+    reason: "Allen confirmed: move the existing record to Gaki Investment Co. Ltd and set NSSF",
+  },
+];
+
