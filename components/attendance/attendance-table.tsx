@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import { Check, Clock, X, Minus, Search, CheckSquare } from "lucide-react";
+import { Check, Clock, X, Minus, Search, CheckSquare, Palmtree } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
-type AttendanceStatus = "present" | "absent" | "late" | "half_day";
+type AttendanceStatus = "present" | "absent" | "late" | "half_day" | "leave";
 
 interface AttendanceTableProps {
   records: AttendanceRecord[];
@@ -37,6 +37,7 @@ const statusConfig = {
   absent: { label: "Hakuwepo", icon: X, color: "bg-red-100 text-red-800 border-red-200", btnColor: "bg-red-500 hover:bg-red-600 text-white" },
   late: { label: "Alichelewa", icon: Clock, color: "bg-amber-100 text-amber-800 border-amber-200", btnColor: "bg-amber-500 hover:bg-amber-600 text-white" },
   half_day: { label: "Nusu Siku", icon: Minus, color: "bg-blue-100 text-blue-800 border-blue-200", btnColor: "bg-blue-500 hover:bg-blue-600 text-white" },
+  leave: { label: "Likizo", icon: Palmtree, color: "bg-purple-100 text-purple-800 border-purple-200", btnColor: "bg-purple-500 hover:bg-purple-600 text-white" },
 };
 
 export function AttendanceTable({ records, isLoading, date, isLocked = false }: AttendanceTableProps) {

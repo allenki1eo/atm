@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { db, ensureDatabase } from "@/lib/db";
 import { nanoid } from "nanoid";
 
-const VALID_STATUSES = ["present", "absent", "late", "half_day"] as const;
+const VALID_STATUSES = ["present", "absent", "late", "half_day", "leave"] as const;
 
 export async function GET(request: NextRequest) {
   const session = await auth();

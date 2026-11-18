@@ -8,6 +8,9 @@ const STATUS_MAP: Record<string, string> = {
   a: "absent",
   l: "late",
   h: "half_day",
+  v: "leave",
+  leave: "leave",
+  likizo: "leave",
 };
 
 function detectSeparator(line: string): string {

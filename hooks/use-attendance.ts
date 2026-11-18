@@ -8,7 +8,7 @@ export interface AttendanceRecord {
   employee_id: string;
   employee_name: string;
   date: string;
-  status: "present" | "absent" | "late" | "half_day" | null;
+  status: "present" | "absent" | "late" | "half_day" | "leave" | null;
   marked_by: string;
   marked_at: string;
   notes: string;
@@ -20,12 +20,13 @@ export interface AttendanceRecord {
   section_id: string | null;
   company_name: string | null;
   section_name: string | null;
+  deduct_nssf?: number | boolean;
 }
 
 export interface AttendanceMarkPayload {
   employee_id: string;
   date: string;
-  status: "present" | "absent" | "late" | "half_day";
+  status: "present" | "absent" | "late" | "half_day" | "leave";
   notes?: string;
 }
 

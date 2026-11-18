@@ -25,6 +25,7 @@ const STATUS_LABELS: Record<string, string> = {
   absent: "Hakuwepo",
   late: "Alichelewa",
   half_day: "Nusu siku",
+  leave: "Likizo",
 };
 
 interface Correction {

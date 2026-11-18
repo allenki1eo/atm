@@ -99,6 +99,7 @@ export const sw = {
     absent: "Hakuwepo",
     late: "Alichelewa",
     half_day: "Nusu Siku",
+    leave: "Likizo",
   },
   // Attendance page
   siku_ya_leo: "Mahudhurio ya Leo",

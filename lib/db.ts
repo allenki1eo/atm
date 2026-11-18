@@ -222,7 +222,7 @@ export async function initializeDatabase() {
       id TEXT PRIMARY KEY,
       employee_id TEXT NOT NULL,
       date DATE NOT NULL,
-      status TEXT CHECK(status IN ('present', 'absent', 'late', 'half_day')) NOT NULL,
+      status TEXT CHECK(status IN ('present', 'absent', 'late', 'half_day', 'leave')) NOT NULL,
       marked_by TEXT NOT NULL,
       marked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       notes TEXT,
@@ -435,7 +435,7 @@ export async function initializeDatabase() {
       date DATE NOT NULL,
       original_attendance_id TEXT,
       original_status TEXT,
-      requested_status TEXT NOT NULL CHECK(requested_status IN ('present','absent','late','half_day')),
+      requested_status TEXT NOT NULL CHECK(requested_status IN ('present','absent','late','half_day','leave')),
       reason TEXT NOT NULL,
       status TEXT CHECK(status IN ('pending','approved','denied')) DEFAULT 'pending',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -590,6 +590,11 @@ export async function migrateDatabase() {
     }
   }
 
+
+  // Allow attendance (and correction requests) to be marked as leave.
+  // SQLite cannot alter a CHECK constraint in place, so rebuild when needed.
+  await migrateAttendanceLeaveStatus();
+
   // Rebuild payroll_periods with a (month, year, company_id) unique key so
   // the same month can be locked independently per company. SQLite cannot
   // drop a UNIQUE constraint in place, so we recreate the table.
@@ -621,6 +626,79 @@ export async function migrateDatabase() {
     }
   } catch {
     // if rebuild fails (already rebuilt, no data, etc) leave as-is
+  }
+}
+
+
+async function migrateAttendanceLeaveStatus() {
+  await rebuildTableIfCheckMissing({
+    table: "attendance",
+    needle: "'leave'",
+    createSql: `CREATE TABLE attendance_new (
+      id TEXT PRIMARY KEY,
+      employee_id TEXT NOT NULL,
+      date DATE NOT NULL,
+      status TEXT CHECK(status IN ('present', 'absent', 'late', 'half_day', 'leave')) NOT NULL,
+      marked_by TEXT NOT NULL,
+      marked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      notes TEXT,
+      is_locked INTEGER DEFAULT 0,
+      UNIQUE(employee_id, date),
+      FOREIGN KEY (employee_id) REFERENCES employees(id),
+      FOREIGN KEY (marked_by) REFERENCES users(id)
+    )`,
+    copySql: `INSERT INTO attendance_new (id, employee_id, date, status, marked_by, marked_at, notes, is_locked)
+      SELECT id, employee_id, date, status, marked_by, marked_at, notes, is_locked FROM attendance`,
+  });
+
+  await rebuildTableIfCheckMissing({
+    table: "attendance_corrections",
+    needle: "'leave'",
+    createSql: `CREATE TABLE attendance_corrections_new (
+      id TEXT PRIMARY KEY,
+      employee_id TEXT NOT NULL,
+      date DATE NOT NULL,
+      original_attendance_id TEXT,
+      original_status TEXT,
+      requested_status TEXT NOT NULL CHECK(requested_status IN ('present','absent','late','half_day','leave')),
+      reason TEXT NOT NULL,
+      status TEXT CHECK(status IN ('pending','approved','denied')) DEFAULT 'pending',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      reviewed_by TEXT,
+      reviewed_at DATETIME,
+      review_note TEXT,
+      applied_attendance_id TEXT,
+      FOREIGN KEY (employee_id) REFERENCES employees(id),
+      FOREIGN KEY (reviewed_by) REFERENCES users(id)
+    )`,
+    copySql: `INSERT INTO attendance_corrections_new
+      (id, employee_id, date, original_attendance_id, original_status, requested_status, reason, status, created_at, reviewed_by, reviewed_at, review_note, applied_attendance_id)
+      SELECT id, employee_id, date, original_attendance_id, original_status, requested_status, reason, status, created_at, reviewed_by, reviewed_at, review_note, applied_attendance_id
+      FROM attendance_corrections`,
+  });
+}
+
+async function rebuildTableIfCheckMissing(opts: {
+  table: string;
+  needle: string;
+  createSql: string;
+  copySql: string;
+}) {
+  try {
+    const schemaRes = await db.execute({
+      sql: "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+      args: [opts.table],
+    });
+    const ddl = (schemaRes.rows[0] as unknown as { sql: string } | undefined)?.sql ?? "";
+    if (!ddl || ddl.includes(opts.needle)) return;
+    const tmp = `${opts.table}_new`;
+    try { await db.execute(`DROP TABLE IF EXISTS ${tmp}`); } catch {}
+    await db.execute(opts.createSql);
+    await db.execute(opts.copySql);
+    await db.execute(`DROP TABLE ${opts.table}`);
+    await db.execute(`ALTER TABLE ${tmp} RENAME TO ${opts.table}`);
+  } catch {
+    // Leave the existing table in place if a rebuild fails mid-way.
   }
 }
 
