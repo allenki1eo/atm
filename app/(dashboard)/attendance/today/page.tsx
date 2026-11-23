@@ -159,6 +159,8 @@ export default function TodayAttendancePage() {
           <h3 className="text-sm font-medium text-blue-900 mb-1">Instructions</h3>
           <ul className="text-xs text-blue-700 space-y-1 list-disc list-inside">
             <li>Click P (present), A (absent), or L (late) buttons to mark attendance</li>
+            <li>Enter check-in (Ingia) and check-out (Toka) times in East Africa Time. Times cannot be in the future, and check-out must be after check-in.</li>
+            <li>If a work start time and grace period are set in Settings, a late check-in is marked Late unless you choose another status.</li>
             <li>Use checkboxes to select multiple employees for bulk actions</li>
             <li>Click on the notes column to add notes to any record</li>
             <li>Lock the day when done to prevent further changes</li>

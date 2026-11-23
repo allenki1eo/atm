@@ -11,7 +11,7 @@
     "test:sms": "tsx --test --test-concurrency=1 lib/sms.test.ts",
     "db:delete-payslips": "node scripts/delete-generated-payslips.mjs",
     "test:nssf": "tsx --test --test-concurrency=1 lib/tanzania-holidays.test.ts lib/name-match.test.ts lib/nssf-autofill.test.ts lib/nssf-import.test.ts",
-    "test": "tsx --test --test-concurrency=1 lib/sso.test.ts lib/sms.test.ts lib/tanzania-holidays.test.ts lib/name-match.test.ts lib/nssf-autofill.test.ts lib/nssf-import.test.ts",
+    "test": "tsx --test --test-concurrency=1 lib/sso.test.ts lib/sms.test.ts lib/tanzania-holidays.test.ts lib/name-match.test.ts lib/nssf-autofill.test.ts lib/nssf-import.test.ts lib/attendance-times.test.ts",
     "nssf:import": "tsx --env-file=.env.local scripts/nssf-import.ts"
   },
   "dependencies": {

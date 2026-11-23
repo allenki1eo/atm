@@ -21,13 +21,26 @@ export interface AttendanceRecord {
   company_name: string | null;
   section_name: string | null;
   deduct_nssf?: number | boolean;
+  check_in_at?: string | null;
+  check_out_at?: string | null;
+  times_updated_by?: string | null;
+  times_updated_at?: string | null;
+  times_updated_by_name?: string | null;
 }
 
 export interface AttendanceMarkPayload {
   employee_id: string;
   date: string;
-  status: "present" | "absent" | "late" | "half_day" | "leave";
+  status?: "present" | "absent" | "late" | "half_day" | "leave";
   notes?: string;
+  check_in_at?: string | null;
+  check_out_at?: string | null;
+}
+
+export interface WorkHoursSettings {
+  work_start_time: string | null;
+  grace_minutes: number | null;
+  timezone: string;
 }
 
 export function useTodayAttendance(supervisorId?: string) {
@@ -66,7 +79,13 @@ export function useMarkAttendance() {
         if (!old) return old;
         return old.map((r) =>
           r.employee_id === payload.employee_id
-            ? { ...r, status: payload.status, notes: payload.notes ?? r.notes }
+            ? {
+                ...r,
+                status: payload.status ?? r.status,
+                notes: payload.notes ?? r.notes,
+                check_in_at: payload.check_in_at !== undefined ? payload.check_in_at : r.check_in_at,
+                check_out_at: payload.check_out_at !== undefined ? payload.check_out_at : r.check_out_at,
+              }
             : r
         );
       });
@@ -145,5 +164,42 @@ export function useAttendanceCalendar(employeeId: string, year: number, month: n
       return res.json();
     },
     enabled: !!employeeId,
+  });
+}
+
+export function useWorkHoursSettings() {
+  return useQuery({
+    queryKey: ["settings", "attendance"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/attendance");
+      if (!res.ok) throw new Error("Failed to fetch attendance settings");
+      return res.json() as Promise<WorkHoursSettings>;
+    },
+    staleTime: 60000,
+  });
+}
+
+export function useSaveWorkHoursSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { work_start_time: string | null; grace_minutes: number | null }) => {
+      const res = await fetch("/api/settings/attendance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "Failed to save settings");
+      }
+      return res.json() as Promise<WorkHoursSettings>;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(["settings", "attendance"], data);
+      toast({ title: "Settings saved", description: "Work start time and grace period were updated." });
+    },
+    onError: (err) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 }

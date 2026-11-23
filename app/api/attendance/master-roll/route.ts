@@ -262,6 +262,7 @@ export async function POST(request: NextRequest) {
       });
     } else {
       statements.push({
+        // Intentionally omit check_in_at / check_out_at so autofill never invents times.
         sql: "INSERT INTO attendance (id, employee_id, date, status, marked_by, notes) VALUES (?, ?, ?, ?, ?, ?)",
         args: [nanoid(), item.employee_id, item.date, item.status, markedBy, item.reason],
       });
