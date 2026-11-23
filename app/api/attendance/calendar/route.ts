@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, ensureDatabase } from "@/lib/db";
 import { addDays, overtimeDaysFromHours } from "@/lib/overtime";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  await ensureDatabase();
 
   const { searchParams } = new URL(request.url);
   const employeeId = searchParams.get("employee_id");
@@ -20,7 +22,7 @@ export async function GET(request: NextRequest) {
   const endDate = new Date(year, month, 0).toISOString().split("T")[0];
 
   const result = await db.execute({
-    sql: `SELECT date, status, notes, is_locked, marked_at
+    sql: `SELECT date, status, notes, is_locked, marked_at, check_in_at, check_out_at, times_updated_at, times_updated_by
           FROM attendance
           WHERE employee_id = ? AND date >= ? AND date <= ?
           ORDER BY date`,
@@ -34,6 +36,10 @@ export async function GET(request: NextRequest) {
     notes: string;
     is_locked: number;
     marked_at: string;
+    check_in_at: string | null;
+    check_out_at: string | null;
+    times_updated_at: string | null;
+    times_updated_by: string | null;
   }[];
 
   // Overtime hours per day, so the calendar can flag days worked beyond schedule.

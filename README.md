@@ -120,6 +120,23 @@ npm run lint
   output outside the default production behavior.
 - Set `SWALA_API_KEY` and `SWALA_SENDER_ID` before enabling live SMS. The key comes from the SwalaSMS dashboard and must not be committed. `SWALA_SENDER_ID` must be an approved sender ID on that account (`POSTSMS` is the sender ID used on other apps). Messages are sent with `POST https://api.swalasms.com/v1/sms/messages` and `Authorization: Bearer <SWALA_API_KEY>`. If the key is missing, sends are logged and skipped instead of crashing the request.
 
+## Check-in and check-out times
+
+Attendance rows may include optional `check_in_at` and `check_out_at` timestamps
+in Africa/Dar_es_Salaam (stored as ISO-8601 with a `+03:00` offset). Existing
+rows are left unchanged when the columns are added — times are never backfilled.
+Master Roll autofill also leaves these fields empty.
+
+HR and admin can set an optional work start time and grace period under
+Settings (`/settings`). When those are set, a check-in after start plus grace
+is recorded as late unless the marker chooses another status.
+
+The additive schema change runs automatically the first time the app initializes
+the database after this version is deployed (`initializeDatabase` /
+`ensureDatabase` on login or the first API request, and `/api/setup`). No
+separate production migration step is required, and this change does not write
+times onto existing records.
+
 ## Master Roll attendance
 
 HR and admin can open `/attendance/master-roll` to:

@@ -13,6 +13,8 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { MasterRollFilter } from "@/components/attendance/master-roll-filter";
+import { AttendanceTimesFields } from "@/components/attendance/attendance-times-fields";
+import { useWorkHoursSettings } from "@/hooks/use-attendance";
 
 type Status = "present" | "absent" | "late" | "half_day";
 
@@ -25,6 +27,10 @@ interface AttendanceRecord {
   is_locked: number;
   notes: string | null;
   deduct_nssf?: number | boolean;
+  check_in_at?: string | null;
+  check_out_at?: string | null;
+  times_updated_by_name?: string | null;
+  times_updated_at?: string | null;
 }
 
 const statusConfig: Record<Status, { label: string; icon: React.ElementType; btn: string; badge: string }> = {
@@ -45,6 +51,7 @@ export default function AttendanceEditPage() {
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [masterRollOnly, setMasterRollOnly] = useState(true);
+  const { data: workHours } = useWorkHoursSettings();
 
   const { data: records, isLoading } = useQuery<AttendanceRecord[]>({
     queryKey: ["attendance", "edit", date],
@@ -56,11 +63,16 @@ export default function AttendanceEditPage() {
   });
 
   const markMutation = useMutation({
-    mutationFn: async ({ employee_id, status }: { employee_id: string; status: Status }) => {
+    mutationFn: async (payload: {
+      employee_id: string;
+      status?: Status;
+      check_in_at?: string | null;
+      check_out_at?: string | null;
+    }) => {
       const res = await fetch("/api/attendance/mark", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ employee_id, date, status, force: true }),
+        body: JSON.stringify({ ...payload, date, force: true }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -113,6 +125,38 @@ export default function AttendanceEditPage() {
       await markMutation.mutateAsync({ employee_id, status });
     } finally {
       setSavingIds((p) => { const n = new Set(p); n.delete(employee_id); return n; });
+    }
+  };
+
+  const handleSaveTimes = async (
+    record: AttendanceRecord,
+    times: { check_in_at: string | null; check_out_at: string | null }
+  ) => {
+    setSavingIds((p) => new Set([...p, record.employee_id]));
+    try {
+      const payload: {
+        employee_id: string;
+        status?: Status;
+        check_in_at: string | null;
+        check_out_at: string | null;
+      } = {
+        employee_id: record.employee_id,
+        check_in_at: times.check_in_at,
+        check_out_at: times.check_out_at,
+      };
+      if (record.status && record.status !== "present") {
+        payload.status = record.status;
+      }
+      await markMutation.mutateAsync(payload);
+      toast({ title: "Imehifadhiwa", description: "Saa za kuingia na kutoka zimehifadhiwa" });
+    } catch (err) {
+      toast({
+        title: "Hitilafu",
+        description: err instanceof Error ? err.message : "Imeshindwa",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingIds((p) => { const n = new Set(p); n.delete(record.employee_id); return n; });
     }
   };
 
@@ -300,13 +344,25 @@ export default function AttendanceEditPage() {
                         />
                       </TableCell>
                       <TableCell>
-                        <div>
-                          <p className="font-medium text-sm">{rec.employee_name}</p>
-                          {rec.is_locked ? (
-                            <span className="text-xs text-amber-600 font-medium">🔒 Imefungwa</span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">{rec.type}</span>
-                          )}
+                        <div className="space-y-2 py-1">
+                          <div>
+                            <p className="font-medium text-sm">{rec.employee_name}</p>
+                            {rec.is_locked ? (
+                              <span className="text-xs text-amber-600 font-medium">🔒 Imefungwa</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">{rec.type}</span>
+                            )}
+                          </div>
+                          <AttendanceTimesFields
+                            employeeName={rec.employee_name}
+                            checkInAt={rec.check_in_at}
+                            checkOutAt={rec.check_out_at}
+                            timesUpdatedByName={rec.times_updated_by_name}
+                            timesUpdatedAt={rec.times_updated_at}
+                            disabled={saving || isBulkSaving}
+                            settings={workHours ?? null}
+                            onSave={(times) => handleSaveTimes(rec, times)}
+                          />
                         </div>
                       </TableCell>
                       <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">

@@ -18,8 +18,10 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   useMarkAttendance,
+  useWorkHoursSettings,
   type AttendanceRecord,
 } from "@/hooks/use-attendance";
+import { AttendanceTimesFields } from "@/components/attendance/attendance-times-fields";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +50,7 @@ export function AttendanceTable({ records, isLoading, date, isLocked = false }: 
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
 
   const markAttendance = useMarkAttendance();
+  const { data: workHours } = useWorkHoursSettings();
 
   const filtered = records.filter((r) =>
     r.employee_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -64,6 +67,40 @@ export function AttendanceTable({ records, isLoading, date, isLocked = false }: 
         toast({ title: "Saved", description: `Attendance marked as ${status}` });
       } finally {
         setSavingIds((prev) => { const next = new Set(prev); next.delete(employeeId); return next; });
+      }
+    },
+    [markAttendance, date, isLocked]
+  );
+
+  const handleSaveTimes = useCallback(
+    async (
+      record: AttendanceRecord,
+      times: { check_in_at: string | null; check_out_at: string | null }
+    ) => {
+      if (isLocked) return;
+      setSavingIds((prev) => new Set([...prev, record.employee_id]));
+      try {
+        const payload: Parameters<typeof markAttendance.mutateAsync>[0] = {
+          employee_id: record.employee_id,
+          date,
+          check_in_at: times.check_in_at,
+          check_out_at: times.check_out_at,
+        };
+        // Keep an explicit non-present status (absent/leave/half_day/late) as an override.
+        // Omit present so a late check-in can auto-set Late.
+        if (record.status && record.status !== "present") {
+          payload.status = record.status;
+        }
+        await markAttendance.mutateAsync(payload);
+        toast({ title: "Saved", description: "Check-in and check-out times updated" });
+      } catch (err) {
+        toast({
+          title: "Error",
+          description: err instanceof Error ? err.message : "Failed to save times",
+          variant: "destructive",
+        });
+      } finally {
+        setSavingIds((prev) => { const next = new Set(prev); next.delete(record.employee_id); return next; });
       }
     },
     [markAttendance, date, isLocked]
@@ -229,9 +266,21 @@ export function AttendanceTable({ records, isLoading, date, isLocked = false }: 
                       </TableCell>
                     )}
                     <TableCell>
-                      <div>
-                        <p className="font-medium text-sm">{record.employee_name}</p>
-                        <p className="text-xs text-muted-foreground">{record.type}</p>
+                      <div className="space-y-2 py-1">
+                        <div>
+                          <p className="font-medium text-sm">{record.employee_name}</p>
+                          <p className="text-xs text-muted-foreground">{record.type}</p>
+                        </div>
+                        <AttendanceTimesFields
+                          employeeName={record.employee_name}
+                          checkInAt={record.check_in_at}
+                          checkOutAt={record.check_out_at}
+                          timesUpdatedByName={record.times_updated_by_name}
+                          timesUpdatedAt={record.times_updated_at}
+                          disabled={isLocked || isSaving}
+                          settings={workHours ?? null}
+                          onSave={(times) => handleSaveTimes(record, times)}
+                        />
                       </div>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">

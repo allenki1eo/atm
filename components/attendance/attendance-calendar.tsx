@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, MessageSquareWarning, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, MessageSquareWarning, Clock, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,6 +10,7 @@ import { useAttendanceCalendar } from "@/hooks/use-attendance";
 import { cn } from "@/lib/utils";
 import { formatDays } from "@/lib/overtime";
 import { CorrectionRequestDialog } from "./correction-request-dialog";
+import { formatEatHourMinute } from "@/lib/attendance-times";
 
 const STATUS_COLORS = {
   present: "bg-green-500",
@@ -51,6 +52,14 @@ interface CorrectionRow {
   status: "pending" | "approved" | "denied";
 }
 
+interface CalendarRecord {
+  date: string;
+  status: string;
+  notes?: string;
+  check_in_at?: string | null;
+  check_out_at?: string | null;
+}
+
 export function AttendanceCalendar({ employeeId, allowCorrection = false }: AttendanceCalendarProps) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -84,7 +93,7 @@ export function AttendanceCalendar({ employeeId, allowCorrection = false }: Atte
   const daysInMonth = new Date(year, month, 0).getDate();
 
   const recordMap = new Map(
-    (data?.records ?? []).map((r: { date: string; status: string }) => [r.date, r])
+    (data?.records ?? []).map((r: CalendarRecord) => [r.date, r])
   );
 
   const overtimeMap = new Map(
@@ -101,8 +110,34 @@ export function AttendanceCalendar({ employeeId, allowCorrection = false }: Atte
     else setMonth(m => m + 1);
   };
 
-  const selectedRecord = selectedDate ? recordMap.get(selectedDate) : null;
+  const selectedRecord = selectedDate ? recordMap.get(selectedDate) as CalendarRecord | undefined : null;
   const selectedOvertime = selectedDate ? overtimeMap.get(selectedDate) : null;
+
+  const downloadMonthCsv = () => {
+    const rows = (data?.records ?? []) as CalendarRecord[];
+    const header = ["Date", "Status", "Check-in (EAT)", "Check-out (EAT)", "Notes"];
+    const escape = (value: string) => `"${value.replaceAll('"', '""')}"`;
+    const lines = [
+      header.join(","),
+      ...rows.map((r) =>
+        [
+          r.date,
+          r.status ?? "",
+          formatEatHourMinute(r.check_in_at) ?? "",
+          formatEatHourMinute(r.check_out_at) ?? "",
+          r.notes ?? "",
+        ].map((v) => escape(String(v))).join(",")
+      ),
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const stamp = `${year}-${String(month).padStart(2, "0")}`;
+    a.href = url;
+    a.download = `attendance-${employeeId}-${stamp}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   if (isLoading) {
     return <Skeleton className="h-64 w-full" />;
@@ -118,6 +153,12 @@ export function AttendanceCalendar({ employeeId, allowCorrection = false }: Atte
         <h3 className="font-semibold">{monthName}</h3>
         <Button variant="ghost" size="icon" onClick={nextMonth}>
           <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={downloadMonthCsv} disabled={!data?.records?.length}>
+          <Download className="h-4 w-4 mr-1.5" />
+          Download CSV
         </Button>
       </div>
 
@@ -253,20 +294,31 @@ export function AttendanceCalendar({ employeeId, allowCorrection = false }: Atte
             })}
           </p>
           {selectedRecord ? (
-            <div className="flex items-center gap-2">
-              <span
-                className={cn(
-                  "h-2 w-2 rounded-full",
-                  STATUS_COLORS[(selectedRecord as { status: string }).status as keyof typeof STATUS_COLORS]
+            <>
+              <div className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full",
+                    STATUS_COLORS[(selectedRecord as CalendarRecord).status as keyof typeof STATUS_COLORS]
+                  )}
+                />
+                <span className="text-sm">
+                  {STATUS_LABELS[(selectedRecord as CalendarRecord).status as keyof typeof STATUS_LABELS]}
+                </span>
+                {(selectedRecord as CalendarRecord).notes && (
+                  <span className="text-xs text-muted-foreground">— {(selectedRecord as CalendarRecord).notes}</span>
                 )}
-              />
-              <span className="text-sm">
-                {STATUS_LABELS[(selectedRecord as { status: string }).status as keyof typeof STATUS_LABELS]}
-              </span>
-              {(selectedRecord as { notes?: string }).notes && (
-                <span className="text-xs text-muted-foreground">— {(selectedRecord as { notes?: string }).notes}</span>
+              </div>
+              {((selectedRecord as CalendarRecord).check_in_at || (selectedRecord as CalendarRecord).check_out_at) && (
+                <p className="text-sm text-muted-foreground">
+                  Ingia: {formatEatHourMinute((selectedRecord as CalendarRecord).check_in_at) ?? "—"}
+                  {"  ·  "}
+                  Toka: {formatEatHourMinute((selectedRecord as CalendarRecord).check_out_at) ?? "—"}
+                  {" "}
+                  <span className="text-xs">(EAT)</span>
+                </p>
               )}
-            </div>
+            </>
           ) : (
             <p className="text-sm text-muted-foreground">No record for this day</p>
           )}

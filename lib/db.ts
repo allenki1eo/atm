@@ -227,9 +227,22 @@ export async function initializeDatabase() {
       marked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       notes TEXT,
       is_locked INTEGER DEFAULT 0,
+      check_in_at TEXT,
+      check_out_at TEXT,
+      times_updated_by TEXT,
+      times_updated_at DATETIME,
       UNIQUE(employee_id, date),
       FOREIGN KEY (employee_id) REFERENCES employees(id),
-      FOREIGN KEY (marked_by) REFERENCES users(id)
+      FOREIGN KEY (marked_by) REFERENCES users(id),
+      FOREIGN KEY (times_updated_by) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_by TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (updated_by) REFERENCES users(id)
     );
 
     CREATE TABLE IF NOT EXISTS transactions (
@@ -591,6 +604,31 @@ export async function migrateDatabase() {
   }
 
 
+  // Additive check-in / check-out columns. Existing rows stay NULL — never backfill times.
+  const attendanceTimeColumns = [
+    "ALTER TABLE attendance ADD COLUMN check_in_at TEXT",
+    "ALTER TABLE attendance ADD COLUMN check_out_at TEXT",
+    "ALTER TABLE attendance ADD COLUMN times_updated_by TEXT",
+    "ALTER TABLE attendance ADD COLUMN times_updated_at DATETIME",
+  ];
+  for (const sql of attendanceTimeColumns) {
+    try {
+      await db.execute(sql);
+    } catch {
+      // Duplicate column — already migrated.
+    }
+  }
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_by TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (updated_by) REFERENCES users(id)
+    )
+  `);
+
   // Allow attendance (and correction requests) to be marked as leave.
   // SQLite cannot alter a CHECK constraint in place, so rebuild when needed.
   await migrateAttendanceLeaveStatus();
@@ -643,12 +681,17 @@ async function migrateAttendanceLeaveStatus() {
       marked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       notes TEXT,
       is_locked INTEGER DEFAULT 0,
+      check_in_at TEXT,
+      check_out_at TEXT,
+      times_updated_by TEXT,
+      times_updated_at DATETIME,
       UNIQUE(employee_id, date),
       FOREIGN KEY (employee_id) REFERENCES employees(id),
-      FOREIGN KEY (marked_by) REFERENCES users(id)
+      FOREIGN KEY (marked_by) REFERENCES users(id),
+      FOREIGN KEY (times_updated_by) REFERENCES users(id)
     )`,
-    copySql: `INSERT INTO attendance_new (id, employee_id, date, status, marked_by, marked_at, notes, is_locked)
-      SELECT id, employee_id, date, status, marked_by, marked_at, notes, is_locked FROM attendance`,
+    copySql: `INSERT INTO attendance_new (id, employee_id, date, status, marked_by, marked_at, notes, is_locked, check_in_at, check_out_at, times_updated_by, times_updated_at)
+      SELECT id, employee_id, date, status, marked_by, marked_at, notes, is_locked, check_in_at, check_out_at, times_updated_by, times_updated_at FROM attendance`,
   });
 
   await rebuildTableIfCheckMissing({
